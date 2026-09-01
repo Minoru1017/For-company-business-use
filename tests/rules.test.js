@@ -14,6 +14,8 @@ describe('rules analysis', () => {
     expect(result.good.length + result.bad.length + result.sug.length).toBeGreaterThan(0);
     expect(result.reportText).toContain('電訪分析報告');
     expect(result.stats.sQuestions).toBeGreaterThanOrEqual(1);
+    expect(result.manualChecks.discovery).toBeTruthy();
+    expect(result.manualChecks.amplification).toBeTruthy();
   });
 
   it('escapes transcript text in converge hint', () => {

@@ -1,3 +1,4 @@
+import { buildLayerHits, evaluateManualRules } from './manual-check.js';
 import { RULES } from './rules.js';
 import { isQuestion } from './speaker.js';
 import { escapeHTML, fmt } from './utils.js';
@@ -100,7 +101,7 @@ export function runAnalysis(segs) {
     }
   }
 
-  const layerHits = RULES.layers.map((L) => ({ ...L, hit: S.find((s) => L.re.test(s.text)) || null }));
+  const layerHits = buildLayerHits(segs);
   const deepest = layerHits.filter((L) => L.hit).length ? Math.max(...layerHits.filter((L) => L.hit).map((L) => L.n)) : 0;
   const convergeSeg = S.find((s) => RULES.converge.test(s.text));
   const convergeHint = convergeSeg
@@ -152,8 +153,10 @@ export function runAnalysis(segs) {
     fiveMiss.forEach((F) => sug.push(`${F.sug.split('：')[0]}：<span class="q">${F.sug.split('：')[1]}</span>`));
   }
 
+  const manualChecks = evaluateManualRules(segs, { layerHits, convergeSeg, sQuestions });
+
   const strip = (h) => h.replace(/<[^>]+>/g, '');
-  const reportText = `【電訪分析報告】\n通話長度 ${fmt(totalDur)}｜客戶說話比例 ${Math.round(custRatio * 100)}%｜業務提問 ${sQuestions.length} 句\n六步驟：${RULES.steps.map((st) => `${st.name}${stepHit[st.key] ? '[●]' : '[○]'}`).join(' ')}\n五層挖掘：最深到 L${deepest}｜收斂驗證${convergeSeg ? '[●]' : '[○]'}\n\n[WELL DONE] 做得好\n${good.map((g) => `・${strip(g)}`).join('\n')}\n\n[IMPROVE] 待加強\n${bad.map((b) => `・${strip(b)}`).join('\n')}\n\n[SCRIPTS] 建議怎麼聊\n${sug.map((s) => `・${strip(s)}`).join('\n')}`;
+  const reportText = `【電訪分析報告】\n通話長度 ${fmt(totalDur)}｜客戶說話比例 ${Math.round(custRatio * 100)}%｜業務提問 ${sQuestions.length} 句\n六步驟：${RULES.steps.map((st) => `${st.name}${stepHit[st.key] ? '[●]' : '[○]'}`).join(' ')}\n五層挖掘：最深到 L${deepest}｜收斂驗證${convergeSeg ? '[●]' : '[○]'}\n手冊檢核：挖掘[${manualChecks.discovery.statusLabel}]｜強化[${manualChecks.amplification.statusLabel}]\n\n[WELL DONE] 做得好\n${good.map((g) => `・${strip(g)}`).join('\n')}\n\n[IMPROVE] 待加強\n${bad.map((b) => `・${strip(b)}`).join('\n')}\n\n[SCRIPTS] 建議怎麼聊\n${sug.map((s) => `・${strip(s)}`).join('\n')}`;
 
   return {
     stats: { totalDur, custRatio, sQuestions: sQuestions.length, sCount: S.length, cCount: C.length, avgCustChars: C.length ? cChars / C.length : 0 },
@@ -161,6 +164,7 @@ export function runAnalysis(segs) {
     layerHits,
     deepest,
     convergeHint,
+    manualChecks,
     good,
     bad,
     sug,
