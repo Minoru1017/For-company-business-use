@@ -13,6 +13,16 @@ npm test         # 執行 Vitest 測試
 
 建置完成後，用 Chrome / Edge 開啟 `dist/index.html`（或執行 `npm run preview`）。
 
+## 分享給別人（最快方式）
+
+合併到 `main` 後，GitHub Actions 會自動部署，分享這個網址即可：
+
+**https://minoru1017.github.io/For-company-business-use/**
+
+首次使用請到 GitHub repo → **Settings → Pages → Build and deployment → Source** 選 **GitHub Actions**。
+
+之後每次推送到 `main`，網站會自動更新（約 1–2 分鐘）。
+
 > 舊版單檔 `sales-call-coach.html` 仍保留作參考，請改用本專案結構。
 
 ## 功能
