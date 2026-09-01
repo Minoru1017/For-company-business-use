@@ -17,30 +17,58 @@
 ## 二、Vibe 專案設定
 
 - [ ] 已建立對應通話專案，音檔完整上傳且轉錄完成
-- [ ] 若 Vibe 支援**說話者分離／Speaker diarization**，請開啟
+- [ ] 在 Vibe 設定檔開啟說話者辨識（建議）  
+  路徑（Windows）：`%APPDATA%\github.com.thewh1teagle.vibe\app_config.json`  
+  設定項：`"transcription.recognizeSpeakers": true`
+- [ ] 轉錄語言設為**繁體中文**（`transcription.modelOptions.lang` 等）
 - [ ] 若有手動指定說話者，確認：
   - **Speaker 0（或第一軌）＝ 業務**
   - **Speaker 1（或第二軌）＝ 客戶**
-- [ ] 轉錄語言設為**繁體中文**（或實際通話語言）
 - [ ] 檢查 Vibe 預覽：問候、自我介紹是否在業務軌；客戶回答是否在客戶軌
 
 > **Call Coach 對應規則**  
-> 匯出內容若含 `Speaker 0:` → 自動標為**業務**；`Speaker 1:`（及其他編號）→ 自動標為**客戶**。
+> `speaker: 0` 或 `Speaker 0:` → **業務**；`speaker: 1` 或 `Speaker 1:` → **客戶**。
+
+### Vibe 逐字稿存放位置（Windows 範例）
+
+```
+C:\Users\<使用者>\Documents\Vibe\
+├── 通話名稱-20260901-153000\
+│   ├── transcript.vibe.json   ← 專案資料夾（新格式，推薦）
+│   └── audio.mp3
+└── 通話名稱-20260901-120000.vibe.json   ← 舊格式扁平檔
+```
+
+**最省事做法**：直接上傳 `transcript.vibe.json` 到 Call Coach，不必再匯出 SRT。
 
 ---
 
-## 三、匯出格式（優先順序）
+## 三、匯出／匯入格式（優先順序）
 
 | 優先 | 格式 | 說明 |
 |------|------|------|
-| ★★★ | **SRT** | 含時間戳＋常見 Speaker 標籤，Call Coach 解析最穩 |
+| ★★★ | **transcript.vibe.json** | Vibe 原生格式，含 `segments[].speaker`（毫秒時間戳），**說話者最準** |
+| ★★☆ | **SRT** | 含時間戳＋Speaker 標籤，通用性高 |
 | ★★☆ | **VTT** | 同上，請確認時間格式為 `hh:mm:ss.mmm` |
 | ★☆☆ | **TXT（含時間戳）** | 可用，但時間精度較粗，Speaker 標籤需手動確認 |
 
-- [ ] 優先匯出 **SRT** 或 **VTT**
+- [ ] **優先直接上傳** `transcript.vibe.json`（開啟 `recognizeSpeakers` 後）
+- [ ] 若需給沒有 Vibe 的人，再匯出 **SRT** 或 **VTT**
 - [ ] 編碼選 **UTF-8**（避免中文亂碼）
-- [ ] 匯出時勾選**保留說話者／Speaker 標籤**（若 Vibe 有此選項）
-- [ ] 不要匯出「純文字、無時間戳」版本作為主要檔案
+- [ ] 匯出時勾選**保留說話者／Speaker 標籤**（若匯出 SRT/VTT）
+
+### Vibe API（進階，通常不必用）
+
+Vibe 本機轉錄 API（Sona）預設**關閉**，且每次啟動 port 會變。  
+**Call Coach 不需要呼叫 API**——讀取已存好的 `transcript.vibe.json` 即可。
+
+僅在「要當場轉錄新音檔」時才需要 API：
+
+1. Vibe → Settings → **API & Agents** 開啟
+2. `GET <baseUrl>/health` 確認服務正常
+3. 轉錄完成後，到 `Documents\Vibe\` 取 `transcript.vibe.json` 上傳 Call Coach
+
+無 API 時也可用 Vibe 內建 `sona.exe transcribe` 離線轉錄，結果同樣存成 `.vibe.json`。
 
 ### Call Coach 可辨識的 Speaker 格式
 
@@ -98,13 +126,10 @@ Speaker 1: 可以。
 
 ```
 錄音（雙軌優先）
-  → Vibe 轉錄＋開啟說話者分離
-  → 確認 Speaker 0＝業務、1＝客戶
-  → 匯出 SRT（UTF-8）
-  → 本清單第四節自檢
-  → 上傳 Call Coach
-  → Tab 快速修正
-  → 開始分析
+  → Vibe 轉錄（recognizeSpeakers: true）
+  → 確認 speaker 0＝業務、1＝客戶
+  → 直接上傳 transcript.vibe.json 到 Call Coach
+  → Tab 快速修正 → 開始分析
 ```
 
 ---

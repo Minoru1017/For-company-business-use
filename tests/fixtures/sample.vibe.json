@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "name": "sales-call-sample",
+  "language": "chinese",
+  "segments": [
+    { "start": 5000, "stop": 12000, "text": "您好，請問是王先生嗎？我是顧問。", "speaker": 0 },
+    { "start": 12000, "stop": 18000, "text": "對，我是。", "speaker": 1 },
+    { "start": 18000, "stop": 25000, "text": "方便聊幾分鐘嗎？想了解一下您的狀況。", "speaker": 0 }
+  ]
+}

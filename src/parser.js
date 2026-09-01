@@ -1,5 +1,24 @@
 import { countChars, tsToSec } from './utils.js';
 
+export function parseVibeJson(raw) {
+  const data = typeof raw === 'string' ? JSON.parse(raw) : raw;
+  if (!data || !Array.isArray(data.segments)) return [];
+  return data.segments
+    .filter((s) => s && String(s.text || '').trim())
+    .map((s) => {
+      const seg = {
+        start: (s.start ?? 0) / 1000,
+        end: (s.stop ?? s.end ?? s.start ?? 0) / 1000,
+        text: String(s.text).trim(),
+      };
+      if (s.speaker != null && s.speaker !== '') {
+        seg.spk = Number(s.speaker) === 0 ? 'S' : 'C';
+        seg.labeled = true;
+      }
+      return seg;
+    });
+}
+
 export function parse(text) {
   const out = [];
   const re =

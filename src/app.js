@@ -11,7 +11,7 @@ import {
   mergeAIResults,
 } from './gemini.js';
 import { bindLabelCollapseHandlers, createLabelController } from './labels.js';
-import { applyBuiltinSpeakerLabels, enrichSegments, parse } from './parser.js';
+import { applyBuiltinSpeakerLabels, enrichSegments, parse, parseVibeJson } from './parser.js';
 import { bumpUsage, checkQuotaBefore, getLimit, getUsage, quotaPercent, saveUsage } from './quota.js';
 import { autoGuess } from './speaker.js';
 import { animateStats, bindUI, renderAnalysisUI, showQuotaModal, showToast } from './ui.js';
@@ -70,16 +70,29 @@ function bindUpload() {
 
 function loadFile(f) {
   const r = new FileReader();
+  const isVibe = /\.vibe\.json$/i.test(f.name);
   r.onload = () => {
-    segs = parse(r.result);
-    if (!segs.length) {
-      $('fname').textContent = '無法解析，請用 Vibe 匯出的 SRT/VTT 或含 [mm:ss] 的 TXT';
+    try {
+      if (isVibe) {
+        segs = parseVibeJson(r.result);
+      } else {
+        segs = parse(r.result);
+        applyBuiltinSpeakerLabels(segs);
+      }
+    } catch {
+      $('fname').textContent = isVibe
+        ? '無法解析 Vibe 檔案，請確認是 transcript.vibe.json'
+        : '無法解析，請用 Vibe 的 .vibe.json、SRT/VTT 或含 [mm:ss] 的 TXT';
       return;
     }
-    applyBuiltinSpeakerLabels(segs);
+    if (!segs.length) {
+      $('fname').textContent = '無法解析，請用 Vibe 的 .vibe.json、SRT/VTT 或含 [mm:ss] 的 TXT';
+      return;
+    }
     if (!segs.some((s) => s.labeled)) autoGuess(segs);
     enrichSegments(segs);
-    $('fname').textContent = `已載入（${segs.length} 句）`;
+    const src = isVibe ? 'Vibe' : '逐字稿';
+    $('fname').textContent = `已載入（${segs.length} 句，來源：${src}）`;
     labelCtrl = createLabelController({ segs, onToast: showToast });
     labelCtrl.resetFocus();
     labelCtrl.renderLabels();
