@@ -123,6 +123,16 @@ button:disabled { opacity:.4; cursor:not-allowed; }
 
 .chart-box { position:relative; height:300px; }
 
+.key-moments-legend { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; min-height:1.5em; }
+.key-moment { display:inline-flex; align-items:center; gap:6px; padding:6px 10px; border-radius:8px;
+              border:1px solid rgba(255,210,80,.35); background:rgba(255,210,80,.08); color:var(--text);
+              font-size:.75rem; cursor:pointer; font-family:var(--sans); }
+.key-moment:hover { border-color:rgba(255,210,80,.7); background:rgba(255,210,80,.14); }
+.key-time { font-family:var(--mono); color:var(--warn); font-size:.68rem; }
+.key-label { font-weight:600; }
+.key-meta { color:var(--muted); font-size:.68rem; }
+.key-empty { font-size:.78rem; color:var(--muted); }
+
 .paper { background:var(--paper); color:var(--ink); border-radius:14px;
          padding:22px; margin-bottom:14px; }
 .paper h2 { color:var(--ink); display:flex; align-items:center; gap:10px; }
