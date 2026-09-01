@@ -28,6 +28,33 @@ describe('parser', () => {
     expect(segs[0].text).toContain('王先生');
   });
 
+  it('parses multiline Vibe SRT (speaker on own line, 1-based)', () => {
+    const text = readFileSync(join(fixtures, 'vibe-multiline.srt'), 'utf8');
+    const segs = parse(text);
+    expect(segs).toHaveLength(2);
+    expect(segs[0].spk).toBe('S');
+    expect(segs[1].spk).toBe('C');
+    expect(segs[0].text).toBe('您好，請問是王先生嗎？');
+    expect(segs[0].labeled).toBe(true);
+  });
+
+  it('parses 發言者 format in SRT', () => {
+    const text = readFileSync(join(fixtures, 'vibe-fayan.srt'), 'utf8');
+    const segs = parse(text);
+    expect(segs).toHaveLength(2);
+    expect(segs[0].spk).toBe('S');
+    expect(segs[1].spk).toBe('C');
+    expect(segs[0].text).toContain('王先生');
+  });
+
+  it('maps Vibe JSON speaker 1/2 to S/C by lowest id', () => {
+    const raw = readFileSync(join(fixtures, 'sample.vibe.json'), 'utf8');
+    const segs = parseVibeJson(raw);
+    expect(segs[0].spk).toBe('S');
+    expect(segs[1].spk).toBe('C');
+    expect(segs[2].spk).toBe('S');
+  });
+
   it('parses VTT timestamps', () => {
     const text = readFileSync(join(fixtures, 'sample.vtt'), 'utf8');
     const segs = parse(text);
