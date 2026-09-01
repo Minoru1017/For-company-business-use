@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' https://fonts.googleapis.com 'unsafe-inline'; font-src https://fonts.gstatic.com; connect-src 'self' https://generativelanguage.googleapis.com ws: wss:; img-src 'self' data:;">
+  <title>CALL COACH｜顧問式銷售電訪分析</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=JetBrains+Mono:wght@400;600&family=Noto+Sans+TC:wght@400;500;700;900&family=Noto+Serif+TC:wght@600;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/src/styles.css">
+</head>
+<body>
+<div class="side-label l">SALES CALL ANALYSIS — CONSULTATIVE SELLING</div>
+<div class="side-label r">FOCUS MODE / LOCAL PROCESSING</div>
+<div class="wrap">
+  <header class="hero">
+    <div class="hero-meta">
+      <span class="pill red">●●● CALL COACH</span>
+      <span class="pill">顧問式銷售 6 步驟</span>
+      <span class="pill">理解需求 → 判斷適配 → 幫助決策</span>
+    </div>
+    <h1 class="display">CALL<br><span class="ghost">COACH</span></h1>
+    <p class="tagline">電訪逐字稿分析工具——把每一通電話變成可複盤的專業判斷。<br>
+    <span>VIBE SRT / VTT / TXT ・ 規則分析全程本地 ・ 僅 AI 功能會傳送至 Google</span></p>
+  </header>
+
+  <section class="sec">
+    <div class="sec-head"><span class="num">01</span><h2>上傳逐字稿</h2><span class="tag">Upload / SRT・VTT・TXT</span></div>
+    <div id="drop">點擊選擇 或 拖曳逐字稿檔到這裡<br><span class="mono-hint" style="font-family:var(--mono);font-size:.7rem;letter-spacing:.15em;color:#555">DRAG &amp; DROP — LOCAL ONLY</span><div id="fname"></div></div>
+    <input type="file" id="file" accept=".srt,.vtt,.txt,text/plain" hidden>
+  </section>
+
+  <section class="sec" id="labelCard" hidden>
+    <div class="sec-head"><span class="num">02</span><h2>標記說話者</h2><span class="tag">Speaker Tagging</span></div>
+    <div class="hint" style="margin:0 0 12px">點選句子聚焦後，按 <kbd style="font-family:var(--mono);padding:2px 6px;border:1px solid #444;border-radius:4px;font-size:.75rem">Tab</kbd> 切換「業務／客戶」，<kbd style="font-family:var(--mono);padding:2px 6px;border:1px solid #444;border-radius:4px;font-size:.75rem">↑↓</kbd> 移動，點空白處收起。</div>
+    <div class="row">
+      <button id="autoGuess" type="button">AUTO — 自動猜測</button>
+      <button id="flipAll" type="button">全部互換</button>
+      <button class="primary" id="analyze" type="button">開始分析 →</button>
+    </div>
+    <div id="labelList" role="list"></div>
+    <div class="hint">「自動猜測」僅供參考，請逐句用 Tab 確認。標記越準，分析越可信。</div>
+  </section>
+
+  <div id="result" hidden>
+    <section class="sec">
+      <div class="sec-head"><span class="num">03</span><h2>通話總覽</h2><span class="tag">Overview</span></div>
+      <div class="stats" id="stats"></div>
+    </section>
+
+    <section class="sec">
+      <div class="sec-head"><span class="num">04</span><h2>六步驟覆蓋</h2><span class="tag">Connect→Discovery→Clarify→Diagnose→Recommend→Decision</span></div>
+      <div class="steps" id="stepBoxes"></div>
+      <div class="hint">依關鍵語句偵測每一步是否出現。流程<b style="color:var(--warn)">不是鐵軌，是地圖</b>——但「判斷 Diagnose（適配 A/B/C）」是顧問核心價值。</div>
+    </section>
+
+    <section class="sec">
+      <div class="sec-head"><span class="num">05</span><h2>五層資訊檢核</h2><span class="tag">現況→問題→影響→動機→未來</span></div>
+      <div class="layers" id="layerBoxes"></div>
+      <div class="hint" id="convergeHint"></div>
+    </section>
+
+    <section class="sec">
+      <div class="sec-head"><span class="num">06</span><h2>對話節奏圖</h2><span class="tag">白=業務 ・ 紅=客戶 ・ 點擊看原句</span></div>
+      <div class="card">
+        <div class="chart-box"><canvas id="chart"></canvas></div>
+        <div id="clicked" style="margin-top:8px;font-size:.88rem;color:var(--warn);min-height:1.2em"></div>
+      </div>
+    </section>
+
+    <div class="sec-head"><span class="num">07</span><h2>分析報告</h2><span class="tag">Report</span></div>
+    <div class="report-shell">
+      <nav class="rnav">
+        <button class="rtab active" data-pane="good" type="button">Well Done<span class="cnt" id="cntGood">0</span></button>
+        <button class="rtab" data-pane="bad" type="button">Improve<span class="cnt" id="cntBad">0</span></button>
+        <button class="rtab" data-pane="sug" type="button">Scripts<span class="cnt" id="cntSug">0</span></button>
+      </nav>
+      <div class="rbody">
+        <aside class="rpager" id="rpager">
+          <span class="pnum active" data-pane="good">01</span>
+          <span class="pnum" data-pane="bad">02</span>
+          <span class="pnum" data-pane="sug">03</span>
+        </aside>
+        <div class="rpanes">
+          <div class="rpane active" data-pane="good">
+            <div class="rpane-title">做得好的部份<span class="en">Well Done</span></div>
+            <ul class="report" id="goodList"></ul>
+          </div>
+          <div class="rpane" data-pane="bad">
+            <div class="rpane-title">待加強的部份<span class="en">Improve</span></div>
+            <ul class="report" id="badList"></ul>
+          </div>
+          <div class="rpane" data-pane="sug">
+            <div class="rpane-title">建議怎麼聊<span class="en">Scripts</span></div>
+            <ul class="report" id="sugList"></ul>
+          </div>
+        </div>
+      </div>
+      <div class="rfoot">
+        <button class="rnav-btn" id="rPrev" type="button">◀ PREV</button>
+        <span class="mono-dim">點擊列可展開原句證據 ・ ←→ 鍵切換分頁</span>
+        <button class="rnav-btn" id="rNext" type="button">NEXT ▶</button>
+      </div>
+    </div>
+
+    <section class="sec">
+      <div class="sec-head"><span class="num">08</span><h2>Demo 後 6 個復盤問題</h2><span class="tag">30-Sec Self Review</span></div>
+      <ul class="faq">
+        <li><span class="idx">Q1</span>客戶原本以為自己的問題是什麼？<span class="tick">✓</span></li>
+        <li><span class="idx">Q2</span>你最後判斷真正問題是什麼？證據呢？<span class="tick">✓</span></li>
+        <li><span class="idx">Q3</span>客戶真正想改變的是什麼？<span class="tick">✓</span></li>
+        <li><span class="idx">Q4</span>你今天做的判斷是：適合／部分適合／不適合？<span class="tick">✓</span></li>
+        <li><span class="idx">Q5</span>你推薦這個方案的核心理由是什麼？<span class="tick">✓</span></li>
+        <li><span class="idx">Q6</span>沒成交的話——是客戶不適合、疑慮沒解決，還是你沒把價值講清楚？<span class="tick">✓</span></li>
+      </ul>
+    </section>
+
+    <section class="sec">
+      <div class="sec-head"><span class="num">09</span><h2>AI 深度分析</h2><span class="tag">Optional / Gemini API</span></div>
+      <div class="card">
+        <div class="row">
+          <input type="password" id="apiKey" class="field" placeholder="貼上 Gemini API Key" style="flex:1;min-width:240px" autocomplete="off">
+          <input id="aiModel" class="field" list="modelList" value="gemini-2.0-flash" style="width:190px">
+          <datalist id="modelList"></datalist>
+          <button id="verifyModel" type="button">驗證模型</button>
+          <button class="primary" id="aiBtn" type="button">AI 深度分析</button>
+          <button id="aiCancel" type="button" hidden>取消</button>
+        </div>
+        <div class="row" style="margin-top:10px;font-size:.82rem">
+          <label><input type="checkbox" id="rememberKey" checked> 記住 API Key（存在本機瀏覽器）</label>
+          <label style="margin-left:16px"><input type="checkbox" id="aiConsent"> 我已去識別化並同意傳送至 Google 分析</label>
+        </div>
+        <div class="hint">敏感通話請先去識別化。取消勾選「記住 API Key」時，Key 僅保留在目前分頁（關閉即清除）。免費申請：aistudio.google.com/apikey</div>
+        <div class="quota-box">
+          <div class="row" style="justify-content:space-between;font-size:.85rem">
+            <span class="mono">USAGE TODAY：<b id="quotaText">0</b> / <input type="number" id="quotaLimit" value="250" min="10"> 次</span>
+            <span id="quotaEst" class="mono" style="color:var(--muted)"></span>
+          </div>
+          <div id="quotaBarTrack"><div id="quotaBar"></div></div>
+        </div>
+        <div id="aiProgress" class="ai-progress" hidden>
+          <div id="aiProgressText" class="hint" style="margin:8px 0 4px"></div>
+          <div id="quotaBarTrack"><div id="aiProgressBar"></div></div>
+        </div>
+        <div id="aiStatus" style="margin-top:8px;font-size:.88rem;color:var(--warn);min-height:1.2em"></div>
+        <div id="aiOut" hidden>
+          <h2 style="margin-top:16px">AI 判讀 — 做得好</h2><ul class="report" id="aiGood"></ul>
+          <h2 style="margin-top:16px">AI 判讀 — 待加強</h2><ul class="report" id="aiBad"></ul>
+          <h2 style="margin-top:16px">AI 判讀 — 建議怎麼聊</h2><ul class="report" id="aiSug"></ul>
+        </div>
+      </div>
+    </section>
+
+    <div class="btns" style="margin-bottom:6px"><button class="primary" id="copyReport" type="button">複製完整報告（文字版）</button></div>
+    <div class="footer">
+      <span class="mono">CALL COACH — CONSULTATIVE SALES ANALYZER</span>
+      <div class="barcode"></div>
+      <span class="mono">VITE BUILD / VER 11</span>
+    </div>
+  </div>
+</div>
+
+<div id="toast"><span class="dot"></span><span id="toastMsg"></span></div>
+<div id="quotaModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:99;align-items:center;justify-content:center;padding:20px">
+  <div style="background:var(--panel);border:1px solid var(--warn);border-radius:14px;max-width:440px;padding:24px">
+    <h2 id="qmTitle" style="color:var(--warn)">免費額度即將用完</h2>
+    <p id="qmBody" style="font-size:.92rem;line-height:1.7;margin:10px 0 16px"></p>
+    <div class="btns">
+      <button class="primary" type="button" data-open="https://aistudio.google.com/usage">查看官方用量</button>
+      <button type="button" data-open="https://ai.google.dev/pricing">升級付費方案</button>
+      <button type="button" id="quotaModalClose">知道了</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js" integrity="sha384-JUh163oCRItcbPme8pYnROHQMC6fNKTBWtRG3I3I0erJkzNgL7uxKlNwcrcFKeqF" crossorigin="anonymous"></script>
+<script type="module" src="/src/app.js"></script>
+</body>
+</html>
