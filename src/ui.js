@@ -32,7 +32,7 @@ export function updateReportCounts() {
 }
 
 export function renderAnalysisUI(result) {
-  const { stats, stepHit, layerHits, convergeHint, good, bad, sug } = result;
+  const { stats, stepHit, layerHits, convergeHint, manualChecks, good, bad, sug } = result;
   const ratioColor = stats.custRatio >= 0.45 ? 'var(--ok)' : stats.custRatio >= 0.3 ? 'var(--warn)' : 'var(--bad)';
 
   $('stats').innerHTML = `<div class="stat"><div class="num">${fmt(stats.totalDur)}</div><div class="lbl">通話長度</div></div>
@@ -51,7 +51,30 @@ export function renderAnalysisUI(result) {
     .join('');
 
   $('layerBoxes').innerHTML = layerHits
-    .map((L) => `<div class="layer ${L.hit ? 'hit' : 'miss'}">${L.name}<br>${L.hit ? '<span class="mk on">●</span>' : '<span class="mk off">○</span>'}</div>`)
+    .map((L) => {
+      const sub = L.manualName ? `<div style="font-size:.68rem;color:var(--muted)">${L.manualName}</div>` : '';
+      return `<div class="layer ${L.hit ? 'hit' : 'miss'}">${L.name}${sub}<br>${L.hit ? '<span class="mk on">●</span>' : '<span class="mk off">○</span>'}</div>`;
+    })
+    .join('');
+
+  $('manualChecks').innerHTML = ['discovery', 'amplification']
+    .map((key) => {
+      const block = manualChecks[key];
+      const criteria = block.criteria
+        .map(
+          (c) =>
+            `<li><span class="mk ${c.pass ? 'on' : 'off'}">${c.pass ? '●' : '○'}</span><span>${c.label}${c.hint && !c.pass ? `<div style="color:var(--muted);font-size:.72rem;margin-top:2px">${c.hint}</div>` : ''}</span></li>`
+        )
+        .join('');
+      return `<article class="rule-card ${block.status}">
+        <div class="rule-card-head">
+          <div><h3>${block.title}</h3><p>${block.subtitle}</p></div>
+          <span class="rule-verdict ${block.status}">${block.statusLabel}</span>
+        </div>
+        <ul class="rule-criteria">${criteria}</ul>
+        <div class="rule-summary">${block.summary}</div>
+      </article>`;
+    })
     .join('');
 
   $('convergeHint').innerHTML = convergeHint;
