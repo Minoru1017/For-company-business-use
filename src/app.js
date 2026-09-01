@@ -124,7 +124,7 @@ function bindLabels() {
     const result = runAnalysis(segs);
     reportText = result.reportText;
     renderAnalysisUI(result);
-    drawChart(segs);
+    drawChart(segs, result.keyMoments);
     $('result').hidden = false;
     showToast('分析完成');
     window.scrollTo({ top: $('result').offsetTop - 10, behavior: 'smooth' });
