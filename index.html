@@ -120,8 +120,12 @@
       <div class="card">
         <div class="row">
           <input type="password" id="apiKey" class="field" placeholder="貼上 Gemini API Key" style="flex:1;min-width:240px" autocomplete="off">
-          <input id="aiModel" class="field" list="modelList" value="gemini-2.0-flash" style="width:190px">
-          <datalist id="modelList"></datalist>
+          <input id="aiModel" class="field" list="modelList" value="gemini-3.6-flash" style="width:190px">
+          <datalist id="modelList">
+            <option value="gemini-3.6-flash">
+            <option value="gemini-3.6-flash-lite">
+            <option value="gemini-3.6-pro">
+          </datalist>
           <button id="verifyModel" type="button">驗證模型</button>
           <button class="primary" id="aiBtn" type="button">AI 深度分析</button>
           <button id="aiCancel" type="button" hidden>取消</button>
