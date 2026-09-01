@@ -5,10 +5,13 @@ import {
   callGemini,
   chunkTranscript,
   DEFAULT_MODEL,
+  extractSuggestedModel,
   FALLBACK_MODELS,
+  isDeprecatedModel,
   listGeminiModels,
   MANUAL_PROMPT,
   mergeAIResults,
+  pickPreferredModel,
 } from './gemini.js';
 import { bindLabelCollapseHandlers, createLabelController } from './labels.js';
 import { applyBuiltinSpeakerLabels, enrichSegments, parse, parseVibeJson } from './parser.js';
@@ -135,11 +138,40 @@ function bindCopyReport() {
   };
 }
 
+function loadModelPreference() {
+  const saved = localStorage.getItem('gemini_model');
+  if (saved && isDeprecatedModel(saved)) {
+    localStorage.removeItem('gemini_model');
+    $('aiModel').value = DEFAULT_MODEL;
+    return DEFAULT_MODEL;
+  }
+  $('aiModel').value = saved || DEFAULT_MODEL;
+  return $('aiModel').value;
+}
+
+function saveModelPreference(model) {
+  $('aiModel').value = model;
+  localStorage.setItem('gemini_model', model);
+}
+
+async function callGeminiResilient({ apiKey, model, text, signal }) {
+  try {
+    return await callGemini({ apiKey, model, text, signal });
+  } catch (e) {
+    if (e.status !== 404) throw e;
+    const suggested = extractSuggestedModel(e.message);
+    const next = suggested && suggested !== model ? suggested : DEFAULT_MODEL;
+    if (next === model) throw e;
+    saveModelPreference(next);
+    showToast(`模型已切換為 ${next}，重新請求中…`);
+    return callGemini({ apiKey, model: next, text, signal });
+  }
+}
+
 function bindApiKey() {
   $('rememberKey').checked = keyStorage.remember;
   $('apiKey').value = keyStorage.load();
-  if (localStorage.getItem('gemini_model')) $('aiModel').value = localStorage.getItem('gemini_model');
-  else $('aiModel').value = DEFAULT_MODEL;
+  loadModelPreference();
 
   $('rememberKey').onchange = () => {
     localStorage.setItem('gemini_remember_key', $('rememberKey').checked ? '1' : '0');
@@ -177,9 +209,9 @@ function bindApiKey() {
         list.appendChild(opt);
       });
       const current = $('aiModel').value.trim();
-      if (!models.includes(current)) {
-        const pick = flash[0] || models[0] || DEFAULT_MODEL;
-        $('aiModel').value = pick;
+      const pick = pickPreferredModel(models, current);
+      if (pick !== current) {
+        saveModelPreference(pick);
         $('aiStatus').textContent = `模型「${current}」不可用，已改為 ${pick}。共找到 ${models.length} 個模型。`;
       } else {
         $('aiStatus').textContent = `模型驗證成功：${current} 可用（共 ${models.length} 個模型）。`;
@@ -252,8 +284,9 @@ async function runAIAnalysis() {
 
   const transcript = buildTranscript(segs, fmt);
   const chunks = chunkTranscript(transcript);
-  const model = $('aiModel').value.trim() || DEFAULT_MODEL;
-  localStorage.setItem('gemini_model', model);
+  let model = $('aiModel').value.trim() || DEFAULT_MODEL;
+  if (isDeprecatedModel(model)) model = DEFAULT_MODEL;
+  saveModelPreference(model);
 
   aiAbort = new AbortController();
   $('aiBtn').disabled = true;
@@ -267,7 +300,7 @@ async function runAIAnalysis() {
       if (aiAbort.signal.aborted) throw new Error('已取消分析');
       const prefix = chunks.length > 1 ? `【第 ${i + 1}/${chunks.length} 段逐字稿】\n` : '';
       setAIProgress(i, chunks.length, `AI 分析中：第 ${i + 1} / ${chunks.length} 段…`);
-      const { parsed, usedTokens } = await callGemini({
+      const { parsed, usedTokens } = await callGeminiResilient({
         apiKey: key,
         model,
         text: MANUAL_PROMPT + prefix + chunks[i],

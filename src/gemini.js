@@ -1,5 +1,32 @@
-export const DEFAULT_MODEL = 'gemini-2.0-flash';
-export const FALLBACK_MODELS = ['gemini-2.0-flash', 'gemini-2.0-flash-lite', 'gemini-1.5-flash', 'gemini-1.5-pro'];
+export const DEFAULT_MODEL = 'gemini-3.6-flash';
+export const FALLBACK_MODELS = ['gemini-3.6-flash', 'gemini-3.6-flash-lite', 'gemini-3.6-pro'];
+
+/** Models Google has deprecated for new users (prefix match). */
+const DEPRECATED_PREFIXES = ['gemini-1.5-', 'gemini-2.0-', 'gemini-2.5-'];
+
+export function isDeprecatedModel(model) {
+  const m = String(model || '').trim().toLowerCase();
+  return DEPRECATED_PREFIXES.some((p) => m.startsWith(p));
+}
+
+/** Pick best available model; prefer 3.6 flash, then any flash, then default. */
+export function pickPreferredModel(models, current) {
+  const list = models || [];
+  if (current && list.includes(current) && !isDeprecatedModel(current)) return current;
+  const prefer = [DEFAULT_MODEL, 'gemini-3.6-flash-lite', 'gemini-3.6-pro', ...FALLBACK_MODELS];
+  for (const p of prefer) {
+    if (list.includes(p)) return p;
+  }
+  const flash = list.find((m) => /flash/i.test(m) && !isDeprecatedModel(m));
+  if (flash) return flash;
+  return list.find((m) => !isDeprecatedModel(m)) || DEFAULT_MODEL;
+}
+
+/** Parse Google error text e.g. "use models/gemini-3.6-flash" */
+export function extractSuggestedModel(message) {
+  const m = String(message || '').match(/models\/(gemini-[\w.-]+)/i);
+  return m ? m[1] : null;
+}
 
 export const MANUAL_PROMPT = `你是電話業務教練，依據以下公司「顧問式銷售全流程」手冊，分析這通電訪逐字稿。核心理念：理解需求→判斷適配→幫助決策。我們賣的不是方案，而是「真正適合客戶的解決方案」。
 
@@ -80,7 +107,12 @@ export function formatApiError(status, errBody) {
   const msg = errBody?.error?.message || `HTTP ${status}`;
   if (status === 401) return `API Key 無效或未授權（401）：${msg}`;
   if (status === 403) return `API Key 沒有權限使用此模型（403）：${msg}`;
-  if (status === 404) return `模型不存在或 API 路徑錯誤（404）：${msg}。請按「驗證模型」確認可用清單。`;
+  if (status === 404) {
+    const hint = extractSuggestedModel(msg);
+    return hint
+      ? `模型不可用（404）：${msg}。已建議改用 ${hint}，請按「驗證模型」或重新分析。`
+      : `模型不存在或 API 路徑錯誤（404）：${msg}。請按「驗證模型」確認可用清單。`;
+  }
   if (status === 429) return `官方額度已用完或請求過於頻繁（429）：${msg}`;
   if (status >= 500) return `Google 服務暫時異常（${status}）：${msg}。請稍後重試。`;
   return msg;

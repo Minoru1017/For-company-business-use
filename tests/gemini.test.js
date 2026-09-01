@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { chunkTranscript, formatApiError, mergeAIResults, parseAIResponse } from '../src/gemini.js';
+import { chunkTranscript, extractSuggestedModel, formatApiError, isDeprecatedModel, mergeAIResults, parseAIResponse, pickPreferredModel } from '../src/gemini.js';
 
 describe('gemini helpers', () => {
   it('parses valid AI JSON', () => {
@@ -32,7 +32,14 @@ describe('gemini helpers', () => {
 
   it('formats API errors clearly', () => {
     expect(formatApiError(401, {})).toContain('401');
-    expect(formatApiError(404, {})).toContain('404');
+    expect(formatApiError(404, { error: { message: 'use models/gemini-3.6-flash' } })).toContain('gemini-3.6-flash');
     expect(formatApiError(429, {})).toContain('429');
+  });
+
+  it('detects deprecated models and picks preferred', () => {
+    expect(isDeprecatedModel('gemini-2.5-flash')).toBe(true);
+    expect(isDeprecatedModel('gemini-3.6-flash')).toBe(false);
+    expect(extractSuggestedModel('Please use models/gemini-3.6-flash instead')).toBe('gemini-3.6-flash');
+    expect(pickPreferredModel(['gemini-2.5-flash', 'gemini-3.6-flash'], 'gemini-2.5-flash')).toBe('gemini-3.6-flash');
   });
 });
