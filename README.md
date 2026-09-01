@@ -41,4 +41,5 @@ npm test         # 執行 Vitest 測試
 
 ## 文件
 
-技術交接：`docs/technical-handoff.pdf`
+- 技術交接：`docs/technical-handoff.pdf`
+- **Vibe 匯出設定檢查清單**：`docs/vibe-export-checklist.md`
