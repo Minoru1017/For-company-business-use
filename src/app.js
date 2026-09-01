@@ -15,7 +15,7 @@ import { applyBuiltinSpeakerLabels, enrichSegments, parse } from './parser.js';
 import { bumpUsage, checkQuotaBefore, getLimit, getUsage, quotaPercent, saveUsage } from './quota.js';
 import { autoGuess } from './speaker.js';
 import { animateStats, bindUI, renderAnalysisUI, showQuotaModal, showToast } from './ui.js';
-import { $, escapeHTML, fmt, setHTML } from './utils.js';
+import { $, escapeHTML, fmt } from './utils.js';
 
 let segs = [];
 let reportText = '';
@@ -180,25 +180,19 @@ function bindApiKey() {
 }
 
 function renderAIResults(j) {
-  setHTML(
-    'aiGood',
-    (j.good || []).map((g) => `<li>${escapeHTML(g.point)}<span class="ev">${escapeHTML(g.evidence || '')}</span></li>`).join('') || '<li>（無）</li>'
-  );
-  setHTML(
-    'aiBad',
+  $('aiGood').innerHTML =
+    (j.good || []).map((g) => `<li>${escapeHTML(g.point)}<span class="ev">${escapeHTML(g.evidence || '')}</span></li>`).join('') || '<li>（無）</li>';
+  $('aiBad').innerHTML =
     (j.bad || [])
       .map(
         (b) =>
           `<li>${escapeHTML(b.point)}${b.rule ? `（規則：${escapeHTML(b.rule)}）` : ''}<span class="ev">${escapeHTML(b.evidence || '')}</span></li>`
       )
-      .join('') || '<li>（無）</li>'
-  );
-  setHTML(
-    'aiSug',
+      .join('') || '<li>（無）</li>';
+  $('aiSug').innerHTML =
     (j.suggest || [])
       .map((s) => `<li>${s.scene ? `${escapeHTML(s.scene)}：` : ''}<span class="q">「${escapeHTML(s.say)}」</span></li>`)
-      .join('') || '<li>（無）</li>'
-  );
+      .join('') || '<li>（無）</li>';
   $('aiOut').hidden = false;
 }
 

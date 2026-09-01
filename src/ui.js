@@ -1,4 +1,4 @@
-import { $, setHTML, fmt } from './utils.js';
+import { $, fmt, renderReportList } from './utils.js';
 import { RULES } from './rules.js';
 
 const PANES = ['good', 'bad', 'sug'];
@@ -55,9 +55,9 @@ export function renderAnalysisUI(result) {
     .join('');
 
   $('convergeHint').innerHTML = convergeHint;
-  setHTML('goodList', good.length ? good.map((g) => `<li>${g}</li>`).join('') : '<li>這通電話尚未偵測到亮點——先從把五層挖掘做完整開始</li>');
-  setHTML('badList', bad.length ? bad.map((b) => `<li>${b}</li>`).join('') : '<li>沒有明顯缺失，維持水準</li>');
-  setHTML('sugList', sug.length ? sug.map((s) => `<li>${s}</li>`).join('') : '<li>流程完整，下一通維持同樣結構即可</li>');
+  renderReportList('goodList', good, '這通電話尚未偵測到亮點——先從把五層挖掘做完整開始');
+  renderReportList('badList', bad, '沒有明顯缺失，維持水準');
+  renderReportList('sugList', sug, '流程完整，下一通維持同樣結構即可');
 
   updateReportCounts();
   switchPane('good');
@@ -82,7 +82,7 @@ export function animateStats() {
 
 export function showQuotaModal(title, body) {
   $('qmTitle').textContent = title;
-  setHTML('qmBody', body);
+  $('qmBody').innerHTML = body;
   $('quotaModal').style.display = 'flex';
 }
 

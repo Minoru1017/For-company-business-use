@@ -56,3 +56,13 @@ export function setHTML(el, html) {
   if (typeof el === 'string') el = $(el);
   if (el) el.innerHTML = safeHTML(html);
 }
+
+/** Render <li> items: structural tags stay raw; item body runs through safeHTML. */
+export function renderReportList(el, items, emptyText) {
+  if (typeof el === 'string') el = $(el);
+  if (!el) return;
+  const rows = items.length
+    ? items.map((item) => `<li>${safeHTML(item)}</li>`).join('')
+    : `<li>${emptyText}</li>`;
+  el.innerHTML = rows;
+}
