@@ -1,0 +1,9 @@
+.env
+.env.*
+*.key
+secrets.*
+recordings/
+transcripts/
+customer-data/
+node_modules/
+dist/
