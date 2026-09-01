@@ -1,9 +1,10 @@
+import { assignSpeakerRoles, splitCueBody } from './speaker-labels.js';
 import { countChars, tsToSec } from './utils.js';
 
 export function parseVibeJson(raw) {
   const data = typeof raw === 'string' ? JSON.parse(raw) : raw;
   if (!data || !Array.isArray(data.segments)) return [];
-  return data.segments
+  const segs = data.segments
     .filter((s) => s && String(s.text || '').trim())
     .map((s) => {
       const seg = {
@@ -11,12 +12,10 @@ export function parseVibeJson(raw) {
         end: (s.stop ?? s.end ?? s.start ?? 0) / 1000,
         text: String(s.text).trim(),
       };
-      if (s.speaker != null && s.speaker !== '') {
-        seg.spk = Number(s.speaker) === 0 ? 'S' : 'C';
-        seg.labeled = true;
-      }
+      if (s.speaker != null && s.speaker !== '') seg.speakerId = Number(s.speaker);
       return seg;
     });
+  return assignSpeakerRoles(segs);
 }
 
 export function parse(text) {
@@ -25,16 +24,17 @@ export function parse(text) {
     /(\d{2}):(\d{2}):(\d{2})[,.](\d{3})\s*-->\s*(\d{2}):(\d{2}):(\d{2})[,.](\d{3})\s*\n([\s\S]*?)(?=\n\s*\n|\n\d+\s*\n|$)/g;
   let m;
   while ((m = re.exec(text)) !== null) {
-    const t = m[9].replace(/\n/g, ' ').trim();
-    if (t) {
-      out.push({
-        start: tsToSec(m[1], m[2], m[3], m[4]),
-        end: tsToSec(m[5], m[6], m[7], m[8]),
-        text: t,
-      });
-    }
+    const { speakerId, text: cueText } = splitCueBody(m[9]);
+    if (!cueText) continue;
+    const seg = {
+      start: tsToSec(m[1], m[2], m[3], m[4]),
+      end: tsToSec(m[5], m[6], m[7], m[8]),
+      text: cueText,
+    };
+    if (speakerId != null) seg.speakerId = speakerId;
+    out.push(seg);
   }
-  if (out.length) return out;
+  if (out.length) return assignSpeakerRoles(out);
 
   const lines = text.split('\n');
   const re2 = /^\[?(?:(\d{1,2}):)?(\d{1,2}):(\d{2})\]?\s*(.+)$/;
@@ -52,14 +52,14 @@ export function parse(text) {
 
 export function applyBuiltinSpeakerLabels(segs) {
   segs.forEach((s) => {
-    const sp = s.text.match(/^(?:Speaker|說話者|发言人)\s*(\d+)\s*[:：]\s*(.*)$/i);
-    if (sp) {
-      s.spk = sp[1] === '0' ? 'S' : 'C';
-      s.text = sp[2];
-      s.labeled = true;
+    if (s.labeled) return;
+    const { speakerId, text } = splitCueBody(s.text);
+    if (speakerId != null) {
+      s.speakerId = speakerId;
+      s.text = text;
     }
   });
-  return segs;
+  return assignSpeakerRoles(segs);
 }
 
 export function enrichSegments(segs) {

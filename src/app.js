@@ -16,6 +16,7 @@ import {
 import { bindLabelCollapseHandlers, createLabelController } from './labels.js';
 import { applyBuiltinSpeakerLabels, enrichSegments, parse, parseVibeJson } from './parser.js';
 import { bumpUsage, checkQuotaBefore, getLimit, getUsage, quotaPercent, saveUsage } from './quota.js';
+import { labeledRatio } from './speaker-labels.js';
 import { autoGuess } from './speaker.js';
 import { animateStats, bindUI, renderAnalysisUI, showQuotaModal, showToast } from './ui.js';
 import { $, escapeHTML, fmt } from './utils.js';
@@ -92,7 +93,7 @@ function loadFile(f) {
       $('fname').textContent = '無法解析，請用 Vibe 的 .vibe.json、SRT/VTT 或含 [mm:ss] 的 TXT';
       return;
     }
-    if (!segs.some((s) => s.labeled)) autoGuess(segs);
+    if (labeledRatio(segs) < 0.5) autoGuess(segs);
     enrichSegments(segs);
     const src = isVibe ? 'Vibe' : '逐字稿';
     $('fname').textContent = `已載入（${segs.length} 句，來源：${src}）`;
@@ -108,6 +109,7 @@ function loadFile(f) {
 
 function bindLabels() {
   $('autoGuess').onclick = () => {
+    if (labeledRatio(segs) > 0 && !confirm('已有發言者標籤，自動猜測會覆蓋現有標記。確定繼續？')) return;
     autoGuess(segs);
     labelCtrl?.resetFocus();
     labelCtrl?.renderLabels();
