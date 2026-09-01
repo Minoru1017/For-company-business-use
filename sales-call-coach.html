@@ -1,0 +1,965 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CALL COACH｜顧問式銷售電訪分析</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.3/dist/chart.umd.min.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=JetBrains+Mono:wght@400;600&family=Noto+Sans+TC:wght@400;500;700;900&family=Noto+Serif+TC:wght@600;700&display=swap" rel="stylesheet">
+<style>
+  :root { --bg:#0a0a0a; --panel:#121212; --panel2:#181818; --border:#2a2a2a;
+          --text:#ededed; --muted:#8a8a8a; --accent:#ff4b33;
+          --ok:#3ddc84; --warn:#f5c518; --bad:#ff5a3c;
+          --sales:#ededed; --cust:#ff5a3c; --paper:#f2f1ec; --ink:#141414;
+          --disp:"Space Grotesk","Noto Sans TC",sans-serif;
+          --mono:"JetBrains Mono",monospace;
+          --sans:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif; }
+  * { box-sizing:border-box; margin:0; padding:0; }
+  body { font-family:var(--sans); background:var(--bg); color:var(--text);
+         min-height:100vh; padding:0 16px 60px;
+         background-image:radial-gradient(rgba(255,255,255,.05) 1px, transparent 1px);
+         background-size:22px 22px; }
+  .wrap { max-width:1020px; margin:0 auto; }
+
+  .side-label { position:fixed; top:50%; font-family:var(--mono); font-size:.66rem;
+                letter-spacing:.35em; color:#4a4a4a; text-transform:uppercase;
+                white-space:nowrap; z-index:5; pointer-events:none; writing-mode:vertical-rl; }
+  .side-label.l { left:12px; transform:rotate(180deg) translateY(50%); }
+  .side-label.r { right:12px; transform:translateY(-50%); }
+  @media (max-width:1140px){ .side-label{ display:none; } }
+
+  .hero { padding:54px 0 30px; border-bottom:1px solid var(--border); margin-bottom:34px; }
+  .hero-meta { display:flex; gap:14px; align-items:center; flex-wrap:wrap; margin-bottom:20px; }
+  .pill { font-family:var(--mono); font-size:.68rem; letter-spacing:.14em;
+          padding:6px 14px; border-radius:99px; border:1px solid var(--border);
+          color:var(--muted); text-transform:uppercase; }
+  .pill.red { background:var(--accent); border-color:var(--accent); color:#fff; font-weight:600; }
+  .display { font-family:var(--disp); font-weight:700; font-size:clamp(3rem,9vw,6.2rem);
+             line-height:.92; letter-spacing:-.02em; text-transform:uppercase; }
+  .display .ghost { color:transparent; -webkit-text-stroke:1.5px #3a3a3a; }
+  .tagline { margin-top:20px; font-size:.95rem; line-height:1.9; }
+  .tagline span { color:var(--muted); font-size:.78rem; font-family:var(--mono); letter-spacing:.06em; }
+
+  .sec { margin-bottom:34px; }
+  .sec-head { display:flex; align-items:baseline; gap:14px; margin-bottom:14px;
+              padding-bottom:10px; border-bottom:1px solid var(--border); flex-wrap:wrap; }
+  .sec-head .num { font-family:var(--mono); font-size:1.9rem; font-weight:600; color:var(--accent); }
+  .sec-head h2 { font-family:var(--disp); font-size:1.12rem; font-weight:700; color:var(--text); }
+  .sec-head .tag { margin-left:auto; font-family:var(--mono); font-size:.62rem;
+                   letter-spacing:.22em; color:#4a4a4a; text-transform:uppercase; }
+
+  .card { background:var(--panel); border:1px solid var(--border); border-radius:14px;
+          padding:20px; margin-bottom:14px; }
+  h2 { font-family:var(--disp); font-size:.98rem; margin-bottom:12px; color:var(--text); }
+
+  #drop { position:relative; border:1px dashed #3a3a3a; border-radius:14px; padding:44px 16px;
+          text-align:center; color:var(--muted); cursor:pointer; transition:.2s;
+          font-size:.92rem; line-height:2; background:var(--panel); }
+  #drop::before, #drop::after { content:""; position:absolute; width:16px; height:16px; }
+  #drop::before { top:-1px; left:-1px; border-top:2px solid var(--accent); border-left:2px solid var(--accent); border-radius:2px 0 0 0; }
+  #drop::after { bottom:-1px; right:-1px; border-bottom:2px solid var(--accent); border-right:2px solid var(--accent); border-radius:0 0 2px 0; }
+  #drop.drag { border-color:var(--accent); color:var(--text); }
+  #fname { color:var(--ok); margin-top:8px; font-size:.85rem; word-break:break-all; }
+
+  button { background:transparent; color:var(--text); border:1px solid var(--border);
+           border-radius:99px; padding:10px 20px; font-size:.85rem; cursor:pointer;
+           font-family:var(--sans); letter-spacing:.04em; transition:.15s; }
+  button:hover { border-color:#5a5a5a; }
+  button.primary { background:var(--accent); border-color:var(--accent); color:#fff; font-weight:700; }
+  button.primary:hover { background:#e63d26; }
+  button:disabled { opacity:.4; cursor:not-allowed; }
+  .row { display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  .hint { font-size:.78rem; color:var(--muted); margin-top:10px; line-height:1.85; }
+
+  #labelList { max-height:360px; overflow-y:auto; border:1px solid var(--border);
+               border-radius:12px; margin-top:14px; background:var(--panel); }
+  .seg { display:flex; gap:12px; padding:10px 14px; border-bottom:1px solid #1e1e1e;
+         font-size:.88rem; align-items:flex-start; }
+  .seg:hover { background:#161616; }
+  .seg .who { flex:0 0 100px; display:flex; gap:4px; }
+  .seg .who button { flex:1; padding:3px 0; font-size:.74rem; font-weight:700;
+                     border-radius:6px; border:1px solid var(--border);
+                     background:transparent; color:#555; }
+  .seg.s .who .b-s { background:var(--text); color:#0a0a0a; border-color:var(--text); }
+  .seg.c .who .b-c { background:var(--accent); color:#fff; border-color:var(--accent); }
+  .seg .ts { flex:0 0 48px; color:#555; font-family:var(--mono); font-size:.72rem; padding-top:3px; }
+
+  .stats { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:1px;
+           background:var(--border); border:1px solid var(--border); border-radius:14px; overflow:hidden; }
+  .stat { background:var(--panel); padding:20px 16px; text-align:left; }
+  .stat .num { font-family:var(--mono); font-size:2rem; font-weight:600; color:var(--text); line-height:1; }
+  .stat .lbl { font-size:.7rem; color:var(--muted); margin-top:8px; letter-spacing:.12em; }
+
+  .steps { display:grid; grid-template-columns:repeat(auto-fit,minmax(150px,1fr)); gap:10px; }
+  .step { background:var(--panel); border:1px solid var(--border); border-radius:12px;
+          padding:14px 12px; font-size:.8rem; line-height:1.8; }
+  .step .nm { font-family:var(--disp); font-weight:700; margin-bottom:4px; font-size:.85rem; }
+  .step.on { border-color:#2f5d43; } .step.on .nm { color:var(--ok); }
+  .step.off { border-color:#5d2f28; } .step.off .nm { color:var(--bad); }
+
+  .layers { display:flex; gap:8px; flex-wrap:wrap; margin-top:6px; }
+  .layer { flex:1; min-width:106px; text-align:center; border-radius:10px; padding:12px 4px;
+           font-size:.8rem; border:1px solid var(--border); background:var(--panel); line-height:2; }
+  .layer.hit { border-color:#2f5d43; color:var(--ok); }
+  .layer.miss { border-color:#5d2f28; color:var(--bad); }
+
+  .chart-box { position:relative; height:300px; }
+
+  .paper { background:var(--paper); color:var(--ink); border-radius:14px;
+           padding:22px; margin-bottom:14px; }
+  .paper h2 { color:var(--ink); display:flex; align-items:center; gap:10px; }
+  .chip { font-family:var(--mono); font-size:.6rem; letter-spacing:.18em;
+          padding:4px 10px; border-radius:99px; color:#fff; text-transform:uppercase; }
+  .chip.g { background:#1a7f4e; } .chip.b { background:#c2321d; } .chip.y { background:#a97b00; }
+  ul.report { list-style:none; }
+  ul.report li { padding:10px 14px; border-radius:8px; margin-bottom:8px; font-size:.9rem; line-height:1.75; }
+  .paper #goodList li { background:#e4efe8; border-left:3px solid #1a7f4e; }
+  .paper #badList li { background:#f6e5e1; border-left:3px solid #c2321d; }
+  .paper #sugList li { background:#f2ecd8; border-left:3px solid #a97b00; }
+  .paper .q { color:#c2321d; font-weight:700; }
+  .paper .ev { display:block; color:#807a6e; font-size:.76rem; margin-top:4px; font-family:var(--mono); }
+  .paper b { color:#000; }
+  .q { color:var(--warn); }
+  .ev { display:block; color:var(--muted); font-size:.78rem; margin-top:4px; }
+
+  .field { background:var(--panel2); color:var(--text); border:1px solid var(--border);
+           border-radius:10px; padding:10px 14px; font-size:.88rem; font-family:var(--sans); }
+  .quota-box { margin-top:12px; background:var(--panel2); border:1px solid var(--border);
+               border-radius:12px; padding:12px 16px; }
+  .quota-box .mono { font-family:var(--mono); font-size:.78rem; }
+  #quotaBarTrack { background:#242424; border-radius:6px; height:6px; margin-top:10px; overflow:hidden; }
+  #quotaBar { height:100%; width:0%; background:var(--ok); border-radius:6px; transition:.3s; }
+  #quotaLimit { width:60px; background:var(--panel); color:var(--text); border:1px solid var(--border);
+                border-radius:6px; padding:2px 6px; text-align:center; font-family:var(--mono); }
+  #aiOut ul.report li { background:var(--panel2); border-left:3px solid var(--border); }
+  #aiOut #aiGood li { border-left-color:var(--ok); }
+  #aiOut #aiBad li { border-left-color:var(--bad); }
+  #aiOut #aiSug li { border-left-color:var(--warn); }
+
+  .faq { border-top:1px solid var(--border); list-style:none; }
+  .faq li { padding:14px 6px; border-bottom:1px solid var(--border);
+            font-size:.9rem; display:flex; gap:14px; align-items:baseline; }
+  .faq li .idx { font-family:var(--mono); color:var(--accent); font-size:.76rem; flex:0 0 28px; }
+
+  .footer { margin-top:46px; padding-top:20px; border-top:1px solid var(--border);
+            display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:12px; }
+  .footer .mono { font-family:var(--mono); font-size:.62rem; letter-spacing:.2em; color:#4a4a4a;
+                  text-transform:uppercase; }
+  .barcode { height:26px; width:130px;
+             background:repeating-linear-gradient(90deg,#3a3a3a 0 2px,transparent 2px 5px,#3a3a3a 5px 6px,transparent 6px 10px); }
+  .btns { display:flex; gap:10px; flex-wrap:wrap; margin-top:10px; }
+
+  /* ===== 報告暗色分頁面板（v8） ===== */
+  .report-shell { position:relative; background:#101010; border:1px solid var(--border);
+                  border-radius:16px; overflow:hidden; margin-bottom:14px; }
+  .report-shell::before { content:""; position:absolute; inset:-40%;
+    background:radial-gradient(ellipse 42% 34% at 26% 30%, rgba(255,255,255,.055), transparent 60%),
+               radial-gradient(ellipse 36% 30% at 76% 68%, rgba(255,255,255,.04), transparent 60%),
+               radial-gradient(ellipse 30% 26% at 55% 12%, rgba(255,75,51,.05), transparent 60%);
+    filter:blur(28px); pointer-events:none; }
+  .report-shell > * { position:relative; }
+  .rnav { display:flex; gap:6px; padding:16px 18px 0; flex-wrap:wrap; }
+  .rtab { position:relative; background:transparent; border:none; border-radius:0;
+          color:#666; font-family:var(--mono); font-size:.7rem; letter-spacing:.2em;
+          text-transform:uppercase; padding:10px 18px; cursor:pointer; transition:.15s; }
+  .rtab:hover { color:#aaa; border:none; }
+  .rtab .cnt { margin-left:8px; font-size:.62rem; color:#555; }
+  .rtab.active { color:var(--text); background:#1a1a1a; }
+  .rtab.active .cnt { color:var(--accent); }
+  .rtab.active::before, .rtab.active::after { content:""; position:absolute; width:9px; height:9px; }
+  .rtab.active::before { top:0; left:0; border-top:1.5px solid var(--text); border-left:1.5px solid var(--text); }
+  .rtab.active::after { bottom:0; right:0; border-bottom:1.5px solid var(--text); border-right:1.5px solid var(--text); }
+  .rbody { display:flex; gap:0; padding:14px 18px 6px; }
+  .rpager { display:flex; flex-direction:column; gap:14px; padding:14px 18px 0 2px; flex:0 0 54px; }
+  .rpager .pnum { font-family:var(--mono); font-size:.74rem; color:#4a4a4a; cursor:pointer;
+                  transition:.15s; padding-bottom:3px; border-bottom:1px solid transparent; width:26px; }
+  .rpager .pnum:hover { color:#999; }
+  .rpager .pnum.active { color:var(--text); border-bottom:1px solid var(--text); }
+  .rpanes { flex:1; min-width:0; }
+  .rpane { display:none; animation:fadeUp .25s ease; }
+  .rpane.active { display:block; }
+  @keyframes fadeUp { from { opacity:0; transform:translateY(6px); } to { opacity:1; transform:none; } }
+  .rpane-title { font-family:var(--disp); font-size:.95rem; margin-bottom:12px; color:var(--text); }
+  .rfoot { display:flex; justify-content:space-between; align-items:center; gap:10px;
+           padding:10px 18px 16px; flex-wrap:wrap; }
+  .rnav-btn { background:transparent; border:none; border-radius:0; color:#777;
+              font-family:var(--mono); font-size:.68rem; letter-spacing:.2em; padding:8px 10px; }
+  .rnav-btn:hover { color:var(--text); border:none; }
+  .mono-dim { font-family:var(--mono); font-size:.6rem; letter-spacing:.15em; color:#3d3d3d;
+              text-transform:uppercase; }
+  /* 報告列：暗色 + hover 左側白條（參考圖 SETTINGS 列） */
+  .rpane ul.report li { background:#161616; border-left:2px solid transparent; position:relative;
+                        transition:.15s; }
+  .rpane #goodList li { border-left-color:#2f5d43; }
+  .rpane #badList li { border-left-color:#5d2f28; }
+  .rpane #sugList li { border-left-color:#5d4d1e; }
+  .rpane ul.report li:hover { background:#1d1d1d; border-left-color:var(--text); }
+  .rpane .q { color:var(--warn); font-weight:700; }
+  .rpane .ev { color:#6e6e6e; font-family:var(--mono); font-size:.74rem; }
+  /* 證據展開互動 */
+  ul.report li .ev { display:none; }
+  ul.report li.open .ev { display:block; }
+  ul.report li.has-ev { cursor:pointer; }
+  ul.report li.has-ev::after { content:"＋"; position:absolute; right:12px; top:9px;
+    color:#4a4a4a; font-family:var(--mono); font-size:.8rem; }
+  ul.report li.has-ev.open::after { content:"－"; color:var(--accent); }
+  ul.report li.has-ev { padding-right:34px; }
+  /* 復盤打勾互動 */
+  .faq li { cursor:pointer; transition:.15s; }
+  .faq li:hover { background:#141414; }
+  .faq li.done { color:#4f4f4f; }
+  .faq li.done .idx { color:#4f4f4f; }
+  .faq li .tick { margin-left:auto; font-family:var(--mono); color:transparent; flex:0 0 auto; }
+  .faq li.done .tick { color:var(--ok); }
+
+  /* ===== v9 玻璃厚度感 ===== */
+  body::before, body::after { content:""; position:fixed; border-radius:50%;
+    pointer-events:none; z-index:-1; filter:blur(70px); }
+  body::before { width:520px; height:520px; top:-160px; right:-140px;
+    background:radial-gradient(circle at 35% 35%, rgba(120,110,100,.16), rgba(40,38,36,.05) 60%, transparent 75%); }
+  body::after { width:420px; height:420px; bottom:-120px; left:-120px;
+    background:radial-gradient(circle at 40% 40%, rgba(90,85,80,.13), rgba(30,30,30,.04) 60%, transparent 75%); }
+
+  .card, .report-shell, #drop, #labelList, .quota-box, .stats {
+    background:rgba(20,20,20,.58);
+    backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
+    border:1px solid rgba(255,255,255,.07);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.06),
+                inset 0 -1px 0 rgba(0,0,0,.4),
+                0 24px 48px -24px rgba(0,0,0,.75);
+  }
+  .stat { background:rgba(22,22,22,.72); }
+  .step, .layer { background:rgba(22,22,22,.6);
+    backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.05), 0 10px 22px -14px rgba(0,0,0,.7);
+    transition:transform .18s ease, box-shadow .18s ease, border-color .18s; }
+  .step:hover, .layer:hover, .stat:hover { transform:translateY(-2px);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.07), 0 16px 30px -14px rgba(0,0,0,.8); }
+  .report-shell { border-radius:20px; }
+  .card { transition:border-color .2s, box-shadow .2s; }
+  .card:hover { border-color:rgba(255,255,255,.12); }
+
+  /* 頂部光暈掃過質感（報告面板） */
+  .report-shell::after { content:""; position:absolute; top:0; left:8%; right:8%; height:1px;
+    background:linear-gradient(90deg, transparent, rgba(255,255,255,.22), transparent); }
+
+  /* 按鈕厚度與按壓回饋 */
+  button { background:linear-gradient(180deg, rgba(255,255,255,.05), rgba(255,255,255,0)) , #161616;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.07), 0 4px 10px -4px rgba(0,0,0,.6);
+    transition:transform .12s ease, box-shadow .12s ease, border-color .15s, background .15s; }
+  button:hover { transform:translateY(-1px);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.09), 0 8px 16px -6px rgba(0,0,0,.7); }
+  button:active { transform:translateY(1px); box-shadow: inset 0 1px 3px rgba(0,0,0,.5); }
+  button.primary { background:linear-gradient(180deg, #ff5f45, #e63d26);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.25), 0 8px 22px -8px rgba(255,75,51,.55); }
+  button.primary:hover { background:linear-gradient(180deg, #ff6c52, #f04830);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.3), 0 12px 26px -8px rgba(255,75,51,.65); }
+  .rtab, .rnav-btn, .rtab:hover, .rnav-btn:hover { background:transparent; box-shadow:none; transform:none; }
+  .rtab.active { background:rgba(32,32,32,.8); box-shadow: inset 0 1px 0 rgba(255,255,255,.05); }
+  .seg .who button { box-shadow:none; background:transparent; }
+  .seg .who button:hover { transform:none; }
+  .seg.s .who .b-s { background:var(--text); box-shadow:0 2px 8px -2px rgba(255,255,255,.25); }
+  .seg.c .who .b-c { background:linear-gradient(180deg,#ff5f45,#e63d26);
+    box-shadow:0 2px 8px -2px rgba(255,75,51,.5); }
+
+  /* 輸入框 focus 回饋 */
+  .field:focus, #quotaLimit:focus { outline:none; border-color:#5a5a5a;
+    box-shadow:0 0 0 3px rgba(255,255,255,.05), inset 0 1px 0 rgba(255,255,255,.05); }
+
+  /* 拖放高亮 */
+  #drop { transition:border-color .2s, box-shadow .2s, background .2s; }
+  #drop.drag { box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 0 0 3px rgba(255,75,51,.18),
+               0 24px 48px -24px rgba(0,0,0,.75); background:rgba(26,20,19,.7); }
+
+  /* 區塊顯示的進場動效 */
+  #result:not([hidden]) > * { animation:fadeUp .35s ease backwards; }
+  #result:not([hidden]) > *:nth-child(2) { animation-delay:.05s; }
+  #result:not([hidden]) > *:nth-child(3) { animation-delay:.1s; }
+  #result:not([hidden]) > *:nth-child(4) { animation-delay:.15s; }
+  #result:not([hidden]) > *:nth-child(5) { animation-delay:.2s; }
+
+  /* Toast 回饋 */
+  #toast { position:fixed; left:50%; bottom:34px; transform:translateX(-50%) translateY(20px);
+    background:rgba(26,26,26,.85); backdrop-filter:blur(12px);
+    border:1px solid rgba(255,255,255,.12); color:var(--text);
+    border-radius:99px; padding:11px 24px; font-size:.85rem; letter-spacing:.05em;
+    opacity:0; pointer-events:none; transition:.28s ease; z-index:200;
+    box-shadow: inset 0 1px 0 rgba(255,255,255,.1), 0 16px 40px -12px rgba(0,0,0,.8); }
+  #toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+  #toast .dot { display:inline-block; width:7px; height:7px; border-radius:50%;
+    background:var(--ok); margin-right:9px; box-shadow:0 0 8px rgba(61,220,132,.8); }
+
+  /* ===== v10 報告區編輯式排版 ===== */
+  .rpane-title { font-family:var(--disp); font-size:1.3rem; font-weight:700;
+                 margin:4px 0 18px; letter-spacing:.01em; }
+  .rpane-title .en { font-family:var(--mono); font-size:.6rem; letter-spacing:.3em;
+                     color:#555; margin-left:14px; text-transform:uppercase; }
+  /* 拿掉左色條，改為編號 + 細線分隔的編輯排版 */
+  .rpane ul.report { counter-reset:ritem; }
+  .rpane ul.report li { counter-increment:ritem; background:transparent; border:none;
+    border-bottom:1px solid #1d1d1d; border-radius:0; margin-bottom:0;
+    padding:16px 36px 16px 52px; position:relative; font-size:.92rem; line-height:1.95; }
+  .rpane ul.report li::before { content:counter(ritem,decimal-leading-zero);
+    position:absolute; left:12px; top:18px; font-family:var(--mono);
+    font-size:.68rem; letter-spacing:.1em; }
+  .rpane #goodList li::before { color:rgba(61,220,132,.75); }
+  .rpane #badList li::before { color:rgba(255,90,60,.75); }
+  .rpane #sugList li::before { color:#8a8a8a; }
+  .rpane ul.report li:hover { background:rgba(255,255,255,.025); border-left:none; }
+  .rpane ul.report li:last-child { border-bottom:none; }
+  ul.report li.has-ev::after { right:8px; top:16px; }
+  /* 引文話術：襯線象牙白，取代土黃 */
+  ul.report .q { font-family:"Noto Serif TC",serif; font-weight:700; color:#ece7da;
+    border-bottom:1px solid rgba(236,231,218,.28); padding-bottom:1px; }
+  #aiOut .q { color:#ece7da; }
+  .rpane .ev { font-size:.72rem; letter-spacing:.02em; margin-top:6px; }
+  /* 幾何狀態記號（取代 emoji） */
+  .mk { font-family:var(--mono); margin-right:7px; font-size:.72rem; }
+  .mk.on { color:var(--ok); } .mk.off { color:var(--bad); }
+</style>
+</head>
+<body>
+<div class="side-label l">SALES CALL ANALYSIS — CONSULTATIVE SELLING</div>
+<div class="side-label r">FOCUS MODE / LOCAL PROCESSING</div>
+<div class="wrap">
+  <header class="hero">
+    <div class="hero-meta">
+      <span class="pill red">●●● CALL COACH</span>
+      <span class="pill">顧問式銷售 6 步驟</span>
+      <span class="pill">理解需求 → 判斷適配 → 幫助決策</span>
+    </div>
+    <h1 class="display">CALL<br><span class="ghost">COACH</span></h1>
+    <p class="tagline">電訪逐字稿分析工具——把每一通電話變成可複盤的專業判斷。<br>
+    <span>VIBE SRT / VTT / TXT ・ 全程本地運算 ・ 逐字稿不上傳</span></p>
+  </header>
+
+  <section class="sec">
+    <div class="sec-head"><span class="num">01</span><h2>上傳逐字稿</h2><span class="tag">Upload / SRT・VTT・TXT</span></div>
+    <div id="drop">點擊選擇 或 拖曳逐字稿檔到這裡<br><span class="mono-hint" style="font-family:var(--mono);font-size:.7rem;letter-spacing:.15em;color:#555">DRAG &amp; DROP — LOCAL ONLY</span><div id="fname"></div></div>
+    <input type="file" id="file" accept=".srt,.vtt,.txt,text/plain" hidden>
+  </section>
+
+  <section class="sec" id="labelCard" hidden>
+    <div class="sec-head"><span class="num">02</span><h2>標記說話者</h2><span class="tag">Speaker Tagging</span></div>
+    <div class="hint" style="margin:0 0 12px">每句點選「業務」或「客戶」按鈕，亮起＝目前身分。</div>
+    <div class="row">
+      <button id="autoGuess">AUTO — 自動猜測</button>
+      <button id="flipAll">全部互換</button>
+      <button class="primary" id="analyze">開始分析 →</button>
+    </div>
+    <div id="labelList"></div>
+    <div class="hint">自動猜測依「問句、課程用語」判斷業務句，準確率約八成，請快速掃過修正——標記越準，分析越可信。</div>
+  </section>
+
+  <div id="result" hidden>
+    <section class="sec">
+      <div class="sec-head"><span class="num">03</span><h2>通話總覽</h2><span class="tag">Overview</span></div>
+      <div class="stats" id="stats"></div>
+    </section>
+
+    <section class="sec">
+      <div class="sec-head"><span class="num">04</span><h2>六步驟覆蓋</h2><span class="tag">Connect→Discovery→Clarify→Diagnose→Recommend→Decision</span></div>
+      <div class="steps" id="stepBoxes"></div>
+      <div class="hint">依關鍵語句偵測每一步是否出現。流程<b style="color:var(--warn)">不是鐵軌，是地圖</b>——但「判斷 Diagnose（適配 A/B/C）」是顧問核心價值，缺了等於只是在賣東西。</div>
+    </section>
+
+    <section class="sec">
+      <div class="sec-head"><span class="num">05</span><h2>五層資訊檢核</h2><span class="tag">現況→問題→影響→動機→未來</span></div>
+      <div class="layers" id="layerBoxes"></div>
+      <div class="hint" id="convergeHint"></div>
+    </section>
+
+    <section class="sec">
+      <div class="sec-head"><span class="num">06</span><h2>對話節奏圖</h2><span class="tag">白=業務 ・ 紅=客戶 ・ 點擊看原句</span></div>
+      <div class="card">
+        <div class="chart-box"><canvas id="chart"></canvas></div>
+        <div id="clicked" style="margin-top:8px;font-size:.88rem;color:var(--warn);min-height:1.2em"></div>
+      </div>
+    </section>
+
+    <div class="sec-head"><span class="num">07</span><h2>分析報告</h2><span class="tag">Report / 白卡＝重點輸出</span></div>
+
+    <div class="report-shell">
+      <nav class="rnav">
+        <button class="rtab active" data-pane="good">Well Done<span class="cnt" id="cntGood">0</span></button>
+        <button class="rtab" data-pane="bad">Improve<span class="cnt" id="cntBad">0</span></button>
+        <button class="rtab" data-pane="sug">Scripts<span class="cnt" id="cntSug">0</span></button>
+      </nav>
+      <div class="rbody">
+        <aside class="rpager" id="rpager">
+          <span class="pnum active" data-pane="good">01</span>
+          <span class="pnum" data-pane="bad">02</span>
+          <span class="pnum" data-pane="sug">03</span>
+        </aside>
+        <div class="rpanes">
+          <div class="rpane active" data-pane="good">
+            <div class="rpane-title">做得好的部份<span class="en">Well Done</span></div>
+            <ul class="report" id="goodList"></ul>
+          </div>
+          <div class="rpane" data-pane="bad">
+            <div class="rpane-title">待加強的部份<span class="en">Improve</span></div>
+            <ul class="report" id="badList"></ul>
+          </div>
+          <div class="rpane" data-pane="sug">
+            <div class="rpane-title">建議怎麼聊<span class="en">Scripts — 下一通可直接用</span></div>
+            <ul class="report" id="sugList"></ul>
+          </div>
+        </div>
+      </div>
+      <div class="rfoot">
+        <button class="rnav-btn" id="rPrev">◀ PREV</button>
+        <span class="mono-dim">點擊列可展開原句證據 ・ ←→ 鍵切換分頁</span>
+        <button class="rnav-btn" id="rNext">NEXT ▶</button>
+      </div>
+    </div>
+
+    <section class="sec">
+      <div class="sec-head"><span class="num">08</span><h2>Demo 後 6 個復盤問題</h2><span class="tag">30-Sec Self Review</span></div>
+      <ul class="faq">
+        <li><span class="idx">Q1</span>客戶原本以為自己的問題是什麼？<span class="tick">✓</span></li>
+        <li><span class="idx">Q2</span>你最後判斷真正問題是什麼？證據呢？<span class="tick">✓</span></li>
+        <li><span class="idx">Q3</span>客戶真正想改變的是什麼？<span class="tick">✓</span></li>
+        <li><span class="idx">Q4</span>你今天做的判斷是：適合／部分適合／不適合？<span class="tick">✓</span></li>
+        <li><span class="idx">Q5</span>你推薦這個方案的核心理由是什麼？<span class="tick">✓</span></li>
+        <li><span class="idx">Q6</span>沒成交的話——是客戶不適合、疑慮沒解決，還是你沒把價值講清楚、信任沒建立？<span class="tick">✓</span></li>
+      </ul>
+      <div class="hint">底線：成交不代表你判斷對了。真正的顧問價值，是知道客戶需要什麼、為什麼需要，也敢給出對他負責的專業建議。</div>
+    </section>
+
+    <section class="sec">
+      <div class="sec-head"><span class="num">09</span><h2>AI 深度分析</h2><span class="tag">Optional / Gemini API</span></div>
+      <div class="card">
+      <div class="row">
+        <input type="password" id="apiKey" class="field" placeholder="貼上你自己的 Gemini API Key（只存在本機瀏覽器）" style="flex:1;min-width:240px">
+        <input id="aiModel" class="field" list="modelList" value="gemini-3.6-flash" style="width:190px">
+        <datalist id="modelList">
+          <option value="gemini-3.6-flash">
+          <option value="gemini-3.6-flash-lite">
+          <option value="gemini-3.6-pro">
+        </datalist>
+        <button class="primary" id="aiBtn">AI 深度分析</button>
+      </div>
+      <div class="hint">注意：按下後逐字稿會傳送至 Google 進行分析——<b>敏感客戶通話請先去識別化（改名、刪個資）再用</b>。Key 僅儲存於你的瀏覽器 localStorage，不會寫進檔案。免費申請：aistudio.google.com/apikey</div>
+      <div class="quota-box">
+        <div class="row" style="justify-content:space-between;font-size:.85rem">
+          <span class="mono">USAGE TODAY：<b id="quotaText">0</b> / <input type="number" id="quotaLimit" value="250" min="10"> 次</span>
+          <span id="quotaEst" class="mono" style="color:var(--muted)"></span>
+        </div>
+        <div id="quotaBarTrack">
+          <div id="quotaBar"></div>
+        </div>
+        <div class="hint" style="margin-top:6px">免費額度上限依模型而異（可自行修改上方數字）；Google 每日重置（太平洋時間午夜）。本估算只計「這台裝置、這個瀏覽器」的用量，實際以官方為準。</div>
+      </div>
+      <div id="aiStatus" style="margin-top:8px;font-size:.88rem;color:var(--warn);min-height:1.2em"></div>
+      <div id="aiOut" hidden>
+        <h2 style="margin-top:16px">AI 判讀 — 做得好</h2><ul class="report" id="aiGood"></ul>
+        <h2 style="margin-top:16px">AI 判讀 — 待加強</h2><ul class="report" id="aiBad"></ul>
+        <h2 style="margin-top:16px">AI 判讀 — 建議怎麼聊</h2><ul class="report" id="aiSug"></ul>
+      </div>
+      </div>
+    </section>
+
+    <div class="btns" style="margin-bottom:6px"><button class="primary" id="copyReport">複製完整報告（文字版）</button></div>
+
+    <div class="footer">
+      <span class="mono">CALL COACH — CONSULTATIVE SALES ANALYZER</span>
+      <div class="barcode"></div>
+      <span class="mono">LOCAL / NO UPLOAD / VER 10</span>
+    </div>
+  </div>
+</div>
+
+<!-- 額度告警彈窗 -->
+<div id="toast"><span class="dot"></span><span id="toastMsg"></span></div>
+
+<!-- 額度告警彈窗 -->
+<div id="quotaModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:99;align-items:center;justify-content:center;padding:20px">
+  <div style="background:var(--panel);border:1px solid var(--warn);border-radius:14px;max-width:440px;padding:24px">
+    <h2 id="qmTitle" style="color:var(--warn)">免費額度即將用完</h2>
+    <p id="qmBody" style="font-size:.92rem;line-height:1.7;margin:10px 0 16px"></p>
+    <div class="btns">
+      <button class="primary" onclick="window.open('https://aistudio.google.com/usage','_blank')">查看官方用量</button>
+      <button onclick="window.open('https://ai.google.dev/pricing','_blank')">升級付費方案</button>
+      <button onclick="document.getElementById('quotaModal').style.display='none'">知道了</button>
+    </div>
+  </div>
+</div>
+
+<script>
+const $ = id => document.getElementById(id);
+let segs = [], chart = null;
+
+/* ---------- 檔案載入與解析 ---------- */
+$('drop').onclick = () => $('file').click();
+$('drop').ondragover = e => { e.preventDefault(); $('drop').classList.add('drag'); };
+$('drop').ondragleave = () => $('drop').classList.remove('drag');
+$('drop').ondrop = e => { e.preventDefault(); $('drop').classList.remove('drag');
+  if (e.dataTransfer.files[0]) load(e.dataTransfer.files[0]); };
+$('file').onchange = () => $('file').files[0] && load($('file').files[0]);
+
+function tsToSec(h,m,s,ms){ return (+h)*3600+(+m)*60+(+s)+(+(ms||0))/1000; }
+function fmt(t){ const m=Math.floor(t/60),s=Math.floor(t%60);
+  return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`; }
+function countChars(t){
+  const cjk=(t.match(/[\u4e00-\u9fff]/g)||[]).length;
+  const w=(t.replace(/[\u4e00-\u9fff]/g,' ').match(/[A-Za-z0-9]+/g)||[]).length;
+  return cjk+w;
+}
+
+function parse(text){
+  const out=[];
+  const re=/(\d{2}):(\d{2}):(\d{2})[,.](\d{3})\s*-->\s*(\d{2}):(\d{2}):(\d{2})[,.](\d{3})\s*\n([\s\S]*?)(?=\n\s*\n|\n\d+\s*\n|$)/g;
+  let m;
+  while((m=re.exec(text))!==null){
+    let t=m[9].replace(/\n/g,' ').trim();
+    if(t) out.push({start:tsToSec(m[1],m[2],m[3],m[4]),end:tsToSec(m[5],m[6],m[7],m[8]),text:t});
+  }
+  if(out.length) return out;
+  const lines=text.split('\n'), re2=/^\[?(?:(\d{1,2}):)?(\d{1,2}):(\d{2})\]?\s*(.+)$/, tmp=[];
+  for(const line of lines){ const mm=line.trim().match(re2);
+    if(mm&&mm[4]) tmp.push({start:tsToSec(mm[1]||0,mm[2],mm[3],0),text:mm[4].trim()}); }
+  for(let i=0;i<tmp.length;i++){ tmp[i].end=i+1<tmp.length?tmp[i+1].start:tmp[i].start+5; out.push(tmp[i]); }
+  return out;
+}
+
+function load(f){
+  const r=new FileReader();
+  r.onload=()=>{
+    segs=parse(r.result);
+    if(!segs.length){ $('fname').textContent='無法解析，請用 Vibe 匯出的 SRT/VTT 或含 [mm:ss] 的 TXT'; return; }
+    // 內建說話者標籤（Vibe 分軌輸出 Speaker 0/1）
+    segs.forEach(s=>{
+      const sp=s.text.match(/^(?:Speaker|說話者|发言人)\s*(\d+)\s*[:：]\s*(.*)$/i);
+      if(sp){ s.spk = sp[1]==='0' ? 'S':'C'; s.text=sp[2]; s.labeled=true; }
+    });
+    if(!segs.some(s=>s.labeled)) autoGuess();
+    segs.forEach(s=>{ s.chars=countChars(s.text); s.dur=Math.max(.5,s.end-s.start); });
+    $('fname').textContent=`已載入（${segs.length} 句）`;
+    renderLabels();
+    showToast(`已載入 ${segs.length} 句逐字稿`);
+    $('labelCard').hidden=false; $('result').hidden=true;
+  };
+  r.readAsText(f,'utf-8');
+}
+
+/* ---------- 說話者標記 ---------- */
+const salesHints=/我是|我們的|我們有|課程|方案|請問|方便|跟您|幫您|建議您|安排|了解一下|想問|好奇|請教/;
+function isQuestion(t){ return /[?？]|嗎$|嗎[。,，]|呢$|呢[。,，]/.test(t); }
+function autoGuess(){
+  segs.forEach(s=>{
+    let score=0;
+    if(salesHints.test(s.text)) score+=2;
+    if(isQuestion(s.text)) score+=1;
+    if(s.text.length<=6) score-=1;
+    s.spk = score>=1 ? 'S':'C';
+  });
+}
+$('autoGuess').onclick=()=>{ autoGuess(); renderLabels(); };
+$('flipAll').onclick=()=>{ segs.forEach(s=>s.spk=s.spk==='S'?'C':'S'); renderLabels(); };
+
+function renderLabels(){
+  $('labelList').innerHTML=segs.map((s,i)=>
+    `<div class="seg ${s.spk==='S'?'s':'c'}" data-i="${i}">
+      <div class="who">
+        <button class="b-s" data-set="S">業務</button>
+        <button class="b-c" data-set="C">客戶</button>
+      </div>
+      <div class="ts">${fmt(s.start)}</div><div>${s.text}</div></div>`).join('');
+  document.querySelectorAll('.seg .who button').forEach(btn=>{
+    btn.onclick=e=>{
+      const row=e.target.closest('.seg'), s=segs[+row.dataset.i];
+      s.spk=e.target.dataset.set;
+      row.className=`seg ${s.spk==='S'?'s':'c'}`;
+    };
+  });
+}
+
+/* ---------- 規則庫（依「顧問式銷售全流程 6 步驟」手冊：理解需求→判斷適配→幫助決策） ---------- */
+const RULES = {
+  steps: [
+    { key:'connect', name:'1 連結 Connect', time:'建立安全感', re:/您好|你好|我是.{0,8}(顧問|學院|老師)|請問是|方便(說話|聊|嗎)|耽誤|打擾|感謝(你|您)接/ , who:'S'},
+    { key:'discovery', name:'2 挖掘 Discovery', time:'現況目標問題動機限制', re:null, who:'S'}, // 用問句數判斷
+    { key:'clarify', name:'3 釐清 Clarify', time:'本質＋不改變的代價', re:/不改變|繼續(下去|這樣)|一直(這樣|拖|卡)|代價|成本.{0,8}(比|高|大)|看(清楚|明白)|放著不(管|處理)|如果(一直)?不(解決|處理|改變)|對你影響最大/, who:'S'},
+    { key:'diagnose', name:'4 判斷 Diagnose', time:'適配 A/B/C', re:/適不適合|(高度|部分)?適合|不適合|(我|我們)(判斷|評估|認為).{0,15}(適合|方案|建議)|依(照)?(你|您)的(狀況|條件|目標|需求)/, who:'S'},
+    { key:'recommend', name:'5 對接 Recommend', time:'方案價值對到問題', re:/我們的(課程|方案|計畫|培訓營|諮詢)|(方案|課程|培訓營|諮詢|一對一).{0,12}(適合|對應|幫|解決)|為什麼(這個)?方案|針對(你|您)的(狀況|需求|目標|問題)/, who:'S'},
+    { key:'decision', name:'6 決策 Decision', time:'協助清楚決定', re:/報名|付款|開課|下一步|安排(時間|體驗|會議)|約(個|一個|在)|(週|星期).{0,3}(方便|可以|有空)|發(連結|資料)給|Meet|體驗|(協助|幫)(你|您).{0,8}(評估|比較|決定)|行動建議/, who:'S'},
+  ],
+  layers: [
+    { n:1, name:'L1 現況', re:/大概是什麼狀況|現在.{0,6}(狀況|情況)|目前(怎麼|如何|在做|的工作)|到底發生/, sug:'問現況：「你現在大概是什麼狀況？」' },
+    { n:2, name:'L2 問題', re:/最困擾|卡(住|在)(哪|什麼)?|哪裡不(滿意|順)|什麼問題|困擾(你|您)/, sug:'問問題：「現在最困擾你的地方是什麼？」' },
+    { n:3, name:'L3 影響', re:/影響最大|不處理.{0,10}(會|造成)|一直這樣.{0,10}(對|會)|(花|佔|浪費).{0,6}(時間|多少)|損失|造成什麼/, sug:'問影響：「如果一直這樣，對你影響最大的是什麼？」' },
+    { n:4, name:'L4 動機', re:/為什麼.{0,10}(重要|現在|想改變|這麼)|什麼契機|怎麼會想(到|要)|為什麼真的/, sug:'問動機：「為什麼這件事現在對你這麼重要？」' },
+    { n:5, name:'L5 未來', re:/希望變成|想變成|什麼樣子|理想(中|的)|(解決|做到)(了|之後).{0,12}(希望|想)|最希望/, sug:'問未來：「如果真的解決了，你最希望變成什麼樣子？」' },
+  ],
+  converge: /所以(你|您)真正想(解決|要)|(你|您)真正需要的是|我(理解|抓)得?(對|準)嗎/,
+  products: /培訓營|落地培訓|企業.{0,4}AI.{0,4}(落地|培訓)|一對一諮詢|業界.{0,4}諮詢|創業者.{0,4}諮詢/,
+  fitA: /最適合(你|您).{0,20}因為|我(認為|判斷|建議).{0,12}(方案|課程|培訓營|諮詢).{0,10}(適合|建議)/,
+  fitC: /目前不建議|可能無法(真正)?幫|先不(用|急著)(報名|買|上)|現在還不適合|敢不賣|建議(你|您)先/,
+  motto: [
+    { key:'要什麼', re:/想要|需要|希望(可以|能)|想學|想用|想做/ },
+    { key:'怕什麼', re:/擔心|害怕|怕(被|跟不上|來不及)?|焦慮|被淘汰|風險|壓力/ },
+    { key:'想什麼', re:/想成為|目標|想做到|想轉(職|行)|未來想|下個階段/ },
+    { key:'愛什麼', re:/喜歡|有興趣|感興趣|覺得不錯|蠻喜歡|熱情/ },
+    { key:'爽什麼', re:/成就感|很爽|開心|有面子|被(稱讚|肯定|認可)|驕傲/ },
+  ],
+  painPattern: /沒有.{0,15}就(會|沒|不)/,   // 逃避痛苦
+  gainPattern: /(如果|要是|假如)能.{0,20}就(能|可以|會)/, // 追求卓越
+  fearWords: /完蛋|被淘汰|來不及了|一定(會)?失敗|很慘|死定|後悔一輩子/,
+  five: [
+    { key:'背景（他在哪裡）', re:/(做|從事)(什麼|哪方面)(工作|行業)|哪個產業|職業|工作(內容|性質)|背景|經驗/, sug:'補問背景：「方便了解一下你目前的工作內容和經驗嗎？」' },
+    { key:'目標（想去哪裡）', re:/目標|想達到|希望達成|想做到什麼程度|想去哪/, sug:'補問目標：「你真正想達成的結果是什麼？」' },
+    { key:'問題（真正卡住的）', re:/最大的(痛點|問題)|真正卡(住|在)|核心問題|最困擾/, sug:'補問痛點：「中間真正卡住你的、最大的痛點是什麼？」' },
+    { key:'動機（為什麼是現在）', re:/為什麼(現在|這時候)|什麼契機|怎麼會想(到|要)/, sug:'補問動機：「為什麼是現在想處理這件事？」' },
+    { key:'現實條件（預算/時間/資源）', re:/預算|費用|多少錢|價格區間|負擔|每週|每天|多少時間|時間(安排|規劃)|資源|其他限制/, sug:'補問現實條件：「預算、時間、資源上有什麼限制嗎？」' },
+  ],
+};
+
+/* ---------- 分析 ---------- */
+$('analyze').onclick=()=>{ runAnalysis(); $('result').hidden=false; showToast('分析完成');
+  window.scrollTo({top:$('result').offsetTop-10,behavior:'smooth'}); };
+
+let reportText='';
+function runAnalysis(){
+  const S=segs.filter(s=>s.spk==='S'), C=segs.filter(s=>s.spk==='C');
+  const sChars=S.reduce((a,s)=>a+s.chars,0), cChars=C.reduce((a,s)=>a+s.chars,0);
+  const custRatio=cChars/(sChars+cChars||1);
+  const totalDur=segs.length?segs[segs.length-1].end-segs[0].start:0;
+  const sQuestions=S.filter(s=>isQuestion(s.text));
+  const good=[], bad=[], sug=[];
+  const ev=s=>`<span class="ev">[${fmt(s.start)}] ${s.text.length>50?s.text.slice(0,50)+'…':s.text}</span>`;
+
+  /* 總覽 */
+  $('stats').innerHTML=`
+    <div class="stat"><div class="num">${fmt(totalDur)}</div><div class="lbl">通話長度</div></div>
+    <div class="stat"><div class="num" style="color:${custRatio>=.45?'var(--ok)':custRatio>=.3?'var(--warn)':'var(--bad)'}">${Math.round(custRatio*100)}%</div><div class="lbl">客戶說話比例</div></div>
+    <div class="stat"><div class="num">${sQuestions.length}</div><div class="lbl">業務提問數</div></div>
+    <div class="stat"><div class="num">${S.length}／${C.length}</div><div class="lbl">業務／客戶句數</div></div>
+    <div class="stat"><div class="num">${C.length?(cChars/C.length).toFixed(1):0}</div><div class="lbl">客戶平均每句字數</div></div>`;
+
+  /* 客戶說話比例（手冊檢查清單第 1 項精神：讓客戶多說） */
+  if(custRatio>=.45){ good.push(`<b>客戶說話比例 ${Math.round(custRatio*100)}%</b>——客戶願意開口，掌握「讓客戶多說」的原則`); }
+  else if(custRatio>=.3){ bad.push(`客戶說話比例 ${Math.round(custRatio*100)}%，偏低——業務講太多，客戶還沒被打開`);
+    sug.push(`提高客戶開口量：每講完一段就停，丟開放式問題。<span class="q">「你目前遇到最想解決的一件事是什麼？」</span>問完就閉嘴等答案`); }
+  else { bad.push(`<b>客戶說話比例僅 ${Math.round(custRatio*100)}%</b>——幾乎是業務獨角戲，手冊第一條就是讓客戶主動說出問題`);
+    sug.push(`下一通把前 5 分鐘目標設為「客戶說滿一半」：用<span class="q">「方便先了解一下你的狀況嗎？」</span>開場，之後每個問題只問一句、不補充`); }
+
+  /* 客戶平均句長（短回應=沒被打開） */
+  const shortReplies=C.filter(s=>s.chars<=4).length;
+  if(C.length && shortReplies/C.length>.5){
+    bad.push(`客戶有 ${shortReplies}/${C.length} 句是 4 字以內的短回應（嗯、好、對）——代表多在被動附和`);
+    sug.push(`把封閉問句改開放：不問<span class="q">「有在用 AI 嗎？」</span>改問<span class="q">「你平常都用 AI 做哪些事？」</span>`);
+  }
+
+  /* 六步驟 */
+  const stepHit={};
+  RULES.steps.forEach(st=>{
+    if(st.key==='discovery'){ stepHit[st.key]=sQuestions.length>=3 ? sQuestions[0] : null; return; }
+    stepHit[st.key]=S.find(s=>st.re.test(s.text))||null;
+  });
+  $('stepBoxes').innerHTML=RULES.steps.map(st=>{
+    const hit=stepHit[st.key];
+    return `<div class="step ${hit?'on':'off'}"><div class="nm">${st.name}</div>
+      <div>${hit?'<span class=\"mk on\">●</span>已偵測':'<span class=\"mk off\">○</span>未偵測'}</div>
+      <div style="color:var(--muted);font-size:.75rem">建議 ${st.time}</div></div>`;
+  }).join('');
+  const stepNames={connect:'連結',discovery:'挖掘',clarify:'釐清',diagnose:'判斷',recommend:'對接',decision:'決策'};
+  const doneSteps=Object.keys(stepHit).filter(k=>stepHit[k]);
+  if(doneSteps.length>=5) good.push(`六步驟完成 <b>${doneSteps.length}/6</b>：${doneSteps.map(k=>stepNames[k]).join('、')}——「理解需求→判斷適配→幫助決策」骨架完整`);
+  else if(doneSteps.length>=3) good.push(`六步驟完成 ${doneSteps.length}/6（${doneSteps.map(k=>stepNames[k]).join('、')}）`);
+  Object.keys(stepHit).forEach(k=>{
+    if(stepHit[k]) return;
+    if(k==='clarify'){ bad.push(`<b>Step 3 釐清未偵測到</b>——沒幫客戶看清「本質＋不改變的代價」（注意：是讓問題變清楚，不是製造恐懼）`);
+      sug.push(`釐清句型（現況成本 vs 改變價值，引導客戶自己說）：<span class="q">「如果一直這樣下去，對你影響最大的是什麼？」</span>`); }
+    if(k==='diagnose'){ bad.push(`<b>Step 4 判斷未偵測到</b>——沒做適配判斷（A 適合／B 部分適合／C 不適合）。手冊：這是顧問的核心價值，不是一定要賣`);
+      sug.push(`判斷句型：<span class="q">「依照你剛說的＿＿、＿＿、＿＿，我評估我們的＿＿方案適合／部分適合／目前不適合你，因為＿＿。」</span>`); }
+    if(k==='recommend'){ bad.push(`Step 5 對接未偵測到——適合的方案價值沒有對到他的問題`);
+      sug.push(`對接公式＝精準對接不介紹全部：<span class="q">「你剛提到＿＿最卡，我們＿＿方案裡的＿＿就是處理這段，所以適合你，因為＿＿。」</span>`); }
+    if(k==='decision'){ bad.push(`<b>Step 6 決策未偵測到</b>——沒有處理真實疑慮、協助做出清楚決定（不是逼單，但也不能沒收尾）`);
+      sug.push(`決策收尾：<span class="q">「你目前最主要的考量是＿＿對嗎？我幫你比較一下兩個做法…那我們下一步約＿＿或＿＿，你方便哪個？」</span>`); }
+    if(k==='connect') bad.push(`Step 1 連結未偵測到——開場沒建立安全感，客戶不會說真話`);
+    if(k==='discovery'){ bad.push(`Step 2 挖掘不足——業務問句僅 ${sQuestions.length} 句（現況/目標/問題/動機/限制要問到能判斷為止）`); }
+  });
+
+  /* 適配判斷 A/B/C 與兩大產品 */
+  const fitASeg=S.find(s=>RULES.fitA.test(s.text));
+  const fitCSeg=S.find(s=>RULES.fitC.test(s.text));
+  const prodSeg=S.find(s=>RULES.products.test(s.text));
+  if(fitASeg) good.push(`有做<b>適配判斷（A 適合）</b>並附理由——「照著 A、B、C 我認為＿＿方案適合，因為＿＿」的結構有出來 ${ev(fitASeg)}`);
+  if(fitCSeg) good.push(`有做<b>「敢不賣」的判斷（C 不適合）</b>——坦白告知目前不建議，正是手冊說的顧問價值 ${ev(fitCSeg)}`);
+  if(!fitASeg&&!fitCSeg&&stepHit['recommend']){ bad.push(`有推方案但<b>沒有明講適配結論與理由</b>——手冊要求推薦時說清楚「為什麼這個方案適合你」`);
+    sug.push(`推薦前先給結論：<span class="q">「依照你的狀況我判斷是＿＿（高度適合／部分適合），因為＿＿，所以我只推薦＿＿，其他部分你目前不需要。」</span>`); }
+  if(prodSeg) good.push(`有對接到公司產品（企業 AI 落地培訓營／一對一諮詢）${ev(prodSeg)}`);
+
+  /* 常見錯誤：急著介紹產品 */
+  const firstPitchIdx=segs.findIndex(s=>s.spk==='S'&&(RULES.steps[4].re.test(s.text)||RULES.products.test(s.text)));
+  if(firstPitchIdx>=0){
+    const qBefore=segs.slice(0,firstPitchIdx).filter(s=>s.spk==='S'&&isQuestion(s.text)).length;
+    if(qBefore<3){ bad.push(`<b>常見錯誤：急著介紹產品</b>——第一次提到方案前只問了 ${qBefore} 個問題（[${fmt(segs[firstPitchIdx].start)}] 就開始講方案）。手冊：先理解 → 再判斷 → 再建議`);
+      sug.push(`把方案往後挪：至少完成現況、問題、影響三層提問，再開口講方案。開場先用<span class="q">「你現在大概是什麼狀況？」</span>`); }
+    else good.push(`沒有急著介紹產品——第一次提方案前已完成 ${qBefore} 個提問，符合「先理解再判斷再建議」`);
+  }
+
+  /* 五層挖掘 */
+  const layerHits=RULES.layers.map(L=>({ ...L, hit:S.find(s=>L.re.test(s.text))||null }));
+  $('layerBoxes').innerHTML=layerHits.map(L=>
+    `<div class="layer ${L.hit?'hit':'miss'}">${L.name}<br>${L.hit?'<span class="mk on">●</span>':'<span class="mk off">○</span>'}</div>`).join('');
+  const deepest=layerHits.filter(L=>L.hit).length?Math.max(...layerHits.filter(L=>L.hit).map(L=>L.n)):0;
+  const convergeSeg=S.find(s=>RULES.converge.test(s.text));
+  $('convergeHint').innerHTML=convergeSeg
+    ? `<span class="mk on">●</span> 完成標準驗證：[${fmt(convergeSeg.start)}]「${convergeSeg.text}」`
+    : `<span class="mk off">○</span> 未偵測到完成標準——手冊：要能說出「<b>所以你真正想解決的是＿＿，因為＿＿；你真正需要的是＿＿，我理解對嗎？</b>」客戶說「對」才算挖到位`;
+  if(deepest>=5) good.push(`五層資訊<b>挖到 L5（未來）</b>——現況/問題/影響/動機/未來的資訊鏈完整，足以做適配判斷`);
+  else if(deepest>=3) { bad.push(`五層資訊只到第 ${deepest} 層——手冊標準：不是問滿 5 層，而是<b>資訊完整到能判斷為止</b>，目前還不足以做 A/B/C 判斷`);
+    layerHits.filter(L=>!L.hit).forEach(L=>sug.push(`${L.name} 補問：<span class="q">「${L.sug.split('：')[1]||L.sug}」</span>`)); }
+  else { bad.push(`<b>五層資訊僅到第 ${deepest} 層</b>——資訊不足就推方案，會變成「看到關鍵字就替客戶下結論」`);
+    layerHits.filter(L=>!L.hit).slice(0,3).forEach(L=>sug.push(L.sug.includes('：')?`${L.name}：<span class="q">${L.sug.split('：')[1]}</span>`:L.sug)); }
+  if(convergeSeg) good.push(`有做<b>完成標準驗證</b>——確認了「真正想解決的＋因為＋真正需要的」${ev(convergeSeg)}`);
+  else sug.push(`挖掘收尾必說：<span class="q">「所以你真正想解決的是＿＿，因為＿＿；你真正需要的是＿＿，我理解對嗎？」</span>客戶說「對」，才進判斷`);
+
+  /* 五字口訣 */
+  const mottoHits=RULES.motto.map(M=>({ ...M, seg:C.find(s=>M.re.test(s.text))||null })).filter(M=>M.seg);
+  if(mottoHits.length){
+    good.push(`客戶話中出現口訣訊號 <b>${mottoHits.map(m=>m.key).join('、')}</b>——有素材可做強化與對接${ev(mottoHits[0].seg)}`);
+    const painSide=mottoHits.some(m=>['要什麼','怕什麼'].includes(m.key));
+    const gainSide=mottoHits.some(m=>['想什麼','愛什麼','爽什麼'].includes(m.key));
+    if(painSide) sug.push(`客戶偏「要／怕」（逃避痛苦）→ 走<span class="q">「沒有…就會…」</span>路線：先幫他解決卡住的事，再談未來`);
+    if(gainSide) sug.push(`客戶偏「想／愛／爽」（追求卓越）→ 走<span class="q">「如果能…就能…」</span>路線：談三個月後他想成為的樣子`);
+  } else bad.push(`客戶語句中未偵測到五字口訣訊號（要/怕/想/愛/爽）——挖掘還沒碰到客戶在意的點`);
+
+  /* 句型使用 */
+  const painUse=S.find(s=>RULES.painPattern.test(s.text));
+  const gainUse=S.find(s=>RULES.gainPattern.test(s.text));
+  if(painUse) good.push(`有使用「沒有…就會…」逃避痛苦句型 ${ev(painUse)}`);
+  if(gainUse) good.push(`有使用「如果能…就能…」追求卓越句型 ${ev(gainUse)}`);
+  if(!painUse&&!gainUse) sug.push(`兩大句型都沒用到。強化階段挑一個：痛苦型<span class="q">「沒有把這段流程改掉，每週就繼續多花 5 小時重工」</span>；卓越型<span class="q">「如果能把 AI 嵌進報告流程，你就能準時下班還被主管看見」</span>`);
+
+  /* 底線：強化不是製造恐懼 */
+  const fearSegs=S.filter(s=>RULES.fearWords.test(s.text));
+  if(fearSegs.length) { bad.push(`<b>偵測到 ${fearSegs.length} 句可能屬「製造恐懼」的用語</b>——手冊底線：只能放大客戶自己說過的困擾，不能自己嚇客戶 ${ev(fearSegs[0])}`); }
+  else good.push(`未偵測到恐嚇式話術——符合手冊底線「強化不是製造恐懼」`);
+
+  /* 五力指標＋第六項適配判斷 */
+  const fiveMiss=RULES.five.filter(F=>!segs.some(s=>F.re.test(s.text)));
+  const fiveHit=RULES.five.length-fiveMiss.length;
+  const hasFit=!!(fitASeg||fitCSeg||stepHit['diagnose']);
+  if(fiveHit>=4&&hasFit) good.push(`五力檢核 <b>${fiveHit}/5 蒐集＋適配判斷完成</b>——前五項是蒐集資訊，第六項判斷才是顧問核心價值，這通有做到`);
+  else if(fiveHit>=4) good.push(`五力資訊蒐集 ${fiveHit}/5——資訊夠了，但別忘了第六項：明講適配判斷與理由`);
+  else { bad.push(`五力指標只蒐集到 ${fiveHit}/5——資訊不完整，第六項「適配判斷」會變成瞎猜`);
+    fiveMiss.forEach(F=>sug.push(`${F.sug.split('：')[0]}：<span class="q">${F.sug.split('：')[1]}</span>`)); }
+
+  /* 渲染報告 */
+  $('goodList').innerHTML=good.length?good.map(g=>`<li>${g}</li>`).join(''):'<li>這通電話尚未偵測到亮點——先從把五層挖掘做完整開始</li>';
+  $('badList').innerHTML=bad.length?bad.map(b=>`<li>${b}</li>`).join(''):'<li>沒有明顯缺失，維持水準</li>';
+  $('sugList').innerHTML=sug.length?sug.map(s=>`<li>${s}</li>`).join(''):'<li>流程完整，下一通維持同樣結構即可</li>';
+
+  const strip=h=>h.replace(/<[^>]+>/g,'');
+  reportText=`【電訪分析報告】\n通話長度 ${fmt(totalDur)}｜客戶說話比例 ${Math.round(custRatio*100)}%｜業務提問 ${sQuestions.length} 句\n六步驟：${RULES.steps.map(st=>`${st.name}${stepHit[st.key]?'[●]':'[○]'}`).join(' ')}\n五層挖掘：最深到 L${deepest}｜收斂驗證${convergeSeg?'[●]':'[○]'}\n\n[WELL DONE] 做得好\n${good.map(g=>'・'+strip(g)).join('\n')}\n\n[IMPROVE] 待加強\n${bad.map(b=>'・'+strip(b)).join('\n')}\n\n[SCRIPTS] 建議怎麼聊\n${sug.map(s=>'・'+strip(s)).join('\n')}`;
+
+  updateReportCounts();
+  switchPane('good');
+  animateStats();
+  drawChart();
+}
+
+$('copyReport').onclick=()=>{ navigator.clipboard.writeText(reportText); showToast('報告已複製到剪貼簿');
+  $('copyReport').textContent='已複製'; setTimeout(()=>$('copyReport').textContent='複製完整報告（文字版）',1500); };
+
+/* ---------- AI 深度分析 ---------- */
+$('apiKey').value = localStorage.getItem('gemini_key') || '';
+$('apiKey').onchange = () => localStorage.setItem('gemini_key', $('apiKey').value.trim());
+if (localStorage.getItem('gemini_model')) $('aiModel').value = localStorage.getItem('gemini_model');
+
+/* ---------- 用量估算與告警 ---------- */
+function todayKey() { return new Date().toISOString().slice(0, 10); }
+function getUsage() {
+  const u = JSON.parse(localStorage.getItem('gemini_usage') || '{}');
+  return u.date === todayKey() ? u : { date: todayKey(), count: 0, tokens: 0 };
+}
+function saveUsage(u) { localStorage.setItem('gemini_usage', JSON.stringify(u)); }
+function getLimit() { return Math.max(10, +($('quotaLimit').value) || 250); }
+$('quotaLimit').value = localStorage.getItem('gemini_limit') || 250;
+$('quotaLimit').onchange = () => { localStorage.setItem('gemini_limit', getLimit()); renderQuota(); };
+
+function renderQuota() {
+  const u = getUsage(), lim = getLimit(), pct = Math.min(100, Math.round(u.count / lim * 100));
+  $('quotaText').textContent = u.count;
+  $('quotaBar').style.width = pct + '%';
+  $('quotaBar').style.background = pct >= 95 ? 'var(--bad)' : pct >= 80 ? 'var(--warn)' : 'var(--ok)';
+  $('quotaEst').textContent = u.tokens ? `累計約 ${(u.tokens/1000).toFixed(1)}K tokens` : '';
+}
+function showQuotaModal(title, body) {
+  $('qmTitle').textContent = title;
+  $('qmBody').innerHTML = body;
+  $('quotaModal').style.display = 'flex';
+}
+function checkQuotaBefore() {
+  const u = getUsage(), lim = getLimit(), pct = u.count / lim * 100;
+  if (u.count >= lim) {
+    showQuotaModal('今日估算額度已達上限',
+      `本機估算今日已使用 <b>${u.count} / ${lim}</b> 次。<br>若官方額度確實用完，可等明日重置（太平洋時間午夜），或升級付費方案（gemini flash 每次分析成本約 NT$0.1–0.5）。`);
+    return false;
+  }
+  if (pct >= 95) showQuotaModal('免費額度即將用完',
+    `本機估算今日已使用 <b>${u.count} / ${lim}</b> 次（${Math.round(pct)}%）。<br>建議先到官方頁確認實際剩餘量，避免分析到一半中斷。`);
+  return true;
+}
+function bumpUsage(tokens) {
+  const u = getUsage(); u.count += 1; u.tokens += tokens || 0; saveUsage(u); renderQuota();
+  const lim = getLimit(), pct = u.count / lim * 100;
+  if (pct >= 80 && pct < 95) $('aiStatus').textContent += `｜注意：今日估算用量已達 ${Math.round(pct)}%`;
+}
+renderQuota();
+
+const MANUAL_PROMPT = `你是電話業務教練，依據以下公司「顧問式銷售全流程」手冊，分析這通電訪逐字稿。核心理念：理解需求→判斷適配→幫助決策。我們賣的不是方案，而是「真正適合客戶的解決方案」。
+
+【兩大產品核心】1.企業AI落地培訓營:適合需要把AI用在實際工作、把想法變成可運用成果的人(系統化教學/實戰任務產出/團隊共學)。2.真人業界/創業者一對一諮詢:適合有方向但卡關、需要針對個人情況給業界經驗與策略建議的人(精準診斷/可行解法/快速修正方向)。
+【六步驟】(不是鐵軌是地圖,依客戶狀況彈性運用) 1連結Connect(建立安全感讓對方說真話,不是尬聊) 2挖掘Discovery(找到現況/目標/問題/動機/限制,開放式提問挖到本質,不是問滿5題) 3釐清Clarify(幫客戶看清本質與不改變的代價,現況成本vs改變價值,引導客戶自己說出來,不是製造恐懼) 4判斷Diagnose(需求×目標×條件×適配,結論必為A高度適合/B部分適合/C不適合,不是一定要賣) 5對接Recommend(把適合的方案價值對到他的問題,精準對接不介紹全部,講清楚為什麼適合,不是推銷商品) 6決策Decision(處理真實疑慮的真正原因,協助評估比較,給行動建議,不是逼單)。
+【五層資訊】L1現況(現在到底發生什麼)→L2問題(哪裡不滿意/卡住)→L3影響(不處理會造成什麼)→L4動機(為什麼真的想改變/為什麼是現在)→L5未來(真正想變成什麼)。標準:不是問滿5層,而是資訊完整到能判斷為止。完成標準:能說出「所以你真正想解決的是___,因為___,如果沒有處理會___;你真正需要的是___,我理解對嗎?」客戶說「對」才算挖到位。
+【適配判斷三結果】A高度適合:清楚推薦並講明理由「依照你的A、B、C,我認為___方案最適合你,因為___」。B部分適合:只推真正需要的,不硬賣不需要的。C不適合:坦白告知目前不建議並給替代建議(敢不賣也是顧問價值)。
+【五力指標+適配】1背景(工作/行業/經驗) 2目標(想達成什麼) 3問題(真正卡住的最大痛點) 4動機(為什麼改變/為什麼現在) 5現實條件(預算/時間/能力/資源限制);前五項=蒐集資訊,第六項=適配判斷(顧問核心價值)。
+【常見錯誤vs正確】急著介紹產品→先理解再判斷再建議;看到關鍵字就替客戶下結論→聽到後檢查提問驗證;為了成交放大恐懼→讓問題變清楚;流程變成背話術→彈性運用;不適合也硬推→真不賣才是專業。
+【底線】不能教成「找痛點+放大恐懼+塞產品+解釋講→收錢」;要教成「理解→挖掘→釐清→判斷→推薦→幫助決策」。成交不代表判斷對了;顧問價值=知道客戶需要什麼、為什麼需要,敢給對他負責的建議。
+
+請輸出繁體中文 JSON（不要 markdown 圍欄）：
+{"good":[{"point":"做得好的具體描述","evidence":"引用原句(含時間)"}],
+"bad":[{"point":"待加強的具體描述","rule":"違反或未達成的手冊規則","evidence":"引用原句或說明缺漏處"}],
+"suggest":[{"scene":"什麼情境下","say":"建議的具體話術(可直接照念)"}],
+"summary":"三句以內的總評"}
+
+每個陣列 3-6 條，聚焦最重要的。逐字稿如下（S=業務, C=客戶）：\n`;
+
+$('aiBtn').onclick = async () => {
+  const key = $('apiKey').value.trim();
+  if (!key) { $('aiStatus').textContent = '請先貼上你自己的 API Key（aistudio.google.com/apikey 免費申請）'; return; }
+  if (!segs.length) { $('aiStatus').textContent = '請先載入逐字稿並完成分析'; return; }
+  if (!checkQuotaBefore()) return;
+  const transcript = segs.map(s => `[${fmt(s.start)}] ${s.spk === 'S' ? 'S' : 'C'}: ${s.text}`).join('\n');
+  const estTokens = Math.round((MANUAL_PROMPT.length + transcript.length) * 1.2) + 1200;
+  $('aiBtn').disabled = true;
+  $('aiStatus').textContent = `AI 分析中（本次預估約 ${(estTokens/1000).toFixed(1)}K tokens，10–30 秒）…`;
+  try {
+    const model = $('aiModel').value.trim() || 'gemini-3.6-flash';
+    localStorage.setItem('gemini_model', model);
+    const res = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(key)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        contents: [{ parts: [{ text: MANUAL_PROMPT + transcript }] }],
+        generationConfig: { temperature: 0.3, responseMimeType: 'application/json' }
+      })
+    });
+    if (!res.ok) {
+      const errBody = await res.json().catch(() => ({}));
+      if (res.status === 429) {
+        showQuotaModal('官方回報：額度已用完（429）',
+          `Google 回應本 Key 的免費額度已耗盡（每分鐘或每日上限）。<br>選項：<b>①</b> 等幾分鐘後重試（若是每分鐘限制）<b>②</b> 等明日重置 <b>③</b> 升級付費方案（每次分析約 NT$0.1–0.5）。`);
+        throw new Error('額度耗盡（429）——已彈窗說明處理方式');
+      }
+      throw new Error(errBody?.error?.message || `HTTP ${res.status}`);
+    }
+    const data = await res.json();
+    const usedTokens = data?.usageMetadata?.totalTokenCount || estTokens;
+    bumpUsage(usedTokens);
+    const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    const j = JSON.parse(raw.replace(/^```json\s*|```\s*$/g, ''));
+    $('aiGood').innerHTML = (j.good || []).map(g =>
+      `<li>${g.point}<span class="ev">${g.evidence || ''}</span></li>`).join('') || '<li>（無）</li>';
+    $('aiBad').innerHTML = (j.bad || []).map(b =>
+      `<li>${b.point}${b.rule ? `（規則：${b.rule}）` : ''}<span class="ev">${b.evidence || ''}</span></li>`).join('') || '<li>（無）</li>';
+    $('aiSug').innerHTML = (j.suggest || []).map(s =>
+      `<li>${s.scene ? s.scene + '：' : ''}<span class="q">「${s.say}」</span></li>`).join('') || '<li>（無）</li>';
+    $('aiOut').hidden = false;
+    $('aiStatus').textContent = 'AI 分析完成 — ' + (j.summary || '');
+    showToast('AI 深度分析完成');
+    reportText += `\n\n【AI 深度分析】\n總評：${j.summary || ''}\n[WELL DONE] ${(j.good||[]).map(g=>g.point).join('；')}\n[IMPROVE] ${(j.bad||[]).map(b=>b.point).join('；')}\n[SCRIPTS] ${(j.suggest||[]).map(s=>s.say).join('；')}`;
+  } catch (e) {
+    $('aiStatus').textContent = '分析失敗：' + e.message + '（請確認 Key 是否有效、額度是否用完）';
+  } finally {
+    $('aiBtn').disabled = false;
+  }
+};
+
+
+
+/* ---------- v9 Toast 回饋 ---------- */
+let toastTimer=null;
+function showToast(msg){
+  $('toastMsg').textContent=msg;
+  $('toast').classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(()=>$('toast').classList.remove('show'),2200);
+}
+
+/* ---------- v8 互動：報告分頁 ---------- */
+const PANES=['good','bad','sug'];
+function switchPane(name){
+  document.querySelectorAll('.rtab').forEach(t=>t.classList.toggle('active',t.dataset.pane===name));
+  document.querySelectorAll('.rpager .pnum').forEach(t=>t.classList.toggle('active',t.dataset.pane===name));
+  document.querySelectorAll('.rpane').forEach(t=>t.classList.toggle('active',t.dataset.pane===name));
+}
+document.querySelectorAll('.rtab,.rpager .pnum').forEach(el=>el.onclick=()=>switchPane(el.dataset.pane));
+function paneStep(dir){
+  const cur=document.querySelector('.rpane.active')?.dataset.pane||'good';
+  switchPane(PANES[(PANES.indexOf(cur)+dir+PANES.length)%PANES.length]);
+}
+$('rPrev').onclick=()=>paneStep(-1);
+$('rNext').onclick=()=>paneStep(1);
+document.addEventListener('keydown',e=>{
+  if($('result').hidden||e.target.tagName==='INPUT'||e.target.tagName==='TEXTAREA') return;
+  if(e.key==='ArrowLeft') paneStep(-1);
+  if(e.key==='ArrowRight') paneStep(1);
+});
+function updateReportCounts(){
+  $('cntGood').textContent=$('goodList').children.length;
+  $('cntBad').textContent=$('badList').children.length;
+  $('cntSug').textContent=$('sugList').children.length;
+  document.querySelectorAll('ul.report li').forEach(li=>{
+    if(li.querySelector('.ev')) li.classList.add('has-ev');
+  });
+}
+/* 證據展開（事件委派，AI 判讀列也適用） */
+document.addEventListener('click',e=>{
+  const li=e.target.closest('ul.report li.has-ev');
+  if(li) li.classList.toggle('open');
+});
+/* 復盤自查打勾 */
+document.querySelectorAll('.faq li').forEach(li=>li.onclick=()=>li.classList.toggle('done'));
+/* 統計數字動畫 */
+function animateStats(){
+  document.querySelectorAll('.stat .num').forEach(el=>{
+    const m=el.textContent.match(/^(\d+)(%?)$/);
+    if(!m) return;
+    const target=+m[1], suffix=m[2], t0=performance.now();
+    const tick=now=>{
+      const p=Math.min(1,(now-t0)/600);
+      el.textContent=Math.round(target*(1-Math.pow(1-p,3)))+suffix;
+      if(p<1) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  });
+}
+
+/* ---------- 節奏圖 ---------- */
+function drawChart(){
+  const vals=segs.map(s=>s.chars);
+  const colors=segs.map(s=>s.spk==='S'?'rgba(237,237,237,.9)':'rgba(255,90,60,.9)');
+  if(chart) chart.destroy();
+  chart=new Chart($('chart'),{
+    type:'bar',
+    data:{ labels:segs.map(s=>fmt(s.start)),
+      datasets:[{ label:'每句字數（白=業務 紅=客戶）', data:vals, backgroundColor:colors, borderRadius:3 }] },
+    options:{ responsive:true, maintainAspectRatio:false,
+      onClick:(e,els)=>{ if(els.length){ const s=segs[els[0].index];
+        $('clicked').textContent=`[${fmt(s.start)}] ${s.spk==='S'?'業務':'客戶'}（${s.chars}字）：${s.text}`; } },
+      plugins:{ legend:{ labels:{ color:'#8a8a8a', font:{ family:'JetBrains Mono' } } },
+        tooltip:{ callbacks:{ afterBody:items=>{
+          const s=segs[items[0].dataIndex];
+          return (s.spk==='S'?'業務：':'客戶：')+(s.text.length>50?s.text.slice(0,50)+'…':s.text); } } } },
+      scales:{ x:{ ticks:{ color:'#5a5a5a', maxTicksLimit:18, font:{ family:'JetBrains Mono', size:10 } }, grid:{ color:'rgba(255,255,255,.05)' } },
+               y:{ ticks:{ color:'#5a5a5a', font:{ family:'JetBrains Mono', size:10 } }, grid:{ color:'rgba(255,255,255,.05)' } } } }
+  });
+}
+</script>
+</body>
+</html>
