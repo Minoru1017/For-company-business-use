@@ -96,6 +96,11 @@
   .demo-guide-table th { background:#1a1a1a; color:var(--muted); font-weight:600; }
   .demo-guide-table td:first-child { font-family:var(--mono); color:var(--ok); white-space:nowrap; }
   .demo-guide-table td:last-child { color:var(--muted); }
+  .demo-guide-token { margin:0 0 12px 1.2em; color:var(--muted); }
+  .demo-guide-token li { margin:8px 0; }
+  .demo-guide-token a { color:var(--ok); text-decoration:none; }
+  .demo-guide-token a:hover { text-decoration:underline; }
+  .demo-guide-token code { font-family:var(--mono); font-size:.75rem; color:var(--warn); }
 
   button { background:transparent; color:var(--text); border:1px solid var(--border);
            border-radius:99px; padding:10px 20px; font-size:.85rem; cursor:pointer;
@@ -411,6 +416,19 @@
             <tr><td>.env</td><td>HF_TOKEN=hf_你的token</td></tr>
           </tbody>
         </table>
+
+        <p class="demo-guide-sub">HF_TOKEN 取得方式（首次設定，約 5 分鐘）</p>
+        <p class="hint" style="margin:0 0 8px">用於 WhisperX「誰在說話」分軌。Token 只寫在本機 <code>.env</code>，不會上傳到 Call Coach。</p>
+        <ol class="demo-guide-token">
+          <li>註冊 Hugging Face 帳號：<a href="https://huggingface.co/join" target="_blank" rel="noopener">huggingface.co/join</a></li>
+          <li>建立 Read Token：<a href="https://huggingface.co/settings/tokens" target="_blank" rel="noopener">Settings → Access Tokens</a> → 點 <strong>New token</strong> → Type 選 <strong>Read</strong> → 複製（開頭 <code>hf_</code>，只顯示一次）</li>
+          <li>同意三個模型授權（同一帳號登入，各頁按 Agree）：
+            <a href="https://huggingface.co/pyannote/speaker-diarization-community-1" target="_blank" rel="noopener">community-1</a>、
+            <a href="https://huggingface.co/pyannote/speaker-diarization-3.1" target="_blank" rel="noopener">diarization-3.1</a>、
+            <a href="https://huggingface.co/pyannote/segmentation-3.0" target="_blank" rel="noopener">segmentation-3.0</a>
+          </li>
+          <li>用記事本開啟 <code>demo-workspace\.env</code>，填入一行（等號前後<strong>不要空格</strong>、不要引號）：<br><code>HF_TOKEN=hf_貼上你的token</code></li>
+        </ol>
 
         <div class="demo-guide-links">
           <a class="demo-guide-btn" href="./demo-transcribe-cmd-guide.pdf" target="_blank" rel="noopener">下載 CMD 操作手冊（PDF）</a>

@@ -189,15 +189,27 @@ python -m venv .venv
 
 .venv\Scripts\python.exe -m pip install whisperx</pre>
 
-<h3>4-4 設定 Hugging Face Token</h3>
-<p>用記事本開啟 <code>.env</code>，填入（等號前後不要空格）：</p>
-<pre>HF_TOKEN=hf_你的token</pre>
-<p>並到 Hugging Face 同意以下三個模型授權（同一帳號）：</p>
-<ul>
-  <li>pyannote/speaker-diarization-community-1</li>
-  <li>pyannote/speaker-diarization-3.1</li>
-  <li>pyannote/segmentation-3.0</li>
-</ul>
+<h3>4-4 取得並設定 Hugging Face Token（HF_TOKEN）</h3>
+<p>轉錄時需要 Token 才能使用 pyannote 模型做「誰在說話」分軌。Token 只寫在本機 <code>.env</code>，不會上傳到 Sales Call Coach。</p>
+
+<div class="step"><div class="step-num">1</div><div><strong>註冊帳號</strong><br>前往 <a href="https://huggingface.co/join">https://huggingface.co/join</a> 建立免費帳號（可用公司信箱）。</div></div>
+<div class="step"><div class="step-num">2</div><div><strong>建立 Read Token</strong><br>
+  開啟 <a href="https://huggingface.co/settings/tokens">Settings → Access Tokens</a><br>
+  點 <strong>New token</strong> → Name 隨意 → Type 選 <strong>Read</strong> → Create<br>
+  複製產生的 Token（開頭 <code>hf_</code>，<strong>只會顯示一次</strong>，請先貼到記事本暫存）
+</div></div>
+<div class="step"><div class="step-num">3</div><div><strong>同意三個模型授權</strong>（用<strong>同一帳號</strong>登入，各頁面按 <strong>Agree and access repository</strong>）：
+  <ul>
+    <li><a href="https://huggingface.co/pyannote/speaker-diarization-community-1">pyannote/speaker-diarization-community-1</a></li>
+    <li><a href="https://huggingface.co/pyannote/speaker-diarization-3.1">pyannote/speaker-diarization-3.1</a></li>
+    <li><a href="https://huggingface.co/pyannote/segmentation-3.0">pyannote/segmentation-3.0</a></li>
+  </ul>
+</div></div>
+<div class="step"><div class="step-num">4</div><div><strong>寫入 .env</strong><br>
+  用記事本開啟 <code>demo-workspace\.env</code>，填入一行（等號前後<strong>不要空格</strong>、不要引號）：
+  <pre>HF_TOKEN=hf_貼上你的token</pre>
+  存檔後關閉。若出現 <code>gated repo</code> 錯誤，通常是 Token 填錯或尚未同意上述三個模型。
+</div></div>
 
 <div class="page-break"></div>
 
