@@ -53,5 +53,6 @@ demo-workspace/
 
 ## 相關文件
 
+- **CMD 操作手冊（PDF）**：`DEMO轉錄-CMD操作手冊.pdf`（亦可開啟 `.html` 用瀏覽器列印）
 - `疑難排解.md`
 - `docs/whisperx-setup.md`
