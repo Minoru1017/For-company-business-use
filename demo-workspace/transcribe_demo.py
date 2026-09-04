@@ -57,21 +57,37 @@ def find_mp4(arg: str | None) -> Path:
     raise FileNotFoundError("input 資料夾沒有 MP4。請放入 input/ 或指定路徑。")
 
 
+def whisperx_cmd() -> list[str]:
+    if WHISPERX.exists():
+        return [str(WHISPERX)]
+    alt = ROOT / ".venv" / "Scripts" / "whisperx.cmd"
+    if alt.exists():
+        return ["cmd", "/c", str(alt)]
+    return [str(VENV_PY), "-m", "whisperx"]
+
+
 def run(cmd: list[str], env: dict[str, str] | None = None) -> None:
+    exe = cmd[0]
+    if exe not in ("cmd",) and not Path(exe).exists() and shutil.which(exe) is None:
+        raise FileNotFoundError(f"找不到可執行檔: {exe}")
     print(">", " ".join(cmd))
-    subprocess.run(cmd, check=True, cwd=ROOT, env=env)
+    try:
+        subprocess.run(cmd, check=True, cwd=ROOT, env=env)
+    except FileNotFoundError as e:
+        raise FileNotFoundError(f"無法執行: {cmd[0]} — 請確認已安裝 (python setup_demo.py)") from e
 
 
 def main() -> int:
     print("=== DEMO 轉錄 ===\n")
 
     if not VENV_PY.exists():
-        print("[錯誤] 尚未安裝。請先執行: python setup_demo.py")
+        print(f"[錯誤] 尚未安裝。請先執行: python setup_demo.py")
+        print(f"  預期路徑: {VENV_PY}")
         return 1
 
-    if not WHISPERX.exists():
-        print("[錯誤] 找不到 whisperx。請先執行: python setup_demo.py")
-        return 1
+    wx = whisperx_cmd()
+    print(f"工作目錄: {ROOT}")
+    print(f"WhisperX: {' '.join(wx)}")
 
     env_vars = os.environ.copy()
     env_vars["HF_HOME"] = str(ROOT / "models")
@@ -99,7 +115,7 @@ def main() -> int:
     wav = mp4.with_suffix(".wav")
     audio = mp4
 
-    ffmpeg = shutil_which("ffmpeg")
+    ffmpeg = shutil.which("ffmpeg")
     if ffmpeg:
         print("\n[1/2] 抽取音軌 ...")
         run(
@@ -128,8 +144,8 @@ def main() -> int:
 
     print("\n[2/2] 開始轉錄（請接電源，2 小時 DEMO 約 1.5～3 小時）\n")
     run(
-        [
-            str(WHISPERX),
+        wx
+        + [
             str(audio),
             "--model",
             MODEL,
@@ -167,15 +183,16 @@ def main() -> int:
     return 0
 
 
-def shutil_which(name: str) -> str | None:
-    import shutil
-
-    return shutil.which(name)
-
-
 if __name__ == "__main__":
     try:
         raise SystemExit(main())
+    except FileNotFoundError as e:
+        print(f"\n[錯誤] {e}")
+        print("\n請在 demo-workspace 資料夾執行以下檢查:")
+        print("  dir transcribe_demo.py")
+        print("  dir .venv\\Scripts\\whisperx.exe")
+        print("  dir input\\*.mp4")
+        raise SystemExit(1)
     except subprocess.CalledProcessError as e:
         print(f"\n[錯誤] 轉錄失敗 (結束碼 {e.returncode})")
         raise SystemExit(1)
