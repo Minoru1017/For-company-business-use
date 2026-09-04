@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+  <meta charset="UTF-8" />
+  <title>DEMO 錄影轉逐字稿 — CMD 操作手冊</title>
+  <style>
+    @page { margin: 18mm 16mm; }
+    * { box-sizing: border-box; }
+    body {
+      font-family: "Microsoft JhengHei", "PingFang TC", "Noto Sans TC", sans-serif;
+      font-size: 11pt;
+      line-height: 1.65;
+      color: #1a1a1a;
+      max-width: 210mm;
+      margin: 0 auto;
+      padding: 12mm;
+    }
+    h1 {
+      font-size: 22pt;
+      color: #0d3b66;
+      border-bottom: 3px solid #0d3b66;
+      padding-bottom: 8px;
+      margin-top: 0;
+    }
+    h2 {
+      font-size: 14pt;
+      color: #0d3b66;
+      margin-top: 22px;
+      padding-left: 10px;
+      border-left: 4px solid #f4a261;
+    }
+    h3 { font-size: 12pt; color: #333; margin-top: 14px; }
+    .subtitle { color: #555; font-size: 11pt; margin-bottom: 20px; }
+    .box {
+      background: #f0f6fb;
+      border: 1px solid #b8d4e8;
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin: 12px 0;
+    }
+    .warn {
+      background: #fff8e6;
+      border: 1px solid #f0c040;
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin: 12px 0;
+    }
+    .ok {
+      background: #edf7ed;
+      border: 1px solid #81c784;
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin: 12px 0;
+    }
+    pre, code {
+      font-family: Consolas, "Courier New", monospace;
+      font-size: 9.5pt;
+    }
+    pre {
+      background: #1e2a38;
+      color: #e8f0f8;
+      padding: 14px 16px;
+      border-radius: 8px;
+      overflow-x: auto;
+      white-space: pre-wrap;
+      word-break: break-all;
+      line-height: 1.5;
+      margin: 10px 0;
+    }
+    code { background: #eee; padding: 1px 5px; border-radius: 3px; color: #c0392b; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      margin: 12px 0;
+      font-size: 10.5pt;
+    }
+    th, td {
+      border: 1px solid #ccc;
+      padding: 8px 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th { background: #0d3b66; color: #fff; }
+    tr:nth-child(even) { background: #f7f9fb; }
+    .step {
+      display: flex;
+      gap: 12px;
+      margin: 10px 0;
+      align-items: flex-start;
+    }
+    .step-num {
+      flex-shrink: 0;
+      width: 28px;
+      height: 28px;
+      background: #0d3b66;
+      color: #fff;
+      border-radius: 50%;
+      text-align: center;
+      line-height: 28px;
+      font-weight: bold;
+      font-size: 12pt;
+    }
+    .flow {
+      text-align: center;
+      font-size: 11pt;
+      padding: 14px;
+      background: #fafafa;
+      border: 1px dashed #aaa;
+      border-radius: 8px;
+      margin: 14px 0;
+    }
+    .page-break { page-break-before: always; }
+    ul { padding-left: 20px; }
+    li { margin: 4px 0; }
+    .footer { margin-top: 30px; font-size: 9pt; color: #777; text-align: center; }
+  </style>
+</head>
+<body>
+
+<h1>DEMO 錄影轉逐字稿</h1>
+<p class="subtitle">CMD 命令提示字元操作手冊｜全程本機處理，音檔不上傳雲端<br>
+適用：1～2 小時 DEMO 錄影（MP4）→ 逐字稿（SRT）→ Sales Call Coach 分析</p>
+
+<div class="box">
+  <strong>你需要準備：</strong>
+  <ul>
+    <li>已安裝 Python、ffmpeg、WhisperX（<code>.venv</code> 資料夾）</li>
+    <li><code>.env</code> 內已填入 Hugging Face Token</li>
+    <li>DEMO 錄影檔（MP4）放入 <code>input\</code> 資料夾</li>
+  </ul>
+</div>
+
+<h2>一、整體流程（一張圖看懂）</h2>
+<div class="flow">
+  DEMO 錄影 MP4<br>↓ 放入 input 資料夾<br>↓ CMD 執行轉錄指令<br>↓ 等待 1.5～3 小時（請接電源）<br>↓ 到 output 資料夾取 .srt<br>↓ 上傳 Sales Call Coach 分析
+</div>
+
+<h2>二、資料夾結構</h2>
+<pre>C:\Users\你的帳號\demo-workspace\
+├── .env              ← Token 設定檔（勿分享）
+├── .venv\            ← 轉錄程式（自動建立）
+│   └── Scripts\
+│       └── whisperx.exe   ← ★ 轉錄時要用這個
+├── models\           ← AI 模型快取（約 3～6 GB）
+├── input\            ← ★ 把 MP4 放這裡
+│   └── demo.mp4
+└── output\           ← ★ 轉好的 SRT 在這裡</pre>
+
+<div class="warn">
+  <strong>⚠ 常見錯誤：</strong> 路徑要寫 <code>.venv\Scripts\whisperx.exe</code>，<strong>不是</strong> <code>Scripts\whisperx.exe</code>（少了 <code>.venv\</code> 會找不到檔案）。
+</div>
+
+<h2>三、如何開啟 CMD（命令提示字元）</h2>
+
+<div class="step"><div class="step-num">1</div><div>開啟檔案總管，進入 <code>demo-workspace</code> 資料夾</div></div>
+<div class="step"><div class="step-num">2</div><div>點一下上方<strong>網址列</strong>（顯示路徑的那一行）</div></div>
+<div class="step"><div class="step-num">3</div><div>輸入 <code>cmd</code>，按 <strong>Enter</strong></div></div>
+<div class="step"><div class="step-num">4</div><div>出現黑底白字視窗，即為 CMD（轉錄過程<strong>不要關閉</strong>）</div></div>
+
+<h2>四、第一次使用（只需做一次）</h2>
+
+<h3>4-1 安裝 Python（若尚未安裝）</h3>
+<p>下載：<strong>https://www.python.org/downloads/</strong><br>
+安裝時務必勾選 <strong>Add python.exe to PATH</strong>，裝完重開電腦。</p>
+
+<h3>4-2 安裝 ffmpeg</h3>
+<pre>winget install Gyan.FFmpeg</pre>
+
+<h3>4-3 建立虛擬環境並安裝 WhisperX</h3>
+<pre>cd /d C:\Users\你的帳號\demo-workspace
+
+python -m venv .venv
+
+.venv\Scripts\python.exe -m pip install -U pip wheel
+
+.venv\Scripts\python.exe -m pip install whisperx</pre>
+
+<h3>4-4 設定 Hugging Face Token</h3>
+<p>用記事本開啟 <code>.env</code>，填入（等號前後不要空格）：</p>
+<pre>HF_TOKEN=hf_你的token</pre>
+<p>並到 Hugging Face 同意以下三個模型授權（同一帳號）：</p>
+<ul>
+  <li>pyannote/speaker-diarization-community-1</li>
+  <li>pyannote/speaker-diarization-3.1</li>
+  <li>pyannote/segmentation-3.0</li>
+</ul>
+
+<div class="page-break"></div>
+
+<h2>五、每次轉 DEMO（重點！複製貼上即可）</h2>
+
+<h3>步驟 1：放入錄影</h3>
+<p>將 MP4 複製到 <code>input\</code> 資料夾。建議檔名：<code>demo.mp4</code></p>
+<div class="warn">若檔名變成 <code>demo.mp4.mp4</code>（雙副檔名），請重新命名為 <code>demo.mp4</code>，或將下方指令中的檔名改成實際檔名。</div>
+
+<h3>步驟 2：開啟 CMD 並進入資料夾</h3>
+<pre>cd /d C:\Users\你的帳號\demo-workspace</pre>
+<p>（把「你的帳號」改成你的 Windows 使用者名稱，例如 <code>經銷業務</code>）</p>
+
+<h3>步驟 3：設定環境並讀取 Token</h3>
+<pre>set HF_HOME=%CD%\models
+set HUGGINGFACE_HUB_CACHE=%CD%\models\hub
+
+for /f "usebackq tokens=1,* delims==" %a in (".env") do if /i "%a"=="HF_TOKEN" set HF_TOKEN=%b</pre>
+
+<h3>步驟 4：從 MP4 抽出音軌（約 1～3 分鐘）</h3>
+<pre>ffmpeg -y -i input\demo.mp4 -vn -ac 1 -ar 16000 -c:a pcm_s16le input\demo.wav</pre>
+<p>若已有 <code>demo.wav</code> 可跳過此步驟。</p>
+
+<h3>步驟 5：開始轉錄（最久，請接電源）</h3>
+<pre>.venv\Scripts\whisperx.exe input\demo.wav --model medium --language zh --device cpu --compute_type int8 --threads 8 --batch_size 4 --diarize --hf_token %HF_TOKEN% --min_speakers 2 --max_speakers 2 --output_format srt --output_dir output</pre>
+
+<div class="box">
+  <strong>預估時間（Intel 內顯 CPU 筆電）：</strong><br>
+  2 小時 DEMO 約需 <strong>1.5～3 小時</strong>。轉錄中請接電源、關閉不必要的程式。
+</div>
+
+<h3>步驟 6：確認結果</h3>
+<pre>dir output\*.srt</pre>
+<p>到 <code>output\</code> 資料夾取得 <code>.srt</code> 檔。</p>
+
+<h2>六、上傳 Sales Call Coach</h2>
+<ol>
+  <li>開啟網址：<strong>https://minoru1017.github.io/For-company-business-use/</strong></li>
+  <li>上傳 <code>output\</code> 內的 <code>.srt</code> 檔</li>
+  <li>確認 <code>SPEAKER_00</code>＝顧問、<code>SPEAKER_01</code>＝客戶</li>
+  <li>若兩者對調 → 點「<strong>全部互換</strong>」</li>
+  <li>Tab 微調少數錯誤 → 按「<strong>開始分析</strong>」</li>
+</ol>
+
+<div class="page-break"></div>
+
+<h2>七、一頁速查（每次轉錄複製這段）</h2>
+<pre>cd /d C:\Users\你的帳號\demo-workspace
+set HF_HOME=%CD%\models
+set HUGGINGFACE_HUB_CACHE=%CD%\models\hub
+for /f "usebackq tokens=1,* delims==" %a in (".env") do if /i "%a"=="HF_TOKEN" set HF_TOKEN=%b
+ffmpeg -y -i input\demo.mp4 -vn -ac 1 -ar 16000 -c:a pcm_s16le input\demo.wav
+.venv\Scripts\whisperx.exe input\demo.wav --model medium --language zh --device cpu --compute_type int8 --threads 8 --batch_size 4 --diarize --hf_token %HF_TOKEN% --min_speakers 2 --max_speakers 2 --output_format srt --output_dir output
+dir output\*.srt</pre>
+
+<h2>八、常見問題</h2>
+<table>
+  <tr><th>錯誤訊息</th><th>原因</th><th>解法</th></tr>
+  <tr>
+    <td>系統找不到指定的路徑</td>
+    <td>路徑寫錯</td>
+    <td>確認是 <code>.venv\Scripts\whisperx.exe</code>（有 <code>.venv\</code>）</td>
+  </tr>
+  <tr>
+    <td>找不到 demo.mp4</td>
+    <td>MP4 不在 input 資料夾</td>
+    <td>把錄影放入 <code>input\</code>，或檢查檔名是否為 <code>demo.mp4.mp4</code></td>
+  </tr>
+  <tr>
+    <td>gated repo / Please log in</td>
+    <td>Token 無效或未授權</td>
+    <td>檢查 <code>.env</code> 的 HF_TOKEN；同意三個 pyannote 模型；重建 Token</td>
+  </tr>
+  <tr>
+    <td>找不到 python</td>
+    <td>Python 未安裝或未加 PATH</td>
+    <td>重新安裝 Python 並勾選 Add to PATH</td>
+  </tr>
+  <tr>
+    <td>.bat 無法執行</td>
+    <td>公司電腦封鎖批次檔</td>
+    <td>改用本手冊的 CMD 指令（不用 .bat）</td>
+  </tr>
+</table>
+
+<h2>九、隱私提醒</h2>
+<div class="ok">
+  <ul>
+    <li>DEMO 錄影與逐字稿存放於公司受控位置，勿上傳個人雲端</li>
+    <li>勿將 <code>.env</code>（Token）或客戶逐字稿分享至公開場合</li>
+    <li>使用 Call Coach 的 Gemini 分析前，請先去識別化並勾選同意</li>
+    <li>刪除整個 <code>demo-workspace</code> 資料夾即可完全移除本工具</li>
+  </ul>
+</div>
+
+<p class="footer">Sales Call Coach · DEMO 轉錄 CMD 操作手冊 · 2026</p>
+
+</body>
+</html>

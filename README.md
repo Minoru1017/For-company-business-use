@@ -42,6 +42,7 @@ npm test         # 執行 Vitest 測試
 ## 文件
 
 - 技術交接：`docs/technical-handoff.pdf`
+- **DEMO 轉錄 CMD 操作手冊（PDF）**：`docs/demo-transcribe-cmd-guide.pdf`
 - **Vibe 匯出設定檢查清單**：`docs/vibe-export-checklist.md`（電訪 < 20 分鐘）
 - **WhisperX 離線轉錄 SOP**：`docs/whisperx-setup.md`（DEMO 1～2 小時，不上雲）
 - **DEMO 轉錄工作區**：`demo-workspace/`（虛擬環境 + 模型 + 錄影同一資料夾）

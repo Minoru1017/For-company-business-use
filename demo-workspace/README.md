@@ -1,25 +1,36 @@
 # DEMO 轉錄工作區
 
-**一鍵自動化**：不用一行一行貼指令。
+**公司電腦封鎖 .bat 時，請用 Python 腳本（下方「封鎖 .bat」一節）。**
 
 ---
 
-## 第一次使用（只做一次）
+## 封鎖 .bat / 無法雙擊安裝時（推薦）
 
-1. 雙擊 **`安裝.bat`**
-2. 記事本開啟 **`.env`**，填入 `HF_TOKEN=hf_你的token`
-3. 到 Hugging Face 同意三個 pyannote 模型（若尚未完成）
+在 `demo-workspace` 資料夾開啟**命令提示字元**（網址列輸入 `cmd`），只需兩條指令：
+
+```cmd
+cd /d C:\Users\經銷業務\demo-workspace
+
+python setup_demo.py
+```
+
+`.env` 填好 `HF_TOKEN` 後，每次轉 DEMO：
+
+```cmd
+python transcribe_demo.py
+```
+
+MP4 放在 `input\` 即可（自動找最新的 `.mp4`）。
 
 ---
 
-## 每次轉 DEMO（二選一）
+## 若 .bat 可用：一鍵雙擊
 
-| 方式 | 操作 |
+| 檔案 | 用途 |
 |------|------|
-| **一鍵轉錄** | MP4 放入 `input\` → 雙擊 **`一鍵轉錄.bat`** |
-| **拖放轉錄** | 把 MP4 **拖到** **`拖放轉錄.bat`** 上 |
-
-完成後到 **`output\`** 取 `.srt` → 上傳 [Call Coach](https://minoru1017.github.io/For-company-business-use/)
+| `安裝.bat` | 第一次安裝 |
+| `一鍵轉錄.bat` | MP4 放 `input\` 後雙擊 |
+| `拖放轉錄.bat` | 拖 MP4 到檔案上 |
 
 ---
 
@@ -27,27 +38,21 @@
 
 ```
 demo-workspace/
-├── 安裝.bat           ← 第一次：雙擊
-├── 一鍵轉錄.bat       ← 每次：MP4 放 input 後雙擊
-├── 拖放轉錄.bat       ← 每次：拖 MP4 到這個檔案
-├── .env               ← HF_TOKEN
-├── input/             ← 放錄影
-├── output/            ← 轉好的 SRT
-├── .venv/             ← 自動建立
-└── models/            ← 模型快取
+├── setup_demo.py       ← 封鎖 bat 時：python setup_demo.py
+├── transcribe_demo.py  ← 封鎖 bat 時：python transcribe_demo.py
+├── .env                ← HF_TOKEN
+├── input/              ← 放 MP4
+├── output/             ← 取 SRT
+├── .venv/
+└── models/
 ```
 
----
-
-## 注意
-
-- 轉錄中請**接電源**，2 小時 DEMO 約需 1.5～3 小時
-- 刪除整個 `demo-workspace` 資料夾 = 完全移除
-- 疑難排解：見 `疑難排解.md`
+完成後上傳 `output\*.srt` → [Call Coach](https://minoru1017.github.io/For-company-business-use/)
 
 ---
 
 ## 相關文件
 
+- **CMD 操作手冊（PDF）**：`DEMO轉錄-CMD操作手冊.pdf`（亦可開啟 `.html` 用瀏覽器列印）
+- `疑難排解.md`
 - `docs/whisperx-setup.md`
-- `docs/vibe-export-checklist.md`（電訪用 Vibe）
