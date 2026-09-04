@@ -11,11 +11,12 @@
 
 ```
 demo-workspace/
-├── setup.ps1          ← 一次性安裝（建立 .venv、下載依賴）
-├── transcribe.ps1     ← 每次轉錄 DEMO
+├── setup.cmd          ← 雙擊安裝（推薦，不需 PowerShell）
+├── transcribe.cmd     ← 雙擊轉錄
+├── 疑難排解.md         ← 不能執行時看這裡
 ├── .env.example       ← 複製成 .env，填入 HF_TOKEN
-├── .venv/             ← Python 虛擬環境（自動建立，勿提交 Git）
-├── models/            ← AI 模型快取（自動建立，約 3～6 GB）
+├── .venv/             ← Python 虛擬環境（自動建立）
+├── models/            ← AI 模型快取（約 3～6 GB）
 ├── input/             ← 放入 demo.mp4
 └── output/            ← 轉錄完成的 .srt
 ```
@@ -24,74 +25,56 @@ demo-workspace/
 
 ## 快速開始（Windows）
 
-### 1. 前置：Python + ffmpeg
+> **請雙擊 `setup.cmd`，不要用 `setup.ps1`。**
 
-```powershell
-# 確認 Python 3.10～3.12
-python --version
+### 1. 安裝 Python（若尚未安裝）
 
-# 若尚未安裝 ffmpeg
-winget install Gyan.FFmpeg
-```
+下載：https://www.python.org/downloads/ （建議 3.11）
+
+安裝時**務必勾選** `Add python.exe to PATH`，裝完**重開電腦**。
 
 ### 2. 一次性安裝
 
-在 `demo-workspace` 資料夾內，於 PowerShell 執行：
+**雙擊 `setup.cmd`**
 
-```powershell
-cd 路徑\到\demo-workspace
-.\setup.ps1
+或在命令提示字元：
+
+```cmd
+cd C:\Users\經銷業務\demo-workspace
+setup.cmd
 ```
 
-### 3. 設定 Hugging Face Token（分軌用，僅首次）
+### 3. 設定 HF_TOKEN
 
-```powershell
-copy .env.example .env
-notepad .env
+用記事本開啟 `.env`：
+
+```
+HF_TOKEN=hf_你的token
 ```
 
-填入 `HF_TOKEN=hf_你的token`，並到以下頁面接受授權：  
-https://huggingface.co/pyannote/speaker-diarization-community-1
+並接受授權：https://huggingface.co/pyannote/speaker-diarization-community-1
 
-### 4. 轉錄 DEMO
+### 4. 轉錄
 
-將錄影檔命名為 `demo.mp4` 放入 `input\`，然後：
+將 `demo.mp4` 放入 `input\`，**雙擊 `transcribe.cmd`**。
 
-```powershell
-.\transcribe.ps1
-```
+完成後到 `output\` 取 `.srt` → 上傳 [Sales Call Coach](https://minoru1017.github.io/For-company-business-use/)
 
-或指定檔名：
+---
 
-```powershell
-.\transcribe.ps1 -InputFile "客戶A-20260904.mp4"
-```
+## 不能執行？
 
-完成後到 `output\` 取 `.srt`，上傳 [Sales Call Coach](https://minoru1017.github.io/For-company-business-use/)。
+見 **`疑難排解.md`**（含完全手動安裝步驟）
 
 ---
 
 ## 完全移除
 
-關閉 PowerShell 後，直接刪除整個 `demo-workspace` 資料夾即可。  
-不需額外解除安裝程式。
-
----
-
-## 硬體參考（Intel 內顯筆電）
-
-| 模型 | 2 小時 DEMO 預估 |
-|------|----------------|
-| `medium`（預設） | 約 1.5～2.5 小時 |
-| `large-v3-turbo` | 約 2.5～4 小時 |
-
-```powershell
-.\transcribe.ps1 -Model large-v3-turbo
-```
+刪除整個 `demo-workspace` 資料夾即可。
 
 ---
 
 ## 相關文件
 
 - 完整 SOP：`docs/whisperx-setup.md`
-- Vibe 電訪流程：`docs/vibe-export-checklist.md`
+- Vibe 電訪：`docs/vibe-export-checklist.md`
