@@ -2,11 +2,15 @@
 const SPEAKER_PREFIX_RE =
   /^(?:Speaker|說話者|发言人|發言者)\s*(\d+)\s*(?:[:：]\s*|\]\s*|[-–—]\s*|\s+)?(.*)$/i;
 const SPEAKER_BRACKET_RE = /^\[(?:Speaker|說話者|发言人|發言者)\s*(\d+)\]\s*(.*)$/i;
+/** WhisperX diarization: [SPEAKER_00], SPEAKER_01:, etc. */
+const WHISPERX_SPEAKER_RE = /^\[?SPEAKER[_\s-]?(\d+)\]?\s*:?\s*(.*)$/i;
 
 export function parseSpeakerLine(line) {
   const t = String(line || '').trim();
   if (!t) return null;
   let m = t.match(SPEAKER_BRACKET_RE);
+  if (m) return { id: +m[1], rest: m[2].trim() };
+  m = t.match(WHISPERX_SPEAKER_RE);
   if (m) return { id: +m[1], rest: m[2].trim() };
   m = t.match(SPEAKER_PREFIX_RE);
   if (m) return { id: +m[1], rest: m[2].trim() };

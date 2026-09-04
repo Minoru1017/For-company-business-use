@@ -28,6 +28,16 @@ describe('parser', () => {
     expect(segs[0].text).toContain('王先生');
   });
 
+  it('parses WhisperX SRT with [SPEAKER_00] labels', () => {
+    const text = readFileSync(join(fixtures, 'whisperx.srt'), 'utf8');
+    const segs = parse(text);
+    expect(segs).toHaveLength(3);
+    expect(segs[0].spk).toBe('S');
+    expect(segs[1].spk).toBe('C');
+    expect(segs[0].text).toContain('課程顧問');
+    expect(segs[0].labeled).toBe(true);
+  });
+
   it('parses multiline Vibe SRT (speaker on own line, 1-based)', () => {
     const text = readFileSync(join(fixtures, 'vibe-multiline.srt'), 'utf8');
     const segs = parse(text);
