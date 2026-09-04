@@ -42,4 +42,5 @@ npm test         # 執行 Vitest 測試
 ## 文件
 
 - 技術交接：`docs/technical-handoff.pdf`
-- **Vibe 匯出設定檢查清單**：`docs/vibe-export-checklist.md`
+- **Vibe 匯出設定檢查清單**：`docs/vibe-export-checklist.md`（電訪 < 20 分鐘）
+- **WhisperX 離線轉錄 SOP**：`docs/whisperx-setup.md`（DEMO 1～2 小時，不上雲）

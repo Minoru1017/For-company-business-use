@@ -12,6 +12,12 @@ describe('speaker-labels', () => {
     expect(parseSpeakerLine('Speaker 2 對')).toEqual({ id: 2, rest: '對' });
   });
 
+  it('parseSpeakerLine supports WhisperX [SPEAKER_00] format', () => {
+    expect(parseSpeakerLine('[SPEAKER_00] 您好')).toEqual({ id: 0, rest: '您好' });
+    expect(parseSpeakerLine('[SPEAKER_01]: 你好')).toEqual({ id: 1, rest: '你好' });
+    expect(parseSpeakerLine('SPEAKER_02 請說')).toEqual({ id: 2, rest: '請說' });
+  });
+
   it('splitCueBody handles speaker on separate line', () => {
     expect(splitCueBody('Speaker 1\n您好，請問是王先生嗎？')).toEqual({
       speakerId: 1,
