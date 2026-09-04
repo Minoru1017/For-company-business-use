@@ -62,6 +62,29 @@
   #drop.drag { border-color:var(--accent); color:var(--text); }
   #fname { color:var(--ok); margin-top:8px; font-size:.85rem; word-break:break-all; }
 
+  .demo-guide { margin-top:16px; border:1px solid var(--border); border-radius:12px;
+                background:var(--panel2); overflow:hidden; }
+  .demo-guide summary { cursor:pointer; padding:12px 16px; font-size:.88rem; color:var(--muted);
+                         list-style:none; user-select:none; }
+  .demo-guide summary::-webkit-details-marker { display:none; }
+  .demo-guide summary::before { content:"▸ "; color:var(--accent); font-family:var(--mono); }
+  .demo-guide[open] summary::before { content:"▾ "; }
+  .demo-guide[open] summary { color:var(--text); border-bottom:1px solid var(--border); }
+  .demo-guide-body { padding:14px 16px 16px; font-size:.85rem; line-height:1.75; }
+  .demo-guide-lead { margin-bottom:10px; color:var(--text); }
+  .demo-guide-steps { margin:0 0 14px 1.2em; color:var(--muted); }
+  .demo-guide-steps li { margin:6px 0; }
+  .demo-guide-steps code { font-family:var(--mono); font-size:.78rem; color:var(--warn); }
+  .demo-guide-links { display:flex; flex-wrap:wrap; align-items:center; gap:8px 12px; margin-bottom:8px; }
+  .demo-guide-btn { display:inline-block; padding:8px 16px; border-radius:99px;
+                    background:var(--accent); color:#fff; text-decoration:none; font-size:.82rem; font-weight:700; }
+  .demo-guide-btn:hover { background:#e63d26; }
+  .demo-guide-link { color:var(--ok); font-size:.8rem; text-decoration:none; }
+  .demo-guide-link:hover { text-decoration:underline; }
+  .demo-guide-sep { color:#444; font-size:.75rem; }
+  .demo-guide-note { margin-top:8px; margin-bottom:0; }
+  .demo-guide-note code { font-family:var(--mono); font-size:.75rem; color:var(--warn); }
+
   button { background:transparent; color:var(--text); border:1px solid var(--border);
            border-radius:99px; padding:10px 20px; font-size:.85rem; cursor:pointer;
            font-family:var(--sans); letter-spacing:.04em; transition:.15s; }
@@ -345,6 +368,25 @@
     <div class="sec-head"><span class="num">01</span><h2>上傳逐字稿</h2><span class="tag">Upload / SRT・VTT・TXT</span></div>
     <div id="drop">點擊選擇 或 拖曳逐字稿檔到這裡<br><span class="mono-hint" style="font-family:var(--mono);font-size:.7rem;letter-spacing:.15em;color:#555">DRAG &amp; DROP — LOCAL ONLY</span><div id="fname"></div></div>
     <input type="file" id="file" accept=".srt,.vtt,.txt,text/plain" hidden>
+
+    <details class="demo-guide">
+      <summary>還沒有 DEMO 逐字稿？本機轉錄指引（1～2 小時錄影・不上雲）</summary>
+      <div class="demo-guide-body">
+        <p class="demo-guide-lead">DEMO 錄影需先在<strong>公司電腦本機</strong>轉成 SRT，再回來上傳分析。音檔不會上傳至任何雲端服務。</p>
+        <ol class="demo-guide-steps">
+          <li>下載 <code>demo-workspace</code> 資料夾（GitHub repo 內）</li>
+          <li>依操作手冊用 CMD 轉錄 MP4 → 取得 <code>output\*.srt</code></li>
+          <li>將 SRT 拖曳到上方上傳區 → 確認 SPEAKER_00＝顧問</li>
+        </ol>
+        <div class="demo-guide-links">
+          <a class="demo-guide-btn" href="./demo-transcribe-cmd-guide.pdf" target="_blank" rel="noopener">下載 CMD 操作手冊（PDF）</a>
+          <a class="demo-guide-link" href="https://github.com/Minoru1017/For-company-business-use/tree/main/demo-workspace" target="_blank" rel="noopener">demo-workspace 資料夾</a>
+          <span class="demo-guide-sep">｜</span>
+          <a class="demo-guide-link" href="https://github.com/Minoru1017/For-company-business-use/blob/main/docs/vibe-export-checklist.md" target="_blank" rel="noopener">電訪用 Vibe 檢查清單（&lt;20 分鐘）</a>
+        </div>
+        <p class="hint demo-guide-note">轉錄約需 1.5～3 小時（CPU 筆電），請接電源。路徑請用 <code>.venv\Scripts\whisperx.exe</code>（不是 <code>Scripts\</code>）。</p>
+      </div>
+    </details>
   </section>
 
   <section class="sec" id="labelCard" hidden>
