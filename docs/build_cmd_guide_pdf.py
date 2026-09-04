@@ -128,7 +128,33 @@ python -m venv .venv
 .venv\Scripts\python.exe -m pip install whisperx"""
         )
     )
-    s.append(Paragraph("4-4 .env 填入 HF_TOKEN=hf_你的token，並到 Hugging Face 同意三個 pyannote 模型", BODY))
+    s.append(Paragraph("4-4 取得並設定 HF_TOKEN（Hugging Face Token）", H2))
+    s.append(
+        Paragraph(
+            "轉錄時需要 Token 才能做「誰在說話」分軌。Token 只寫在本機 .env，不會上傳到 Call Coach。",
+            BODY,
+        )
+    )
+    s.append(Paragraph("步驟 1：註冊帳號 → https://huggingface.co/join", BODY))
+    s.append(
+        Paragraph(
+            "步驟 2：建立 Read Token → https://huggingface.co/settings/tokens"
+            " → New token → Type 選 Read → 複製 hf_ 開頭的 Token（只顯示一次）",
+            BODY,
+        )
+    )
+    s.append(Paragraph("步驟 3：同意三個模型授權（同一帳號，各頁按 Agree）：", BODY))
+    s.append(Paragraph("• pyannote/speaker-diarization-community-1", BODY))
+    s.append(Paragraph("• pyannote/speaker-diarization-3.1", BODY))
+    s.append(Paragraph("• pyannote/segmentation-3.0", BODY))
+    s.append(Paragraph("步驟 4：用記事本開啟 demo-workspace\\.env，填入（等號前後不要空格）：", BODY))
+    s.append(pre("HF_TOKEN=hf_貼上你的token"))
+    s.append(
+        Paragraph(
+            "若出現 gated repo 錯誤：檢查 Token 是否填對、三個模型是否已同意。",
+            WARN,
+        )
+    )
 
     s.append(Paragraph("五、每次轉 DEMO（重點）", H2))
     s.append(Paragraph("步驟 1：MP4 放入 input\\（建議檔名 demo.mp4，避免 demo.mp4.mp4 雙副檔名）", BODY))
