@@ -5,5 +5,11 @@ secrets.*
 recordings/
 transcripts/
 customer-data/
+demo-workspace/.venv/
+demo-workspace/models/
+demo-workspace/output/
+demo-workspace/.env
+demo-workspace/input/*
+!demo-workspace/input/.gitkeep
 node_modules/
 dist/

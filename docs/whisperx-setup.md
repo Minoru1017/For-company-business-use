@@ -35,10 +35,30 @@
 
 ---
 
-## 三、一次性安裝（需網路，僅下載模型）
+## 三、推薦：專案資料夾一體式（`demo-workspace/`）
 
-> 此步驟需要網路下載 Python 套件與 AI 模型，**不會上傳你的音檔**。  
-> 完成後即可完全離線使用。
+虛擬環境、模型快取、DEMO 錄影、輸出 SRT **全部放在同一資料夾**，方便管理與完全移除。
+
+```
+demo-workspace/
+├── setup.ps1          ← 一次性安裝
+├── transcribe.ps1     ← 每次轉錄
+├── .env               ← HF_TOKEN（勿提交 Git）
+├── .venv/             ← 虛擬環境
+├── models/            ← AI 模型（約 3～6 GB）
+├── input/demo.mp4     ← 放入錄影
+└── output/*.srt       ← 轉錄結果
+```
+
+**移除時**：刪除整個 `demo-workspace` 資料夾即可，不影響系統其他位置。
+
+詳見 **`demo-workspace/README.md`**。
+
+---
+
+## 四、手動安裝（進階，模型在系統快取）
+
+> 若使用上方 `demo-workspace/`，可跳過本節。
 
 ### 步驟 1：安裝 ffmpeg
 
