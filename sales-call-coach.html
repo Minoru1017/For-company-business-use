@@ -84,6 +84,18 @@
   .demo-guide-sep { color:#444; font-size:.75rem; }
   .demo-guide-note { margin-top:8px; margin-bottom:0; }
   .demo-guide-note code { font-family:var(--mono); font-size:.75rem; color:var(--warn); }
+  .demo-guide-sub { margin:14px 0 8px; font-size:.82rem; font-weight:700; color:var(--text); }
+  .demo-guide-tree { margin:0 0 12px; padding:12px 14px; border-radius:8px;
+                     background:#0e0e0e; border:1px solid var(--border);
+                     font-family:var(--mono); font-size:.72rem; line-height:1.55;
+                     color:#c8c8c8; overflow-x:auto; white-space:pre; }
+  .demo-guide-tree .hi { color:var(--warn); }
+  .demo-guide-table { width:100%; border-collapse:collapse; margin:0 0 12px; font-size:.78rem; }
+  .demo-guide-table th, .demo-guide-table td { border:1px solid var(--border); padding:7px 10px;
+                                                text-align:left; vertical-align:top; }
+  .demo-guide-table th { background:#1a1a1a; color:var(--muted); font-weight:600; }
+  .demo-guide-table td:first-child { font-family:var(--mono); color:var(--ok); white-space:nowrap; }
+  .demo-guide-table td:last-child { color:var(--muted); }
 
   button { background:transparent; color:var(--text); border:1px solid var(--border);
            border-radius:99px; padding:10px 20px; font-size:.85rem; cursor:pointer;
@@ -374,10 +386,32 @@
       <div class="demo-guide-body">
         <p class="demo-guide-lead">DEMO 錄影需先在<strong>公司電腦本機</strong>轉成 SRT，再回來上傳分析。音檔不會上傳至任何雲端服務。</p>
         <ol class="demo-guide-steps">
-          <li>下載 <code>demo-workspace</code> 資料夾（GitHub repo 內）</li>
+          <li>從 GitHub 下載整個 <code>demo-workspace</code> 資料夾到本機（見下方結構）</li>
           <li>依操作手冊用 CMD 轉錄 MP4 → 取得 <code>output\*.srt</code></li>
           <li>將 SRT 拖曳到上方上傳區 → 確認 SPEAKER_00＝顧問</li>
         </ol>
+
+        <p class="demo-guide-sub">資料夾結構（全部放在同一層，不要拆散）</p>
+        <pre class="demo-guide-tree">C:\Users\經銷業務\demo-workspace\
+├── <span class="hi">input\</span>              ← 放 DEMO 錄影（demo.mp4）
+├── <span class="hi">output\</span>             ← 轉完在這裡取 .srt
+├── .env                ← HF_TOKEN（勿分享）
+├── setup_demo.py       ← 第一次：python setup_demo.py
+├── transcribe_demo.py  ← 每次轉錄：python transcribe_demo.py
+├── .venv\
+│   └── Scripts\
+│       └── <span class="hi">whisperx.exe</span>   ← CMD 轉錄用這個（不是 Scripts\）
+└── models\             ← AI 模型快取（約 3～6 GB，自動建立）</pre>
+        <table class="demo-guide-table">
+          <thead><tr><th>路徑</th><th>用途</th></tr></thead>
+          <tbody>
+            <tr><td>input\demo.mp4</td><td>放入 DEMO 錄影（避免 demo.mp4.mp4 雙副檔名）</td></tr>
+            <tr><td>output\*.srt</td><td>轉錄完成後上傳到本頁</td></tr>
+            <tr><td>.venv\Scripts\whisperx.exe</td><td>CMD 轉錄指令要用的程式</td></tr>
+            <tr><td>.env</td><td>HF_TOKEN=hf_你的token</td></tr>
+          </tbody>
+        </table>
+
         <div class="demo-guide-links">
           <a class="demo-guide-btn" href="./demo-transcribe-cmd-guide.pdf" target="_blank" rel="noopener">下載 CMD 操作手冊（PDF）</a>
           <a class="demo-guide-link" href="https://github.com/Minoru1017/For-company-business-use/tree/main/demo-workspace" target="_blank" rel="noopener">demo-workspace 資料夾</a>
