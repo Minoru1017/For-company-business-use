@@ -36,12 +36,22 @@ winget install Gyan.FFmpeg
 
 ### 2. 一次性安裝
 
-在 `demo-workspace` 資料夾內，於 PowerShell 執行：
+在 `demo-workspace` 資料夾內執行（**擇一**）：
+
+**方式 A — 雙擊或命令提示字元（推薦，不需改系統設定）：**
+
+```cmd
+setup.cmd
+```
+
+**方式 B — PowerShell：**
 
 ```powershell
 cd 路徑\到\demo-workspace
-.\setup.ps1
+powershell -ExecutionPolicy Bypass -File .\setup.ps1
 ```
+
+> 若出現「已停用指令碼執行」錯誤，請用 **方式 A** 或上方 Bypass 指令，不要用 `.\setup.ps1`。
 
 ### 3. 設定 Hugging Face Token（分軌用，僅首次）
 
@@ -55,23 +65,45 @@ https://huggingface.co/pyannote/speaker-diarization-community-1
 
 ### 4. 轉錄 DEMO
 
-將錄影檔命名為 `demo.mp4` 放入 `input\`，然後：
+將錄影檔命名為 `demo.mp4` 放入 `input\`，然後（**擇一**）：
+
+```cmd
+transcribe.cmd
+```
 
 ```powershell
-.\transcribe.ps1
+powershell -ExecutionPolicy Bypass -File .\transcribe.ps1
 ```
 
 或指定檔名：
 
 ```powershell
-.\transcribe.ps1 -InputFile "客戶A-20260904.mp4"
+powershell -ExecutionPolicy Bypass -File .\transcribe.ps1 -InputFile "客戶A-20260904.mp4"
+```
+
+或：
+
+```cmd
+transcribe.cmd -InputFile "客戶A-20260904.mp4"
 ```
 
 完成後到 `output\` 取 `.srt`，上傳 [Sales Call Coach](https://minoru1017.github.io/For-company-business-use/)。
 
 ---
 
-## 完全移除
+## 常見錯誤：已停用指令碼執行
+
+Windows 預設可能封鎖 `.ps1`。**不必改公司電腦的系統安全設定**，改用：
+
+| 做法 | 指令 |
+|------|------|
+| 最簡單 | 雙擊 `setup.cmd` / `transcribe.cmd` |
+| 命令列 | `setup.cmd` 或 `transcribe.cmd` |
+| PowerShell 單次放行 | `powershell -ExecutionPolicy Bypass -File .\setup.ps1` |
+
+`Bypass` 只對**這一次**執行有效，不會永久降低電腦安全性。
+
+---
 
 關閉 PowerShell 後，直接刪除整個 `demo-workspace` 資料夾即可。  
 不需額外解除安裝程式。
