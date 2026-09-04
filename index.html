@@ -28,25 +28,6 @@
     <div class="sec-head"><span class="num">01</span><h2>上傳逐字稿</h2><span class="tag">Upload / SRT・VTT・TXT</span></div>
     <div id="drop">點擊選擇 或 拖曳逐字稿檔到這裡<br><span class="mono-hint" style="font-family:var(--mono);font-size:.7rem;letter-spacing:.15em;color:#555">VIBE .JSON / SRT / VTT / TXT — LOCAL ONLY</span><div id="fname"></div></div>
     <input type="file" id="file" accept=".vibe.json,.json,.srt,.vtt,.txt,text/plain,application/json" hidden>
-
-    <details class="demo-guide">
-      <summary>還沒有 DEMO 逐字稿？本機轉錄指引（1～2 小時錄影・不上雲）</summary>
-      <div class="demo-guide-body">
-        <p class="demo-guide-lead">DEMO 錄影需先在<strong>公司電腦本機</strong>轉成 SRT，再回來上傳分析。音檔不會上傳至任何雲端服務。</p>
-        <ol class="demo-guide-steps">
-          <li>下載 <code>demo-workspace</code> 資料夾（GitHub repo 內）</li>
-          <li>依操作手冊用 CMD 轉錄 MP4 → 取得 <code>output\*.srt</code></li>
-          <li>將 SRT 拖曳到上方上傳區 → 確認 SPEAKER_00＝顧問</li>
-        </ol>
-        <div class="demo-guide-links">
-          <a class="demo-guide-btn" href="./demo-transcribe-cmd-guide.pdf" target="_blank" rel="noopener">下載 CMD 操作手冊（PDF）</a>
-          <a class="demo-guide-link" href="https://github.com/Minoru1017/For-company-business-use/tree/main/demo-workspace" target="_blank" rel="noopener">demo-workspace 資料夾</a>
-          <span class="demo-guide-sep">｜</span>
-          <a class="demo-guide-link" href="https://github.com/Minoru1017/For-company-business-use/blob/main/docs/vibe-export-checklist.md" target="_blank" rel="noopener">電訪用 Vibe 檢查清單（&lt;20 分鐘）</a>
-        </div>
-        <p class="hint demo-guide-note">轉錄約需 1.5～3 小時（CPU 筆電），請接電源。路徑請用 <code>.venv\Scripts\whisperx.exe</code>（不是 <code>Scripts\</code>）。</p>
-      </div>
-    </details>
   </section>
 
   <section class="sec" id="labelCard" hidden>

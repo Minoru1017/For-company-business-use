@@ -6,7 +6,10 @@ export default defineConfig(({ command }) => ({
   build: {
     outDir: 'dist',
     rollupOptions: {
-      input: 'index.html',
+      input: {
+        main: 'index.html',
+        legacy: 'sales-call-coach.html',
+      },
     },
   },
 }));
