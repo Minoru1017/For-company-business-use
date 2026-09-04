@@ -59,14 +59,50 @@ def build():
 
     s.append(Paragraph("二、資料夾結構", H2))
     s.append(
-        pre(
-            r"""C:\Users\你的帳號\demo-workspace\
-├── .env              ← Token（勿分享）
-├── .venv\Scripts\whisperx.exe  ← ★ 轉錄用這個
-├── input\            ← ★ MP4 放這裡
-└── output\           ← ★ SRT 在這裡"""
+        Paragraph(
+            "請把 GitHub 上的整個 <b>demo-workspace</b> 資料夾下載到本機，維持以下結構"
+            "（範例路徑，帳號請改成你的 Windows 使用者名稱，例如經銷業務）：",
+            BODY,
         )
     )
+    s.append(
+        pre(
+            r"""C:\Users\經銷業務\demo-workspace\
++-- input\              <-- 放 DEMO 錄影 (demo.mp4)
++-- output\             <-- 轉好的 SRT 在這裡
++-- .env                <-- HF_TOKEN (勿分享)
++-- setup_demo.py       <-- 封鎖 .bat 時: 第一次安裝
++-- transcribe_demo.py  <-- 封鎖 .bat 時: 每次轉錄
++-- .venv\
+|   \-- Scripts\
+|       \-- whisperx.exe   <-- CMD 轉錄用這個
+\-- models\             <-- AI 模型快取 (約 3~6 GB)"""
+        )
+    )
+    folder_data = [
+        ["路徑", "用途"],
+        ["C:\\Users\\經銷業務\\demo-workspace\\", "工作區根目錄（全部放同一層）"],
+        ["input\\demo.mp4", "放入 DEMO 錄影；避免 demo.mp4.mp4 雙副檔名"],
+        ["output\\*.srt", "轉錄完成後上傳 Sales Call Coach"],
+        [".venv\\Scripts\\whisperx.exe", "CMD 轉錄指令要執行的程式"],
+        [".env", "一行：HF_TOKEN=hf_你的token"],
+        ["models\\", "模型快取，首次轉錄自動下載"],
+    ]
+    ft = Table(folder_data, colWidths=[68 * mm, 97 * mm])
+    ft.setStyle(
+        TableStyle(
+            [
+                ("FONT", (0, 0), (-1, -1), FONT, 9),
+                ("BACKGROUND", (0, 0), (-1, 0), colors.HexColor("#0d3b66")),
+                ("TEXTCOLOR", (0, 0), (-1, 0), colors.white),
+                ("GRID", (0, 0), (-1, -1), 0.5, colors.grey),
+                ("VALIGN", (0, 0), (-1, -1), "TOP"),
+                ("ROWBACKGROUNDS", (0, 1), (-1, -1), [colors.white, colors.HexColor("#f7f9fb")]),
+            ]
+        )
+    )
+    s.append(ft)
+    s.append(Spacer(1, 6))
     s.append(
         Paragraph(
             "<b>⚠ 常見錯誤：</b>路徑要寫 <font color='#c0392b'>.venv\\Scripts\\whisperx.exe</font>，"
@@ -86,7 +122,7 @@ def build():
     s.append(Paragraph("4-3 安裝 WhisperX：", BODY))
     s.append(
         pre(
-            r"""cd /d C:\Users\你的帳號\demo-workspace
+            r"""cd /d C:\Users\經銷業務\demo-workspace
 python -m venv .venv
 .venv\Scripts\python.exe -m pip install -U pip wheel
 .venv\Scripts\python.exe -m pip install whisperx"""
@@ -96,10 +132,10 @@ python -m venv .venv
 
     s.append(Paragraph("五、每次轉 DEMO（重點）", H2))
     s.append(Paragraph("步驟 1：MP4 放入 input\\（建議檔名 demo.mp4，避免 demo.mp4.mp4 雙副檔名）", BODY))
-    s.append(Paragraph("步驟 2～6：在 CMD 依序執行以下指令（把「你的帳號」改成實際名稱，例如經銷業務）", BODY))
+    s.append(Paragraph("步驟 2～6：在 CMD 依序執行以下指令（路徑請改成你的 demo-workspace 位置）", BODY))
     s.append(
         pre(
-            r"""cd /d C:\Users\你的帳號\demo-workspace
+            r"""cd /d C:\Users\經銷業務\demo-workspace
 set HF_HOME=%CD%\models
 set HUGGINGFACE_HUB_CACHE=%CD%\models\hub
 for /f "usebackq tokens=1,* delims==" %a in (".env") do if /i "%a"=="HF_TOKEN" set HF_TOKEN=%b

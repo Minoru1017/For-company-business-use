@@ -136,15 +136,29 @@
 </div>
 
 <h2>二、資料夾結構</h2>
-<pre>C:\Users\你的帳號\demo-workspace\
-├── .env              ← Token 設定檔（勿分享）
-├── .venv\            ← 轉錄程式（自動建立）
+<p>請把 GitHub 上的 <strong>整個 <code>demo-workspace</code> 資料夾</strong>下載到本機，維持以下結構（範例路徑，帳號請改成你的 Windows 使用者名稱）：</p>
+<pre>C:\Users\經銷業務\demo-workspace\
+├── input\              ← ★ 把 MP4 放這裡（demo.mp4）
+├── output\             ← ★ 轉好的 SRT 在這裡
+├── .env                ← HF_TOKEN 設定檔（勿分享）
+├── setup_demo.py       ← 封鎖 .bat 時：第一次安裝
+├── transcribe_demo.py  ← 封鎖 .bat 時：每次轉錄
+├── .venv\              ← 轉錄程式（安裝後自動建立）
 │   └── Scripts\
-│       └── whisperx.exe   ← ★ 轉錄時要用這個
-├── models\           ← AI 模型快取（約 3～6 GB）
-├── input\            ← ★ 把 MP4 放這裡
-│   └── demo.mp4
-└── output\           ← ★ 轉好的 SRT 在這裡</pre>
+│       └── whisperx.exe   ← ★ CMD 轉錄時要用這個
+└── models\             ← AI 模型快取（約 3～6 GB，自動建立）</pre>
+
+<table>
+  <thead><tr><th>路徑</th><th>用途</th></tr></thead>
+  <tbody>
+    <tr><td><code>C:\Users\經銷業務\demo-workspace\</code></td><td>工作區根目錄（全部放同一層）</td></tr>
+    <tr><td><code>input\demo.mp4</code></td><td>放入 DEMO 錄影；避免 <code>demo.mp4.mp4</code> 雙副檔名</td></tr>
+    <tr><td><code>output\*.srt</code></td><td>轉錄完成後，上傳到 Sales Call Coach</td></tr>
+    <tr><td><code>.venv\Scripts\whisperx.exe</code></td><td>CMD 轉錄指令要執行的程式</td></tr>
+    <tr><td><code>.env</code></td><td>一行：<code>HF_TOKEN=hf_你的token</code></td></tr>
+    <tr><td><code>models\</code></td><td>模型快取，首次轉錄自動下載</td></tr>
+  </tbody>
+</table>
 
 <div class="warn">
   <strong>⚠ 常見錯誤：</strong> 路徑要寫 <code>.venv\Scripts\whisperx.exe</code>，<strong>不是</strong> <code>Scripts\whisperx.exe</code>（少了 <code>.venv\</code> 會找不到檔案）。
