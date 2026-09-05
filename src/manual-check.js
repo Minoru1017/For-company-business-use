@@ -69,7 +69,7 @@ function statusLabel(status) {
   return '未達標';
 }
 
-export function evaluateManualRules(segs, { layerHits, convergeSeg, sQuestions }) {
+export function evaluateManualRules(segs, { layerHits, convergeSeg, sQuestions, purposeProfile }) {
   const S = segs.filter((s) => s.spk === 'S');
   const C = segs.filter((s) => s.spk === 'C');
   const deepest = layerHits.filter((L) => L.hit).length ? Math.max(...layerHits.filter((L) => L.hit).map((L) => L.n)) : 0;
@@ -119,16 +119,36 @@ export function evaluateManualRules(segs, { layerHits, convergeSeg, sQuestions }
 
   const amplificationCriteria = [
     {
-      key: 'pattern',
-      label: '使用強化句型（沒有…就會／如果能…就能）',
-      pass: !!(painUse || gainUse),
-      hint: '強化階段需用痛苦型或卓越型句型，幫客戶面對不改變的代價',
+      key: 'classify',
+      label: '已判斷客戶學 AI 目的類型（要／怕／想／愛／爽）',
+      pass: !!purposeProfile?.classified,
+      hint: '先用五層挖掘，再從客戶原話判斷五種目的類型，不可一概而論',
+    },
+    {
+      key: 'typeAmplify',
+      label: purposeProfile?.dominant
+        ? `強化符合「${purposeProfile.dominant.label}」類型`
+        : '強化符合主導目的類型',
+      pass: !!purposeProfile?.amplifyMatched || !!(painUse || gainUse),
+      hint: purposeProfile?.dominant
+        ? purposeProfile.dominant.amplify
+        : '依目的類型分別強化，不是只用通用句型',
     },
     {
       key: 'link',
       label: '強化內容連結挖掘（L3–L5 客戶原話）',
       pass: linkedToDiscovery,
       hint: '強化時須引用客戶在影響／意義／終局層說過的話，不可自創恐懼',
+    },
+    {
+      key: 'typePitch',
+      label: purposeProfile?.dominant
+        ? `對接用「${purposeProfile.dominant.label}」類型語言`
+        : '對接用客戶想聽的話',
+      pass: !!purposeProfile?.pitchMatched,
+      hint: purposeProfile?.dominant
+        ? `對接範例：「${purposeProfile.dominant.pitch}」`
+        : '判斷目的類型後，用對應語言對接方案價值',
     },
     {
       key: 'nofear',
@@ -139,8 +159,8 @@ export function evaluateManualRules(segs, { layerHits, convergeSeg, sQuestions }
   ];
 
   const ampPassCount = amplificationCriteria.filter((c) => c.pass).length;
-  const amplificationPass = ampPassCount === 3;
-  const amplificationPartial = ampPassCount >= 1 && fearSegs.length === 0;
+  const amplificationPass = ampPassCount >= 4 && fearSegs.length === 0;
+  const amplificationPartial = ampPassCount >= 2 && fearSegs.length === 0;
   const amplificationStatus = verdictStatus(amplificationPass, amplificationPartial);
 
   return {
@@ -161,7 +181,7 @@ export function evaluateManualRules(segs, { layerHits, convergeSeg, sQuestions }
     },
     amplification: {
       title: '強化 Amplification',
-      subtitle: '說明「不改變的代價」，內容須來自挖掘階段客戶原話，不可製造恐懼',
+      subtitle: '先判斷五種目的類型，再分別強化，最後用客戶想聽的話對接',
       status: amplificationStatus,
       statusLabel: statusLabel(amplificationStatus),
       criteria: amplificationCriteria,
@@ -170,10 +190,10 @@ export function evaluateManualRules(segs, { layerHits, convergeSeg, sQuestions }
       fearCount: fearSegs.length,
       summary:
         amplificationStatus === 'pass'
-          ? '強化句型到位，且連結客戶原話，未製造恐懼。'
+          ? '已判斷目的類型，強化與對接語言符合客戶動機，且未製造恐懼。'
           : amplificationStatus === 'partial'
-            ? '有部分強化跡象，但句型、連結挖掘或底線檢核尚未全部達標。'
-            : '未偵測到有效強化，或違反「不可製造恐懼」底線。',
+            ? '有部分強化或對接跡象，但目的類型判斷、分別強化或底線檢核尚未全部達標。'
+            : '未判斷目的類型，或未依類型分別強化／對接。',
     },
   };
 }

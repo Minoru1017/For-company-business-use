@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { buildLayerHits, evaluateManualRules, sharesDiscoveryTerms } from '../src/manual-check.js';
 import { enrichSegments } from '../src/parser.js';
+import { buildPurposeProfile } from '../src/purpose-types.js';
 
 describe('manual-check', () => {
   it('detects layers from customer speech', () => {
@@ -36,9 +37,10 @@ describe('manual-check', () => {
     const layerHits = buildLayerHits(segs);
     const convergeSeg = segs.find((s) => s.text.includes('我理解對嗎'));
     const sQuestions = segs.filter((s) => s.spk === 'S' && /[?？]/.test(s.text));
-    const checks = evaluateManualRules(segs, { layerHits, convergeSeg, sQuestions });
+    const purposeProfile = buildPurposeProfile(segs);
+    const checks = evaluateManualRules(segs, { layerHits, convergeSeg, sQuestions, purposeProfile });
     expect(checks.discovery.status).toBe('pass');
-    expect(checks.amplification.criteria.find((c) => c.key === 'pattern').pass).toBe(true);
+    expect(checks.amplification.criteria.find((c) => c.key === 'typeAmplify').pass).toBe(true);
     expect(checks.amplification.criteria.find((c) => c.key === 'link').pass).toBe(true);
   });
 
@@ -47,7 +49,12 @@ describe('manual-check', () => {
       { start: 0, end: 5, text: '你再不改就完蛋了', spk: 'S' },
       { start: 5, end: 10, text: '嗯', spk: 'C' },
     ]);
-    const checks = evaluateManualRules(segs, { layerHits: buildLayerHits(segs), convergeSeg: null, sQuestions: [] });
+    const checks = evaluateManualRules(segs, {
+      layerHits: buildLayerHits(segs),
+      convergeSeg: null,
+      sQuestions: [],
+      purposeProfile: buildPurposeProfile(segs),
+    });
     expect(checks.amplification.criteria.find((c) => c.key === 'nofear').pass).toBe(false);
     expect(checks.amplification.status).toBe('fail');
   });

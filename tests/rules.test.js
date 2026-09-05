@@ -16,6 +16,7 @@ describe('rules analysis', () => {
     expect(result.stats.sQuestions).toBeGreaterThanOrEqual(1);
     expect(result.manualChecks.discovery).toBeTruthy();
     expect(result.manualChecks.amplification).toBeTruthy();
+    expect(result.purposeProfile).toBeTruthy();
   });
 
   it('escapes transcript text in converge hint', () => {
