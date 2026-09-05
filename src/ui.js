@@ -41,14 +41,34 @@ export function renderPurposeProfile(profile) {
     const isDom = profile.dominant?.key === t.key;
     const isSec = profile.secondary?.key === t.key;
     const badge = isDom ? '<span class="purpose-badge dom">主導</span>' : isSec ? '<span class="purpose-badge sec">次要</span>' : '';
+    const dontForce = t.dontForceTo?.length
+      ? `<div class="purpose-ev muted">勿硬導向：${t.dontForceTo.join('、')}</div>`
+      : '';
     return `<div class="purpose-card ${hit ? 'hit' : 'miss'} ${isDom ? 'dominant' : ''}">
       <div class="purpose-card-head">${t.label}${badge}</div>
       <div class="purpose-desc">${t.purpose}</div>
       ${hit ? `<div class="purpose-ev">客戶原話：${escapeHTML(hit.evidence.text.slice(0, 60))}${hit.evidence.text.length > 60 ? '…' : ''}</div>` : `<div class="purpose-ev muted">未偵測到 — 可問：${escapeHTML(t.probe)}</div>`}
+      ${dontForce}
     </div>`;
   }).join('');
 
-  let playbook = '';
+  let tierLayers = '';
+  if (profile.dominant && profile.typeLayerHits?.length) {
+    const d = profile.dominant;
+    const layerBoxes = profile.typeLayerHits
+      .map(
+        (L) =>
+          `<div class="layer ${L.hit ? 'hit' : 'miss'}" title="${escapeHTML(L.question)}">L${L.n} ${escapeHTML(L.name)}<br>${L.hit ? '<span class="mk on">●</span>' : '<span class="mk off">○</span>'}</div>`
+      )
+      .join('');
+    tierLayers = `<div class="purpose-playbook"><h4>「${escapeHTML(d.label)}」分級五層挖掘</h4>
+      <p class="reason-summary">${escapeHTML(d.antiPattern)}</p>
+      <div class="layers tier-layers">${layerBoxes}</div>
+      <p class="purpose-status">最深到 L${profile.typeDeepest || 0}／5${profile.wrongProbes?.length ? ` · <span style="color:var(--bad)">偵測到 ${profile.wrongProbes.length} 句問錯方向</span>` : ''}</p>
+    </div>`;
+  }
+
+  let playbook = tierLayers;
   const dr = profile.deepReasoning;
   if (dr?.ready && dr.chains.length) {
     const chainHtml = dr.chains
@@ -63,11 +83,11 @@ export function renderPurposeProfile(profile) {
         return `<div class="reason-chain"><h5>${escapeHTML(chain.role)} · ${escapeHTML(chain.label)}${chain.confidence === 'low' ? ' <span class="purpose-badge sec">信心偏低</span>' : ''}</h5>${steps}</div>`;
       })
       .join('');
-    playbook = `<div class="purpose-playbook"><h4>深層推理鏈</h4><p class="reason-summary">${escapeHTML(dr.summary)}</p>${chainHtml}</div>`;
+    playbook += `<div class="purpose-playbook"><h4>深層推理鏈</h4><p class="reason-summary">${escapeHTML(dr.summary)}</p>${chainHtml}</div>`;
   } else if (profile.dominant) {
     const d = profile.dominant;
-    playbook = `<div class="purpose-playbook">
-      <h4>主導類型「${escapeHTML(d.label)}」→ 分別強化 → 對接</h4>
+    playbook += `<div class="purpose-playbook">
+      <h4>主導分級「${escapeHTML(d.label)}」→ 分別強化 → 對接</h4>
       <p><b>學 AI 目的：</b>${escapeHTML(d.aiPurpose)}</p>
       <p><b>強化：</b>${escapeHTML(d.amplify)}</p>
       <p class="q-line">「${escapeHTML(d.amplifyExample)}」</p>
@@ -77,7 +97,7 @@ export function renderPurposeProfile(profile) {
         ／ ${profile.pitchMatched ? '● 已偵測到符合類型的對接' : '○ 尚未用此類型語言對接'}</p>
     </div>`;
   } else {
-    playbook = '<div class="purpose-playbook muted">尚未判斷目的類型。完成五層挖掘後，從客戶原話辨識是「要／怕／想／愛／爽」哪一型，再分別強化與對接。</div>';
+    playbook = '<div class="purpose-playbook muted">尚未判斷目的分級。從客戶原話辨識是「要／怕／想／愛／爽」哪一型，再依該分級往下挖五層、分別強化與對接。</div>';
   }
 
   el.innerHTML = `<div class="purpose-grid">${typeCards}</div>${playbook}`;

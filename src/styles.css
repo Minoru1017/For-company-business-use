@@ -178,6 +178,7 @@ button:disabled { opacity:.4; cursor:not-allowed; }
 .purpose-playbook h4 { margin:0 0 8px; font-family:var(--disp); font-size:.9rem; }
 .purpose-playbook .q-line { color:var(--warn); font-weight:600; margin:4px 0 10px; }
 .purpose-playbook.muted { color:var(--muted); }
+.tier-layers { margin:10px 0; }
 .purpose-status { margin-top:8px; font-size:.75rem; color:var(--muted); font-family:var(--mono); }
 
 .reason-chain { margin-top:12px; padding-top:12px; border-top:1px solid var(--border); }
