@@ -49,7 +49,22 @@ export function renderPurposeProfile(profile) {
   }).join('');
 
   let playbook = '';
-  if (profile.dominant) {
+  const dr = profile.deepReasoning;
+  if (dr?.ready && dr.chains.length) {
+    const chainHtml = dr.chains
+      .map((chain) => {
+        const steps = chain.steps
+          .map((st) => {
+            const quote = st.quote ? `<div class="reason-quote">「${escapeHTML(st.quote)}」</div>` : '';
+            const ex = st.example ? `<div class="reason-example">例：${escapeHTML(st.example)}</div>` : '';
+            return `<div class="reason-step"><span class="reason-title">${st.title}</span>${quote}<div class="reason-insight">${escapeHTML(st.insight)}</div>${ex}</div>`;
+          })
+          .join('');
+        return `<div class="reason-chain"><h5>${escapeHTML(chain.role)} · ${escapeHTML(chain.label)}${chain.confidence === 'low' ? ' <span class="purpose-badge sec">信心偏低</span>' : ''}</h5>${steps}</div>`;
+      })
+      .join('');
+    playbook = `<div class="purpose-playbook"><h4>深層推理鏈</h4><p class="reason-summary">${escapeHTML(dr.summary)}</p>${chainHtml}</div>`;
+  } else if (profile.dominant) {
     const d = profile.dominant;
     playbook = `<div class="purpose-playbook">
       <h4>主導類型「${escapeHTML(d.label)}」→ 分別強化 → 對接</h4>

@@ -1,4 +1,6 @@
-/** 五種「學 AI 背後的目的類型」— 先分類 → 分別強化 → 用客戶想聽的話對接 */
+import { buildDeepReasoning } from './purpose-reasoning.js';
+
+/** 五種「學 AI 背後的目的類型」— 先分類 → 深層推理 → 分別強化 → 用客戶想聽的話對接 */
 
 export const PURPOSE_TYPES = [
   {
@@ -93,6 +95,8 @@ export function buildPurposeProfile(segs) {
   const matchedPitch = dominant ? S.find((s) => dominant.pitchRe.test(s.text)) : null;
 
   const recommendations = [];
+  const deepReasoning = buildDeepReasoning(segs, { signals, dominant, secondary });
+
   if (!signals.length) {
     recommendations.push({
       type: 'probe',
@@ -129,6 +133,7 @@ export function buildPurposeProfile(segs) {
     classified: signals.length > 0,
     amplifyMatched: !!matchedAmplify,
     pitchMatched: !!matchedPitch,
+    deepReasoning,
     recommendations,
   };
 }

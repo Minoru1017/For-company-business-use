@@ -1,4 +1,5 @@
 import { buildPurposeProfile } from './purpose-types.js';
+import { DEEP_REASONING_META } from './purpose-reasoning.js';
 import { detectKeyMoments } from './key-moments.js';
 import { buildLayerHits, evaluateManualRules } from './manual-check.js';
 import { RULES } from './rules.js';
@@ -150,6 +151,21 @@ export function runAnalysis(segs) {
       sug.push(`${dom.label} 對接：<span class="q">「${dom.pitch}」</span>`);
     } else {
       sug.push(`${dom.label} 對接預備：<span class="q">「${dom.pitch}」</span>`);
+    }
+    if (purposeProfile.deepReasoning?.ambiguous) {
+      bad.push(
+        `「${purposeProfile.deepReasoning.ambiguousTypes.join('」與「')}」訊號都強——深層推理尚未收斂，勿急著選一邊強化`
+      );
+      sug.push(
+        `收斂驗證：<span class="q">「所以你真正在意的是＿＿（補缺口／避風險／進圈子／被看重／有意義），我理解對嗎？」</span>`
+      );
+    } else if (purposeProfile.deepReasoning?.ready) {
+      const chain = purposeProfile.deepReasoning.chains[0];
+      if (chain?.confidence === 'low') {
+        bad.push(`「${dom.label}」深層推理信心偏低——目前多為表面詞，需再問：${DEEP_REASONING_META[dom.key]?.deepQuestion || dom.probe}`);
+      } else {
+        good.push(`「${dom.label}」深層推理：${purposeProfile.deepReasoning.summary}`);
+      }
     }
   } else {
     bad.push('尚未判斷客戶學 AI 的目的類型（要／怕／想／愛／爽）——挖掘還沒碰到客戶真正在意的點');

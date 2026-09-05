@@ -180,6 +180,15 @@ button:disabled { opacity:.4; cursor:not-allowed; }
 .purpose-playbook.muted { color:var(--muted); }
 .purpose-status { margin-top:8px; font-size:.75rem; color:var(--muted); font-family:var(--mono); }
 
+.reason-chain { margin-top:12px; padding-top:12px; border-top:1px solid var(--border); }
+.reason-chain h5 { margin:0 0 8px; font-size:.85rem; font-family:var(--disp); }
+.reason-summary { margin:0 0 10px; font-size:.8rem; color:var(--warn); }
+.reason-step { margin-bottom:10px; padding-left:10px; border-left:2px solid var(--border); }
+.reason-title { font-family:var(--mono); font-size:.72rem; color:var(--muted); display:block; margin-bottom:4px; }
+.reason-quote { font-size:.8rem; color:var(--text); margin-bottom:4px; }
+.reason-insight { font-size:.78rem; color:var(--muted); line-height:1.6; }
+.reason-example { font-size:.78rem; color:var(--warn); margin-top:4px; }
+
 .chart-box { position:relative; height:300px; }
 
 .key-moments-legend { display:flex; flex-wrap:wrap; gap:8px; margin-top:12px; min-height:1.5em; }
