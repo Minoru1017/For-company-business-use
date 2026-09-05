@@ -1,3 +1,4 @@
+import { buildPurposeProfile } from './purpose-types.js';
 import { detectKeyMoments } from './key-moments.js';
 import { buildLayerHits, evaluateManualRules } from './manual-check.js';
 import { RULES } from './rules.js';
@@ -123,22 +124,44 @@ export function runAnalysis(segs) {
   if (convergeSeg) good.push(`有做<b>完成標準驗證</b>——確認了「真正想解決的＋因為＋真正需要的」${ev(convergeSeg)}`);
   else sug.push('挖掘收尾必說：<span class="q">「所以你真正想解決的是＿＿，因為＿＿；你真正需要的是＿＿，我理解對嗎？」</span>客戶說「對」，才進判斷');
 
-  const mottoHits = RULES.motto.map((M) => ({ ...M, seg: C.find((s) => M.re.test(s.text)) || null })).filter((M) => M.seg);
-  if (mottoHits.length) {
-    good.push(`客戶話中出現口訣訊號 <b>${mottoHits.map((m) => m.key).join('、')}</b>——有素材可做強化與對接${ev(mottoHits[0].seg)}`);
-    const painSide = mottoHits.some((m) => ['要什麼', '怕什麼'].includes(m.key));
-    const gainSide = mottoHits.some((m) => ['想什麼', '愛什麼', '爽什麼'].includes(m.key));
-    if (painSide) sug.push('客戶偏「要／怕」（逃避痛苦）→ 走<span class="q">「沒有…就會…」</span>路線：先幫他解決卡住的事，再談未來');
-    if (gainSide) sug.push('客戶偏「想／愛／爽」（追求卓越）→ 走<span class="q">「如果能…就能…」</span>路線：談三個月後他想成為的樣子');
-  } else bad.push('客戶語句中未偵測到五字口訣訊號（要/怕/想/愛/爽）——挖掘還沒碰到客戶在意的點');
+  const purposeProfile = buildPurposeProfile(segs);
+
+  if (purposeProfile.classified) {
+    const types = purposeProfile.signals.map((t) => t.label).join('、');
+    const dom = purposeProfile.dominant;
+    good.push(
+      `已判斷客戶學 AI 的目的類型：<b>${types}</b>（主導：<b>${dom.label}</b> — ${dom.purpose}）${dom.evidence ? ev(dom.evidence) : ''}`
+    );
+    if (purposeProfile.secondary) {
+      good.push(`次要目的類型：<b>${purposeProfile.secondary.label}</b> — ${purposeProfile.secondary.purpose}`);
+    }
+    if (purposeProfile.matchedAmplify) {
+      good.push(`強化語言符合「${dom.label}」類型 ${ev(purposeProfile.matchedAmplify)}`);
+    } else {
+      bad.push(`尚未用「${dom.label}」類型的語言做強化 — ${dom.amplify}`);
+      sug.push(
+        `${dom.label} 強化：<span class="q">「${dom.amplifyExample}」</span>（須引用客戶原話，不可自創恐懼）`
+      );
+    }
+    if (purposeProfile.matchedPitch) {
+      good.push(`對接話術符合「${dom.label}」類型 — 用客戶想聽的話 ${ev(purposeProfile.matchedPitch)}`);
+    } else if (stepHit.recommend || prodSeg) {
+      bad.push(`有推方案，但對接話術尚未對準「${dom.label}」類型`);
+      sug.push(`${dom.label} 對接：<span class="q">「${dom.pitch}」</span>`);
+    } else {
+      sug.push(`${dom.label} 對接預備：<span class="q">「${dom.pitch}」</span>`);
+    }
+  } else {
+    bad.push('尚未判斷客戶學 AI 的目的類型（要／怕／想／愛／爽）——挖掘還沒碰到客戶真正在意的點');
+    sug.push(
+      '用五層挖掘後，從客戶原話判斷目的類型，再分別強化、用他想聽的話對接。可先問：<span class="q">「你現在最缺的是什麼？」</span>或<span class="q">「你最擔心的是什麼？」</span>'
+    );
+  }
 
   const painUse = S.find((s) => RULES.painPattern.test(s.text));
   const gainUse = S.find((s) => RULES.gainPattern.test(s.text));
-  if (painUse) good.push(`有使用「沒有…就會…」逃避痛苦句型 ${ev(painUse)}`);
-  if (gainUse) good.push(`有使用「如果能…就能…」追求卓越句型 ${ev(gainUse)}`);
-  if (!painUse && !gainUse) {
-    sug.push('兩大句型都沒用到。強化階段挑一個：痛苦型<span class="q">「沒有把這段流程改掉，每週就繼續多花 5 小時重工」</span>；卓越型<span class="q">「如果能把 AI 嵌進報告流程，你就能準時下班還被主管看見」</span>');
-  }
+  if (painUse && !purposeProfile.matchedAmplify) good.push(`有使用通用強化句型「沒有…就會…」${ev(painUse)}`);
+  if (gainUse && !purposeProfile.matchedAmplify) good.push(`有使用通用強化句型「如果能…就能…」${ev(gainUse)}`);
 
   const fearSegs = S.filter((s) => RULES.fearWords.test(s.text));
   if (fearSegs.length) bad.push(`<b>偵測到 ${fearSegs.length} 句可能屬「製造恐懼」的用語</b>——手冊底線：只能放大客戶自己說過的困擾，不能自己嚇客戶 ${ev(fearSegs[0])}`);
@@ -154,11 +177,11 @@ export function runAnalysis(segs) {
     fiveMiss.forEach((F) => sug.push(`${F.sug.split('：')[0]}：<span class="q">${F.sug.split('：')[1]}</span>`));
   }
 
-  const manualChecks = evaluateManualRules(segs, { layerHits, convergeSeg, sQuestions });
+  const manualChecks = evaluateManualRules(segs, { layerHits, convergeSeg, sQuestions, purposeProfile });
   const keyMoments = detectKeyMoments(segs);
 
   const strip = (h) => h.replace(/<[^>]+>/g, '');
-  const reportText = `【電訪分析報告】\n通話長度 ${fmt(totalDur)}｜客戶說話比例 ${Math.round(custRatio * 100)}%｜業務提問 ${sQuestions.length} 句\n六步驟：${RULES.steps.map((st) => `${st.name}${stepHit[st.key] ? '[●]' : '[○]'}`).join(' ')}\n五層挖掘：最深到 L${deepest}｜收斂驗證${convergeSeg ? '[●]' : '[○]'}\n手冊檢核：挖掘[${manualChecks.discovery.statusLabel}]｜強化[${manualChecks.amplification.statusLabel}]\n\n[WELL DONE] 做得好\n${good.map((g) => `・${strip(g)}`).join('\n')}\n\n[IMPROVE] 待加強\n${bad.map((b) => `・${strip(b)}`).join('\n')}\n\n[SCRIPTS] 建議怎麼聊\n${sug.map((s) => `・${strip(s)}`).join('\n')}`;
+  const reportText = `【電訪分析報告】\n通話長度 ${fmt(totalDur)}｜客戶說話比例 ${Math.round(custRatio * 100)}%｜業務提問 ${sQuestions.length} 句\n六步驟：${RULES.steps.map((st) => `${st.name}${stepHit[st.key] ? '[●]' : '[○]'}`).join(' ')}\n五層挖掘：最深到 L${deepest}｜收斂驗證${convergeSeg ? '[●]' : '[○]'}\n目的類型：${purposeProfile.dominant ? purposeProfile.dominant.label : '未判斷'}｜手冊檢核：挖掘[${manualChecks.discovery.statusLabel}]｜強化[${manualChecks.amplification.statusLabel}]\n\n[WELL DONE] 做得好\n${good.map((g) => `・${strip(g)}`).join('\n')}\n\n[IMPROVE] 待加強\n${bad.map((b) => `・${strip(b)}`).join('\n')}\n\n[SCRIPTS] 建議怎麼聊\n${sug.map((s) => `・${strip(s)}`).join('\n')}`;
 
   return {
     stats: { totalDur, custRatio, sQuestions: sQuestions.length, sCount: S.length, cCount: C.length, avgCustChars: C.length ? cChars / C.length : 0 },
@@ -167,6 +190,7 @@ export function runAnalysis(segs) {
     deepest,
     convergeHint,
     manualChecks,
+    purposeProfile,
     keyMoments,
     good,
     bad,

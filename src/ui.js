@@ -1,4 +1,5 @@
-import { $, fmt, renderReportList } from './utils.js';
+import { $, escapeHTML, fmt, renderReportList } from './utils.js';
+import { PURPOSE_TYPES } from './purpose-types.js';
 import { RULES } from './rules.js';
 
 const PANES = ['good', 'bad', 'sug'];
@@ -31,8 +32,44 @@ export function updateReportCounts() {
   });
 }
 
+export function renderPurposeProfile(profile) {
+  const el = $('purposeTypes');
+  if (!el) return;
+
+  const typeCards = PURPOSE_TYPES.map((t) => {
+    const hit = profile.signals.find((s) => s.key === t.key);
+    const isDom = profile.dominant?.key === t.key;
+    const isSec = profile.secondary?.key === t.key;
+    const badge = isDom ? '<span class="purpose-badge dom">主導</span>' : isSec ? '<span class="purpose-badge sec">次要</span>' : '';
+    return `<div class="purpose-card ${hit ? 'hit' : 'miss'} ${isDom ? 'dominant' : ''}">
+      <div class="purpose-card-head">${t.label}${badge}</div>
+      <div class="purpose-desc">${t.purpose}</div>
+      ${hit ? `<div class="purpose-ev">客戶原話：${escapeHTML(hit.evidence.text.slice(0, 60))}${hit.evidence.text.length > 60 ? '…' : ''}</div>` : `<div class="purpose-ev muted">未偵測到 — 可問：${escapeHTML(t.probe)}</div>`}
+    </div>`;
+  }).join('');
+
+  let playbook = '';
+  if (profile.dominant) {
+    const d = profile.dominant;
+    playbook = `<div class="purpose-playbook">
+      <h4>主導類型「${escapeHTML(d.label)}」→ 分別強化 → 對接</h4>
+      <p><b>學 AI 目的：</b>${escapeHTML(d.aiPurpose)}</p>
+      <p><b>強化：</b>${escapeHTML(d.amplify)}</p>
+      <p class="q-line">「${escapeHTML(d.amplifyExample)}」</p>
+      <p><b>對接（客戶想聽的話）：</b></p>
+      <p class="q-line">「${escapeHTML(d.pitch)}」</p>
+      <p class="purpose-status">${profile.amplifyMatched ? '● 已偵測到符合類型的強化' : '○ 尚未用此類型語言強化'}
+        ／ ${profile.pitchMatched ? '● 已偵測到符合類型的對接' : '○ 尚未用此類型語言對接'}</p>
+    </div>`;
+  } else {
+    playbook = '<div class="purpose-playbook muted">尚未判斷目的類型。完成五層挖掘後，從客戶原話辨識是「要／怕／想／愛／爽」哪一型，再分別強化與對接。</div>';
+  }
+
+  el.innerHTML = `<div class="purpose-grid">${typeCards}</div>${playbook}`;
+}
+
 export function renderAnalysisUI(result) {
-  const { stats, stepHit, layerHits, convergeHint, manualChecks, good, bad, sug } = result;
+  const { stats, stepHit, layerHits, convergeHint, manualChecks, purposeProfile, good, bad, sug } = result;
   const ratioColor = stats.custRatio >= 0.45 ? 'var(--ok)' : stats.custRatio >= 0.3 ? 'var(--warn)' : 'var(--bad)';
 
   $('stats').innerHTML = `<div class="stat"><div class="num">${fmt(stats.totalDur)}</div><div class="lbl">通話長度</div></div>
@@ -76,6 +113,8 @@ export function renderAnalysisUI(result) {
       </article>`;
     })
     .join('');
+
+  renderPurposeProfile(purposeProfile);
 
   $('convergeHint').innerHTML = convergeHint;
   renderReportList('goodList', good, '這通電話尚未偵測到亮點——先從把五層挖掘做完整開始');
