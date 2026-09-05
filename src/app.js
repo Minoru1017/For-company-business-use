@@ -240,6 +240,24 @@ function renderAIResults(j) {
     (j.suggest || [])
       .map((s) => `<li>${s.scene ? `${escapeHTML(s.scene)}：` : ''}<span class="q">「${escapeHTML(s.say)}」</span></li>`)
       .join('') || '<li>（無）</li>';
+  const prEl = $('aiPurposeReasoning');
+  if (prEl) {
+    const pr = j.purpose_reasoning || [];
+    prEl.hidden = !pr.length;
+    prEl.innerHTML = pr.length
+      ? `<h4 style="margin:12px 0 8px;font-family:var(--disp)">深層推理（要～爽）</h4>${pr
+          .map(
+            (p) =>
+              `<div class="reason-chain"><h5>${escapeHTML(p.role || '')} · ${escapeHTML(p.type || '')}</h5>
+              <div class="reason-step"><span class="reason-title">表面</span><div class="reason-quote">「${escapeHTML(p.surface_quote || '')}」</div></div>
+              <div class="reason-step"><span class="reason-title">深層目的</span><div class="reason-insight">${escapeHTML(p.deep_motive || '')}</div></div>
+              <div class="reason-step"><span class="reason-title">為何不是其他類型</span><div class="reason-insight">${escapeHTML(p.why_not_other || '')}</div></div>
+              <div class="reason-step"><span class="reason-title">強化</span><div class="reason-example">「${escapeHTML(p.amplify_line || '')}」</div></div>
+              <div class="reason-step"><span class="reason-title">對接</span><div class="reason-example">「${escapeHTML(p.pitch_line || '')}」</div></div></div>`
+          )
+          .join('')}`
+      : '';
+  }
   $('aiOut').hidden = false;
 }
 

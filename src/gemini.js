@@ -38,10 +38,13 @@ export const MANUAL_PROMPT = `你是電話業務教練，依據以下公司「�
 【常見錯誤vs正確】急著介紹產品→先理解再判斷再建議;看到關鍵字就替客戶下結論→聽到後檢查提問驗證;為了成交放大恐懼→讓問題變清楚;流程變成背話術→彈性運用;不適合也硬推→真不賣才是專業。
 【底線】不能教成「找痛點+放大恐懼+塞產品+解釋講→收錢」;要教成「理解→挖掘→釐清→判斷→推薦→幫助決策」。成交不代表判斷對了;顧問價值=知道客戶需要什麼、為什麼需要,敢給對他負責的建議。
 
+【五字口訣深層推理】每種類型須推敲:①表面陳述(客戶字面)②深層目的(學AI真正為了什麼)③常見誤判(為何不是其他類型)④收斂驗證⑤分別強化⑥對接話術。輸出JSON時加 purpose_reasoning 陣列(每種主導/次要類型一筆,含 surface_quote/deep_motive/why_not_other/verify_question/amplify_line/pitch_line)。
+
 請輸出繁體中文 JSON（不要 markdown 圍欄）：
 {"good":[{"point":"做得好的具體描述","evidence":"引用原句(含時間)"}],
 "bad":[{"point":"待加強的具體描述","rule":"違反或未達成的手冊規則","evidence":"引用原句或說明缺漏處"}],
 "suggest":[{"scene":"什麼情境下","say":"建議的具體話術(可直接照念)"}],
+"purpose_reasoning":[{"type":"要什麼|怕什麼|想什麼|愛什麼|爽什麼","role":"主導|次要","surface_quote":"","deep_motive":"","why_not_other":"","verify_question":"","amplify_line":"","pitch_line":""}],
 "summary":"三句以內的總評"}
 
 每個陣列 3-6 條，聚焦最重要的。逐字稿如下（S=業務, C=客戶）：\n`;
@@ -74,15 +77,19 @@ export function parseAIResponse(raw) {
   for (const key of ['good', 'bad', 'suggest']) {
     if (j[key] != null && !Array.isArray(j[key])) throw new Error(`AI 回傳欄位 ${key} 應為陣列`);
   }
+  if (j.purpose_reasoning != null && !Array.isArray(j.purpose_reasoning)) {
+    throw new Error('AI 回傳欄位 purpose_reasoning 應為陣列');
+  }
   return j;
 }
 
 export function mergeAIResults(results) {
-  const merged = { good: [], bad: [], suggest: [], summary: '' };
+  const merged = { good: [], bad: [], suggest: [], purpose_reasoning: [], summary: '' };
   for (const r of results) {
     merged.good.push(...(r.good || []));
     merged.bad.push(...(r.bad || []));
     merged.suggest.push(...(r.suggest || []));
+    merged.purpose_reasoning.push(...(r.purpose_reasoning || []));
     if (r.summary) merged.summary += (merged.summary ? ' ' : '') + r.summary;
   }
   return merged;
