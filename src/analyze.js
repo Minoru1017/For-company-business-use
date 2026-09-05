@@ -131,10 +131,38 @@ export function runAnalysis(segs) {
     const types = purposeProfile.signals.map((t) => t.label).join('、');
     const dom = purposeProfile.dominant;
     good.push(
-      `已判斷客戶學 AI 的目的類型：<b>${types}</b>（主導：<b>${dom.label}</b> — ${dom.purpose}）${dom.evidence ? ev(dom.evidence) : ''}`
+      `已判斷客戶學 AI 目的分級：<b>${types}</b>（主導：<b>${dom.label}</b> — ${dom.purpose}）${dom.evidence ? ev(dom.evidence) : ''}`
     );
     if (purposeProfile.secondary) {
-      good.push(`次要目的類型：<b>${purposeProfile.secondary.label}</b> — ${purposeProfile.secondary.purpose}`);
+      good.push(`次要分級：<b>${purposeProfile.secondary.label}</b> — ${purposeProfile.secondary.purpose}`);
+    }
+    if (purposeProfile.typeDeepest >= 5) {
+      good.push(`依「${dom.label}」分級往下挖到 <b>L5</b>——五層路徑完整，足以做適配判斷`);
+    } else if (purposeProfile.typeDeepest >= 3) {
+      bad.push(
+        `「${dom.label}」分級挖掘只到第 ${purposeProfile.typeDeepest} 層——應依該分級往下挖五層，不是硬導向其他分級`
+      );
+      const next = purposeProfile.typeLayerHits.find((L) => !L.hit);
+      if (next) {
+        sug.push(`${dom.label} L${next.n}（${next.name}）：<span class="q">「${next.question}」</span>`);
+      }
+    } else if (purposeProfile.typeDeepest > 0) {
+      bad.push(`「${dom.label}」分級挖掘僅到第 ${purposeProfile.typeDeepest} 層——${dom.antiPattern}`);
+      purposeProfile.typeLayerHits
+        .filter((L) => !L.hit)
+        .slice(0, 2)
+        .forEach((L) => sug.push(`${dom.label} L${L.n}（${L.name}）：<span class="q">「${L.question}」</span>`));
+    } else {
+      bad.push(`已判斷「${dom.label}」分級，但尚未依該分級往下挖——先問：<span class="q">「${dom.probe}」</span>`);
+      sug.push(`${dom.label} 五層起點：<span class="q">「${purposeProfile.typeLayerHits[0]?.question || dom.probe}」</span>`);
+    }
+    if (purposeProfile.wrongProbes.length) {
+      purposeProfile.wrongProbes.forEach((w) => {
+        bad.push(`<b>問錯方向</b>：客戶是「${dom.label}」，但業務問了「${w.toward}」方向 ${ev(w.seg)}`);
+      });
+      sug.push(
+        `依「${dom.label}」往下挖，勿硬導向${dom.dontForceTo.map((d) => `「${d}」`).join('或')}。${dom.antiPattern}`
+      );
     }
     if (purposeProfile.matchedAmplify) {
       good.push(`強化語言符合「${dom.label}」類型 ${ev(purposeProfile.matchedAmplify)}`);
@@ -168,9 +196,9 @@ export function runAnalysis(segs) {
       }
     }
   } else {
-    bad.push('尚未判斷客戶學 AI 的目的類型（要／怕／想／愛／爽）——挖掘還沒碰到客戶真正在意的點');
+    bad.push('尚未判斷客戶學 AI 的目的分級（要／怕／想／愛／爽）——先從客戶原話判斷分級，再依分級往下挖五層');
     sug.push(
-      '用五層挖掘後，從客戶原話判斷目的類型，再分別強化、用他想聽的話對接。可先問：<span class="q">「你現在最缺的是什麼？」</span>或<span class="q">「你最擔心的是什麼？」</span>'
+      '先從客戶原話判斷分級：可問<span class="q">「對你來說，什麼事會讓你覺得真的很爽、很值得？」</span>（爽什麼）、<span class="q">「你現在最缺的是什麼？」</span>（要什麼）等——判斷後依該分級往下挖，勿混用'
     );
   }
 
