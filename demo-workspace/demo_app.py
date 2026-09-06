@@ -201,6 +201,17 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/upload":
             return self._handle_upload()
 
+        if path == "/api/uninstall":
+            if JOB.running:
+                return self._send_json({"ok": False, "message": "轉錄或安裝進行中，請稍後再解除安裝"}, 409)
+            data = json.loads(body.decode("utf-8") or "{}")
+            remove_models = bool(data.get("remove_models"))
+            ok, msg = run_job(
+                "uninstall",
+                lambda log: demo_core.run_uninstall(remove_models=remove_models, log=log),
+            )
+            return self._send_json({"ok": ok, "message": msg})
+
         self.send_error(404)
 
     def _handle_upload(self) -> None:
@@ -227,8 +238,18 @@ class Handler(BaseHTTPRequestHandler):
 
         dest = ROOT / "input" / filename
         (ROOT / "input").mkdir(exist_ok=True)
-        with dest.open("wb") as f:
-            f.write(item.file.read())
+        tmp = dest.with_suffix(dest.suffix + ".uploading")
+        try:
+            with tmp.open("wb") as f:
+                while True:
+                    chunk = item.file.read(1024 * 1024)
+                    if not chunk:
+                        break
+                    f.write(chunk)
+            tmp.replace(dest)
+        except OSError as e:
+            tmp.unlink(missing_ok=True)
+            return self._send_json({"ok": False, "message": f"寫入失敗: {e}"}, 500)
 
         return self._send_json(
             {

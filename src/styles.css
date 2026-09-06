@@ -113,6 +113,14 @@ h2 { font-family:var(--disp); font-size:.98rem; margin-bottom:12px; color:var(--
 .bridge-progress { height: 6px; background: #242424; border-radius: 6px; overflow: hidden; margin-bottom: 10px; }
 .bridge-progress div { height: 100%; width: 0%; background: var(--warn); border-radius: 6px; transition: width .15s; }
 .bridge-token { width: 100%; margin-bottom: 10px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--panel2); color: var(--text); font-family: var(--mono); font-size: .8rem; }
+.bridge-manual { background: #121a14; border: 1px solid #2f5d43; border-radius: 10px; padding: 12px 14px; margin-bottom: 12px; font-size: .85rem; }
+.bridge-manual strong { color: var(--ok); font-size: .88rem; }
+.bridge-path { display: block; margin-top: 4px; padding: 8px 10px; background: #0e0e0e; border: 1px solid var(--border); border-radius: 6px; font-family: var(--mono); font-size: .75rem; color: var(--warn); word-break: break-all; }
+.bridge-or { text-align: center; color: var(--muted); font-size: .78rem; margin: 10px 0; }
+.bridge-cancel { margin-bottom: 10px; border-color: #5d2f28; color: var(--bad); }
+.bridge-cancel:hover { border-color: var(--bad); }
+.bridge-uninstall { border-color: #5d2f28; color: var(--muted); }
+.bridge-uninstall:hover { border-color: var(--bad); color: var(--bad); }
 .bridge-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
 .bridge-log { background: #0e0e0e; border: 1px solid var(--border); border-radius: 8px; padding: 10px; max-height: 180px; overflow-y: auto; font-family: var(--mono); font-size: .7rem; line-height: 1.5; color: #b0b0b0; white-space: pre-wrap; }
 
