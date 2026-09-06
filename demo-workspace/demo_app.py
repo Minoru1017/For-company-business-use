@@ -198,6 +198,19 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send_json({"ok": False, "message": str(e)}, 500)
             return self._send_json({"ok": True})
 
+        if path == "/api/open-url":
+            data = json.loads(body.decode("utf-8") or "{}")
+            url = str(data.get("url", "")).strip()
+            if not url:
+                return self._send_json({"ok": False, "message": "缺少 url"}, 400)
+            try:
+                demo_core.open_url(url)
+            except ValueError as e:
+                return self._send_json({"ok": False, "message": str(e)}, 400)
+            except OSError as e:
+                return self._send_json({"ok": False, "message": str(e)}, 500)
+            return self._send_json({"ok": True})
+
         if path == "/api/upload":
             return self._handle_upload()
 

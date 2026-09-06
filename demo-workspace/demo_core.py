@@ -386,6 +386,25 @@ def open_folder(folder: str) -> None:
         subprocess.run(["xdg-open", str(path)], check=False)
 
 
+HF_URL_PREFIXES = (
+    "https://huggingface.co/join",
+    "https://huggingface.co/settings/tokens",
+    "https://huggingface.co/pyannote/",
+)
+
+
+def open_url(url: str) -> None:
+    url = url.strip()
+    if not any(url.startswith(p) for p in HF_URL_PREFIXES):
+        raise ValueError("僅允許開啟 Hugging Face 相關頁面")
+    if sys.platform == "win32":
+        os.startfile(url)  # type: ignore[attr-defined]
+    else:
+        import webbrowser
+
+        webbrowser.open(url)
+
+
 def list_srt_files() -> list[Path]:
     output_dir = ROOT / "output"
     if not output_dir.exists():

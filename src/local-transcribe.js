@@ -12,6 +12,8 @@ let uploadXhr = null;
 let uploadStartAt = 0;
 
 const LARGE_FILE_MB = 80;
+const HF_TOKEN_URL = 'https://huggingface.co/settings/tokens';
+const TOKEN_PAGE_KEY = 'call_coach_hf_token_opened';
 
 function fmtSize(bytes) {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -22,6 +24,23 @@ function fmtSpeed(bps) {
   if (!bps || bps < 1024) return '計算中…';
   if (bps < 1024 * 1024) return `${(bps / 1024).toFixed(0)} KB/s`;
   return `${(bps / (1024 * 1024)).toFixed(1)} MB/s`;
+}
+
+async function openTokenPage(showToast, url = HF_TOKEN_URL) {
+  try {
+    await api('/api/open-url', { method: 'POST', body: JSON.stringify({ url }) });
+    showToast?.('已開啟 Hugging Face Token 頁面 — 建立 Read Token 後貼回下方');
+  } catch {
+    window.open(url, '_blank', 'noopener,noreferrer');
+    showToast?.('已開啟 Token 頁面（若未跳出請允許彈出視窗）');
+  }
+}
+
+function maybeAutoOpenTokenPage(st, showToast) {
+  if (st.token_ok || !st.venv_ok || !st.whisperx_ok) return;
+  if (sessionStorage.getItem(TOKEN_PAGE_KEY)) return;
+  sessionStorage.setItem(TOKEN_PAGE_KEY, '1');
+  openTokenPage(showToast);
 }
 
 function fmtElapsed(sec) {
@@ -128,6 +147,7 @@ export function initLocalTranscribe({ onTranscriptReady, showToast }) {
       <div class="bridge-actions">
         ${!st.venv_ok || !st.whisperx_ok ? '<button type="button" class="btn primary" id="bridgeSetup">一鍵安裝</button>' : ''}
         ${st.can_uninstall ? '<button type="button" class="btn bridge-uninstall" id="bridgeUninstall">解除安裝轉錄環境</button>' : ''}
+        ${!st.token_ok ? '<button type="button" class="btn" id="bridgeOpenToken">前往取得 Token</button>' : ''}
         ${!st.token_ok ? '<button type="button" class="btn" id="bridgeSaveToken">儲存 Token</button>' : ''}
         <button type="button" class="btn primary" id="bridgeTranscribe" ${st.ready_to_transcribe && selectedMp4 ? '' : 'disabled'}>開始本機轉錄</button>
         <button type="button" class="btn" id="bridgeImport" ${st.srt_files?.length ? '' : 'disabled'}>載入最新 SRT</button>
@@ -181,11 +201,13 @@ export function initLocalTranscribe({ onTranscriptReady, showToast }) {
       if (uploadXhr) uploadXhr.abort();
     });
 
+    panel.querySelector('#bridgeOpenToken')?.addEventListener('click', () => openTokenPage(showToast));
     panel.querySelector('#bridgeSaveToken')?.addEventListener('click', () => saveToken(showToast, refreshStatus));
     panel.querySelector('#bridgeTranscribe')?.addEventListener('click', () =>
       runTranscribe(onTranscriptReady, showToast, refreshStatus)
     );
     panel.querySelector('#bridgeImport')?.addEventListener('click', () => importLatest(onTranscriptReady, showToast));
+    maybeAutoOpenTokenPage(st, showToast);
   }
 
   refreshStatus();
@@ -356,7 +378,9 @@ async function runSetup(showToast, refreshStatus) {
   showToast('開始安裝…');
   pollJob((ok) => {
     showToast(ok ? '安裝完成' : '安裝失敗');
-    refreshStatus();
+    refreshStatus().then((st) => {
+      if (ok && st && !st.token_ok) openTokenPage(showToast);
+    });
   });
 }
 
@@ -388,7 +412,11 @@ async function runUninstall(showToast, refreshStatus) {
 
 async function saveToken(showToast, refreshStatus) {
   const token = document.getElementById('bridgeToken')?.value?.trim();
-  if (!token) return showToast('請貼上 Token');
+  if (!token) {
+    showToast('請先取得 Token');
+    await openTokenPage(showToast);
+    return;
+  }
   const r = await api('/api/token', { method: 'POST', body: JSON.stringify({ token }) });
   if (!r.ok) return showToast(r.message || '儲存失敗');
   showToast('Token 已儲存');
