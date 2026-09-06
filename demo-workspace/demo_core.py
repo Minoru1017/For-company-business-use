@@ -1,0 +1,359 @@
+"""Shared DEMO transcription logic for CLI scripts and demo_app."""
+from __future__ import annotations
+
+import os
+import shutil
+import subprocess
+import sys
+from dataclasses import dataclass, field
+from pathlib import Path
+from typing import Callable
+
+ROOT = Path(__file__).resolve().parent
+VENV_PY = ROOT / ".venv" / "Scripts" / "python.exe"
+WHISPERX = ROOT / ".venv" / "Scripts" / "whisperx.exe"
+REQUIRED_PY = (3, 10)
+MODEL = "medium"
+THREADS = 8
+BATCH = 4
+CALL_COACH_URL = "https://minoru1017.github.io/For-company-business-use/"
+
+HF_LINKS = {
+    "join": "https://huggingface.co/join",
+    "tokens": "https://huggingface.co/settings/tokens",
+    "models": [
+        "https://huggingface.co/pyannote/speaker-diarization-community-1",
+        "https://huggingface.co/pyannote/speaker-diarization-3.1",
+        "https://huggingface.co/pyannote/segmentation-3.0",
+    ],
+}
+
+LogFn = Callable[[str], None]
+
+
+def default_log(msg: str) -> None:
+    print(msg, flush=True)
+
+
+def load_env(path: Path | None = None) -> dict[str, str]:
+    path = path or ROOT / ".env"
+    out: dict[str, str] = {}
+    if not path.exists():
+        return out
+    for line in path.read_text(encoding="utf-8").splitlines():
+        line = line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+        k, _, v = line.partition("=")
+        out[k.strip()] = v.strip().strip('"').strip("'")
+    return out
+
+
+def save_hf_token(token: str) -> None:
+    token = token.strip()
+    if not token.startswith("hf_"):
+        raise ValueError("Token 必須以 hf_ 開頭")
+    env_file = ROOT / ".env"
+    if not env_file.exists():
+        shutil.copy(ROOT / ".env.example", env_file)
+    lines: list[str] = []
+    replaced = False
+    if env_file.exists():
+        for line in env_file.read_text(encoding="utf-8").splitlines():
+            if line.strip().startswith("HF_TOKEN="):
+                lines.append(f"HF_TOKEN={token}")
+                replaced = True
+            else:
+                lines.append(line)
+    if not replaced:
+        lines.append(f"HF_TOKEN={token}")
+    env_file.write_text("\n".join(lines) + "\n", encoding="utf-8")
+
+
+def has_valid_token() -> bool:
+    token = load_env().get("HF_TOKEN", "")
+    return bool(token) and token.startswith("hf_") and "在這裡" not in token
+
+
+def whisperx_cmd() -> list[str]:
+    if WHISPERX.exists():
+        return [str(WHISPERX)]
+    alt = ROOT / ".venv" / "Scripts" / "whisperx.cmd"
+    if alt.exists():
+        return ["cmd", "/c", str(alt)]
+    return [str(VENV_PY), "-m", "whisperx"]
+
+
+def list_mp4_files() -> list[Path]:
+    input_dir = ROOT / "input"
+    if not input_dir.exists():
+        return []
+    return sorted(input_dir.glob("*.mp4"), key=lambda p: p.stat().st_mtime, reverse=True)
+
+
+def find_mp4(arg: str | None = None) -> Path:
+    if arg:
+        p = Path(arg)
+        if not p.is_absolute():
+            p = ROOT / p
+        if p.exists():
+            return p
+        raise FileNotFoundError(f"找不到: {p}")
+
+    preferred = ROOT / "input" / "demo.mp4"
+    if preferred.exists():
+        return preferred
+
+    mp4s = list_mp4_files()
+    if mp4s:
+        return mp4s[0]
+
+    raise FileNotFoundError("input 資料夾沒有 MP4。請先選擇或放入錄影檔。")
+
+
+def cache_env() -> dict[str, str]:
+    env = os.environ.copy()
+    env["HF_HOME"] = str(ROOT / "models")
+    env["HUGGINGFACE_HUB_CACHE"] = str(ROOT / "models" / "hub")
+    env["TORCH_HOME"] = str(ROOT / "models" / "torch")
+    env["XDG_CACHE_HOME"] = str(ROOT / "models")
+    token = load_env().get("HF_TOKEN", "").strip()
+    if token:
+        env["HF_TOKEN"] = token
+    return env
+
+
+@dataclass
+class EnvStatus:
+    python_ok: bool
+    python_version: str
+    ffmpeg_ok: bool
+    venv_ok: bool
+    whisperx_ok: bool
+    token_ok: bool
+    input_dir_ok: bool
+    output_dir_ok: bool
+    mp4_files: list[str] = field(default_factory=list)
+    srt_files: list[str] = field(default_factory=list)
+    ready_to_transcribe: bool = False
+
+    def to_dict(self) -> dict:
+        return {
+            "python_ok": self.python_ok,
+            "python_version": self.python_version,
+            "ffmpeg_ok": self.ffmpeg_ok,
+            "venv_ok": self.venv_ok,
+            "whisperx_ok": self.whisperx_ok,
+            "token_ok": self.token_ok,
+            "input_dir_ok": self.input_dir_ok,
+            "output_dir_ok": self.output_dir_ok,
+            "mp4_files": self.mp4_files,
+            "srt_files": self.srt_files,
+            "ready_to_transcribe": self.ready_to_transcribe,
+            "root": str(ROOT),
+            "call_coach_url": CALL_COACH_URL,
+            "hf_links": HF_LINKS,
+        }
+
+
+def get_status() -> EnvStatus:
+    ver = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
+    python_ok = sys.version_info >= REQUIRED_PY
+    ffmpeg_ok = shutil.which("ffmpeg") is not None
+    venv_ok = VENV_PY.exists()
+    whisperx_ok = WHISPERX.exists() or (ROOT / ".venv" / "Scripts" / "whisperx.cmd").exists()
+    token_ok = has_valid_token()
+    input_dir = ROOT / "input"
+    output_dir = ROOT / "output"
+    mp4s = [p.name for p in list_mp4_files()]
+    srts = []
+    if output_dir.exists():
+        srts = [p.name for p in sorted(output_dir.glob("*.srt"), key=lambda p: p.stat().st_mtime, reverse=True)]
+
+    ready = python_ok and venv_ok and whisperx_ok and token_ok and ffmpeg_ok and bool(mp4s)
+
+    return EnvStatus(
+        python_ok=python_ok,
+        python_version=ver,
+        ffmpeg_ok=ffmpeg_ok,
+        venv_ok=venv_ok,
+        whisperx_ok=whisperx_ok,
+        token_ok=token_ok,
+        input_dir_ok=input_dir.exists(),
+        output_dir_ok=output_dir.exists(),
+        mp4_files=mp4s,
+        srt_files=srts,
+        ready_to_transcribe=ready,
+    )
+
+
+def run_command(cmd: list[str], log: LogFn = default_log, env: dict[str, str] | None = None) -> int:
+    log("> " + " ".join(cmd))
+    proc = subprocess.Popen(
+        cmd,
+        cwd=ROOT,
+        env=env or os.environ.copy(),
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        encoding="utf-8",
+        errors="replace",
+        bufsize=1,
+    )
+    assert proc.stdout is not None
+    for line in proc.stdout:
+        log(line.rstrip())
+    return proc.wait()
+
+
+def run_setup(log: LogFn = default_log) -> int:
+    log("=== 開始安裝轉錄工具 ===")
+    if sys.version_info < REQUIRED_PY:
+        log(f"[錯誤] 需要 Python {REQUIRED_PY[0]}.{REQUIRED_PY[1]}+")
+        return 1
+
+    for name in ("models", "input", "output"):
+        (ROOT / name).mkdir(exist_ok=True)
+        log(f"資料夾 OK: {name}/")
+
+    if not VENV_PY.exists():
+        log("建立虛擬環境 .venv ...")
+        code = run_command([sys.executable, "-m", "venv", str(ROOT / ".venv")], log=log)
+        if code != 0:
+            return code
+
+    code = run_command([str(VENV_PY), "-m", "pip", "install", "-U", "pip", "wheel"], log=log)
+    if code != 0:
+        return code
+
+    log("安裝 whisperx（首次約 5～15 分鐘，請保持網路連線）...")
+    code = run_command([str(VENV_PY), "-m", "pip", "install", "whisperx", "huggingface_hub"], log=log)
+    if code != 0:
+        return code
+
+    env_file = ROOT / ".env"
+    if not env_file.exists():
+        shutil.copy(ROOT / ".env.example", env_file)
+        log("已建立 .env — 請在下一步填入 HF_TOKEN")
+
+    if not shutil.which("ffmpeg"):
+        log("[提醒] 找不到 ffmpeg，請安裝: winget install Gyan.FFmpeg")
+
+    log("=== 安裝完成 ===")
+    return 0
+
+
+def run_transcribe(mp4_name: str | None = None, log: LogFn = default_log) -> int:
+    log("=== 開始轉錄 DEMO ===")
+
+    if not VENV_PY.exists():
+        log("[錯誤] 尚未安裝，請先按「一鍵安裝」")
+        return 1
+
+    if not has_valid_token():
+        log("[錯誤] 請先設定 HF_TOKEN")
+        return 1
+
+    env_vars = cache_env()
+    (ROOT / "models").mkdir(exist_ok=True)
+    (ROOT / "output").mkdir(exist_ok=True)
+    (ROOT / "input").mkdir(exist_ok=True)
+
+    try:
+        if mp4_name:
+            mp4 = find_mp4(f"input/{mp4_name}")
+        else:
+            mp4 = find_mp4()
+    except FileNotFoundError as e:
+        log(f"[錯誤] {e}")
+        return 1
+
+    log(f"錄影檔: {mp4.name}")
+    wav = mp4.with_suffix(".wav")
+    audio = mp4
+
+    ffmpeg = shutil.which("ffmpeg")
+    if ffmpeg:
+        log("[1/2] 從 MP4 抽出音軌（約 1～3 分鐘）...")
+        code = run_command(
+            [
+                ffmpeg,
+                "-y",
+                "-hide_banner",
+                "-loglevel",
+                "error",
+                "-i",
+                str(mp4),
+                "-vn",
+                "-ac",
+                "1",
+                "-ar",
+                "16000",
+                "-c:a",
+                "pcm_s16le",
+                str(wav),
+            ],
+            log=log,
+            env=env_vars,
+        )
+        if code != 0:
+            log("[錯誤] 音軌抽取失敗")
+            return code
+        audio = wav
+    else:
+        log("[提醒] 未安裝 ffmpeg，直接對 MP4 轉錄")
+
+    token = load_env().get("HF_TOKEN", "").strip()
+    log("[2/2] 開始轉錄（2 小時 DEMO 約 1.5～3 小時，請接電源）...")
+    code = run_command(
+        whisperx_cmd()
+        + [
+            str(audio),
+            "--model",
+            MODEL,
+            "--language",
+            "zh",
+            "--device",
+            "cpu",
+            "--compute_type",
+            "int8",
+            "--threads",
+            str(THREADS),
+            "--batch_size",
+            str(BATCH),
+            "--diarize",
+            "--hf_token",
+            token,
+            "--min_speakers",
+            "2",
+            "--max_speakers",
+            "2",
+            "--output_format",
+            "srt",
+            "--output_dir",
+            str(ROOT / "output"),
+        ],
+        log=log,
+        env=env_vars,
+    )
+    if code != 0:
+        log("[錯誤] 轉錄失敗")
+        return code
+
+    srts = list((ROOT / "output").glob("*.srt"))
+    log("=== 轉錄完成 ===")
+    for s in srts:
+        log(f"逐字稿: {s.name}")
+    log(f"請上傳至 Call Coach: {CALL_COACH_URL}")
+    return 0
+
+
+def open_folder(folder: str) -> None:
+    path = ROOT / folder
+    path.mkdir(exist_ok=True)
+    if sys.platform == "win32":
+        os.startfile(str(path))  # type: ignore[attr-defined]
+    elif sys.platform == "darwin":
+        subprocess.run(["open", str(path)], check=False)
+    else:
+        subprocess.run(["xdg-open", str(path)], check=False)

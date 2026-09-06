@@ -1,26 +1,29 @@
 # DEMO 轉錄工作區
 
-**公司電腦封鎖 .bat 時，請用 Python 腳本（下方「封鎖 .bat」一節）。**
+把 DEMO 錄影（MP4）在本機轉成逐字稿（SRT），再上傳 [Call Coach](https://minoru1017.github.io/For-company-business-use/) 分析。**音檔全程不上傳雲端。**
 
 ---
 
-## 封鎖 .bat / 無法雙擊安裝時（推薦）
+## 推薦：圖形化轉錄助手（不需 CMD）
 
-在 `demo-workspace` 資料夾開啟**命令提示字元**（網址列輸入 `cmd`），只需兩條指令：
+適合非資訊背景同事，四步驟完成：
+
+1. 雙擊 **`啟動轉錄助手.pyw`**（或執行 `python demo_app.py`）
+2. 瀏覽器會開啟本機操作介面 → 按「**一鍵安裝**」
+3. 貼上 **HF_TOKEN** → 拖曳 MP4 錄影 → 按「**開始轉錄**」
+4. 完成後按「**開啟 output 資料夾**」→ 上傳 `.srt` 到 Call Coach
+
+> 若雙擊 `.pyw` 沒反應：在資料夾網址列輸入 `cmd`，執行 `python demo_app.py`
+
+---
+
+## 進階：命令列（封鎖 .bat 時）
 
 ```cmd
 cd /d C:\Users\經銷業務\demo-workspace
-
 python setup_demo.py
-```
-
-`.env` 填好 `HF_TOKEN` 後，每次轉 DEMO：
-
-```cmd
 python transcribe_demo.py
 ```
-
-MP4 放在 `input\` 即可（自動找最新的 `.mp4`）。
 
 ---
 
@@ -38,8 +41,10 @@ MP4 放在 `input\` 即可（自動找最新的 `.mp4`）。
 
 ```
 demo-workspace/
-├── setup_demo.py       ← 封鎖 bat 時：python setup_demo.py
-├── transcribe_demo.py  ← 封鎖 bat 時：python transcribe_demo.py
+├── 啟動轉錄助手.pyw    ← 推薦：雙擊開啟圖形介面
+├── demo_app.py         ← 轉錄助手主程式
+├── setup_demo.py       ← 命令列安裝
+├── transcribe_demo.py  ← 命令列轉錄
 ├── .env                ← HF_TOKEN
 ├── input/              ← 放 MP4
 ├── output/             ← 取 SRT
@@ -47,12 +52,10 @@ demo-workspace/
 └── models/
 ```
 
-完成後上傳 `output\*.srt` → [Call Coach](https://minoru1017.github.io/For-company-business-use/)
-
 ---
 
 ## 相關文件
 
-- **CMD 操作手冊（PDF）**：`DEMO轉錄-CMD操作手冊.pdf`（亦可開啟 `.html` 用瀏覽器列印）
+- **CMD 操作手冊**：`DEMO轉錄-CMD操作手冊.html`
 - `疑難排解.md`
 - `docs/whisperx-setup.md`
