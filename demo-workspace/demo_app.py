@@ -27,6 +27,7 @@ import demo_core
 ROOT = demo_core.ROOT
 STATIC = ROOT / "demo_app"
 PORT = 8765
+CALL_COACH_URL = demo_core.CALL_COACH_URL + "#transcribe"
 
 
 class JobState:
@@ -96,8 +97,14 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
+        self._cors()
         self.end_headers()
         self.wfile.write(body)
+
+    def _cors(self) -> None:
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Headers", "Content-Type")
 
     def _send_file(self, path: Path) -> None:
         if not path.exists() or not path.is_file():
@@ -108,8 +115,14 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(data)))
+        self._cors()
         self.end_headers()
         self.wfile.write(data)
+
+    def do_OPTIONS(self) -> None:
+        self.send_response(204)
+        self._cors()
+        self.end_headers()
 
     def do_GET(self) -> None:
         parsed = urlparse(self.path)
@@ -122,6 +135,22 @@ class Handler(BaseHTTPRequestHandler):
             snap = JOB.snapshot()
             snap["status"] = demo_core.get_status().to_dict()
             return self._send_json(snap)
+
+        if path == "/api/srt/latest":
+            try:
+                name, content = demo_core.read_srt()
+            except FileNotFoundError:
+                return self._send_json({"ok": False, "message": "尚無 SRT"}, 404)
+            return self._send_json({"ok": True, "filename": name, "content": content})
+
+        if path.startswith("/api/srt/"):
+            name = Path(path).name
+            if name.endswith(".srt"):
+                try:
+                    fname, content = demo_core.read_srt(name)
+                except FileNotFoundError:
+                    return self._send_json({"ok": False, "message": "找不到檔案"}, 404)
+                return self._send_json({"ok": True, "filename": fname, "content": content})
 
         if path in ("/", "/index.html"):
             return self._send_file(STATIC / "index.html")
@@ -208,10 +237,12 @@ def main() -> int:
         return 1
 
     host = "127.0.0.1"
-    url = f"http://{host}:{PORT}/"
+    url = CALL_COACH_URL
+    wizard_url = f"http://{host}:{PORT}/"
     print("=== DEMO 轉錄助手 ===")
     print(f"工作目錄: {ROOT}")
-    print(f"請在瀏覽器開啟: {url}")
+    print(f"Call Coach（整合模式）: {url}")
+    print(f"獨立轉錄介面: {wizard_url}")
     print("（關閉此視窗即停止服務）\n")
 
     server = ThreadingHTTPServer((host, PORT), Handler)
