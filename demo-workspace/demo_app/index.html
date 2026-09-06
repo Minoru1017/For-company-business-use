@@ -170,6 +170,7 @@
     <label style="font-size:.88rem">貼上 Token（開頭 hf_）</label>
     <input type="password" id="tokenInput" placeholder="hf_xxxxxxxxxxxxxxxx" autocomplete="off">
     <div class="btn-row">
+      <button class="btn primary" id="btnOpenToken">前往取得 Token</button>
       <button class="btn primary" id="btnSaveToken">儲存 Token</button>
     </div>
     <div class="nav-row">
@@ -265,7 +266,7 @@ const checks = [
   { key: 'token_ok', label: 'HF_TOKEN 已設定' },
 ];
 
-function showStep(n) {
+function showStep(n, openToken = false) {
   currentStep = n;
   [0,1,2,3].forEach(i => {
     $(`#panel${i}`).classList.toggle('hidden', i !== n);
@@ -273,11 +274,22 @@ function showStep(n) {
     tab.classList.toggle('active', i === n);
     tab.classList.toggle('done', i < n);
   });
+  if (n === 1 && openToken) openTokenPage();
 }
 
 async function api(path, opts = {}) {
   const res = await fetch(path, opts);
   return res.json();
+}
+
+const HF_TOKEN_URL = 'https://huggingface.co/settings/tokens';
+
+async function openTokenPage(url = HF_TOKEN_URL) {
+  try {
+    await api('/api/open-url', { method: 'POST', body: JSON.stringify({ url }) });
+  } catch {
+    window.open(url, '_blank', 'noopener,noreferrer');
+  }
 }
 
 function renderChecks(st) {
@@ -356,7 +368,13 @@ $('#btnSetup').onclick = async () => {
   const logEl = $('#setupLog');
   const r = await api('/api/setup', { method: 'POST' });
   if (!r.ok) { alert(r.message); $('#btnSetup').disabled = false; return; }
-  pollJob(logEl, (ok) => { $('#btnSetup').disabled = false; if (ok) refresh(); });
+  pollJob(logEl, (ok) => {
+    $('#btnSetup').disabled = false;
+    if (ok) refresh().then((st) => {
+      if (st && !st.token_ok) showStep(1, true);
+      else refresh();
+    });
+  });
 };
 
 $('#btnUninstall').onclick = async () => {
@@ -385,9 +403,14 @@ $('#btnUninstall').onclick = async () => {
 
 $('#btnRefresh').onclick = refresh;
 
+$('#btnOpenToken').onclick = () => openTokenPage();
+
 $('#btnSaveToken').onclick = async () => {
   const token = $('#tokenInput').value.trim();
-  if (!token) return alert('請貼上 Token');
+  if (!token) {
+    await openTokenPage();
+    return alert('已開啟 Token 取得頁面 — 建立 Read Token 後貼回上方欄位');
+  }
   const r = await api('/api/token', { method: 'POST', body: JSON.stringify({ token }) });
   if (!r.ok) return alert(r.message || '儲存失敗');
   await refresh();
@@ -414,7 +437,7 @@ $('#btnRescan').onclick = async () => {
 };
 $('#btnOpenOutput').onclick = () => api('/api/open-folder', { method: 'POST', body: JSON.stringify({ folder: 'output' }) });
 
-$('#toStep1').onclick = () => showStep(1);
+$('#toStep1').onclick = () => showStep(1, true);
 $('#toStep2').onclick = () => showStep(2);
 $('#back0').onclick = () => showStep(0);
 $('#back1').onclick = () => showStep(1);
