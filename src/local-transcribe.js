@@ -8,6 +8,7 @@ let pollTimer = null;
 let refreshTimer = null;
 let selectedMp4 = null;
 let uploadBusy = false;
+let transcribeBusy = false;
 let uploadXhr = null;
 let uploadStartAt = 0;
 
@@ -77,7 +78,7 @@ export function initLocalTranscribe({ onTranscriptReady, showToast, getMode }) {
     }
     if (offline) offline.classList.add('hidden');
     panel.hidden = false;
-    if (!uploadBusy) renderPanel(st);
+    if (!uploadBusy && !transcribeBusy) renderPanel(st);
     return st;
   }
 
@@ -140,9 +141,11 @@ export function initLocalTranscribe({ onTranscriptReady, showToast, getMode }) {
         ${st.can_uninstall ? '<button type="button" class="btn bridge-uninstall" id="bridgeUninstall">解除安裝轉錄環境</button>' : ''}
         ${!st.token_ok ? '<button type="button" class="btn" id="bridgeOpenToken">前往取得 Token</button>' : ''}
         ${!st.token_ok ? '<button type="button" class="btn" id="bridgeSaveToken">儲存 Token</button>' : ''}
-        <button type="button" class="btn primary" id="bridgeTranscribe" ${st.ready_to_transcribe && selectedMp4 ? '' : 'disabled'}>開始本機轉錄</button>
+        <button type="button" class="btn primary" id="bridgeTranscribe" ${st.ready_to_transcribe && selectedMp4 && !transcribeBusy ? '' : 'disabled'}>開始本機轉錄</button>
+        <button type="button" class="btn bridge-cancel hidden" id="bridgeCancelTranscribe">取消轉錄</button>
         <button type="button" class="btn" id="bridgeImport" ${st.srt_files?.length ? '' : 'disabled'}>載入最新 SRT</button>
       </div>
+      <div class="bridge-transcribe-status hidden" id="bridgeTranscribeStatus"></div>
       <pre class="bridge-log hidden" id="bridgeLog"></pre>
       <p class="hint">2 小時 DEMO 約 1.5～3 小時，請接電源。轉錄中請保持「啟動轉錄助手」視窗開啟。</p>
     `;
@@ -197,7 +200,11 @@ export function initLocalTranscribe({ onTranscriptReady, showToast, getMode }) {
     panel.querySelector('#bridgeTranscribe')?.addEventListener('click', () =>
       runTranscribe(onTranscriptReady, showToast, refreshStatus)
     );
+    panel.querySelector('#bridgeCancelTranscribe')?.addEventListener('click', () =>
+      cancelTranscribe(showToast, refreshStatus)
+    );
     panel.querySelector('#bridgeImport')?.addEventListener('click', () => importLatest(onTranscriptReady, showToast));
+    if (transcribeBusy) setTranscribeUI({ active: true });
     maybeAutoOpenTokenPage(st, showToast);
   }
 
@@ -205,6 +212,24 @@ export function initLocalTranscribe({ onTranscriptReady, showToast, getMode }) {
   if (refreshTimer) clearInterval(refreshTimer);
   refreshTimer = setInterval(refreshStatus, 8000);
   window.__refreshBridge = refreshStatus;
+
+  api('/api/job')
+    .then((j) => {
+      if (!j.running || j.kind !== 'transcribe') return;
+      transcribeBusy = true;
+      setTranscribeUI({ active: true, message: '本機轉錄進行中…' });
+      showLog(j.logs || []);
+      pollJob(async (ok, job) => {
+        await refreshStatus();
+        if (job.exit_code === 130) {
+          showToast(job.cancel_uninstall ? '已取消轉錄並解除安裝' : '已取消轉錄');
+          return;
+        }
+        if (ok) await importLatest(onTranscriptReady, showToast);
+        else showToast('轉錄失敗，請查看記錄');
+      }, { trackTranscribe: true });
+    })
+    .catch(() => {});
 }
 
 function setUploadUI({ state, message, pct = 0, showCancel = false }) {
@@ -344,6 +369,25 @@ async function uploadMp4(file, showToast, refreshStatus) {
   }
 }
 
+function setTranscribeUI({ active, message = '本機轉錄進行中…請保持助手視窗開啟' }) {
+  const status = document.getElementById('bridgeTranscribeStatus');
+  const cancel = document.getElementById('bridgeCancelTranscribe');
+  const start = document.getElementById('bridgeTranscribe');
+  if (!status) return;
+
+  if (active) {
+    status.classList.remove('hidden');
+    status.classList.add('busy');
+    status.textContent = message;
+    cancel?.classList.remove('hidden');
+    if (start) start.disabled = true;
+  } else {
+    status.classList.add('hidden');
+    status.classList.remove('busy');
+    cancel?.classList.add('hidden');
+  }
+}
+
 function showLog(lines) {
   const el = document.getElementById('bridgeLog');
   if (!el) return;
@@ -352,14 +396,30 @@ function showLog(lines) {
   el.scrollTop = el.scrollHeight;
 }
 
-async function pollJob(onDone) {
+async function pollJob(onDone, { trackTranscribe = false } = {}) {
   clearInterval(pollTimer);
   pollTimer = setInterval(async () => {
-    const j = await api('/api/job');
-    showLog(j.logs);
-    if (!j.running && j.exit_code !== null) {
+    try {
+      const j = await api('/api/job');
+      showLog(j.logs);
+      if (trackTranscribe && j.running && j.kind === 'transcribe') {
+        setTranscribeUI({ active: true, message: j.cancel_requested ? '正在取消轉錄…' : '本機轉錄進行中…' });
+      }
+      if (!j.running && j.exit_code !== null) {
+        clearInterval(pollTimer);
+        if (trackTranscribe) {
+          transcribeBusy = false;
+          setTranscribeUI({ active: false });
+        }
+        onDone(j.exit_code === 0, j);
+      }
+    } catch {
       clearInterval(pollTimer);
-      onDone(j.exit_code === 0);
+      if (trackTranscribe) {
+        transcribeBusy = false;
+        setTranscribeUI({ active: false });
+      }
+      onDone(false, { logs: ['[錯誤] 無法連線本機轉錄助手'] });
     }
   }, 800);
 }
@@ -374,6 +434,34 @@ async function runSetup(showToast, refreshStatus) {
       if (ok && st && !st.token_ok) openTokenPage(showToast);
     });
   });
+}
+
+async function cancelTranscribe(showToast, refreshStatus) {
+  const sure = confirm('確定要取消轉錄嗎？\n\n已處理的進度將不會保存。');
+  if (!sure) return;
+
+  const uninstall = confirm(
+    '是否同時解除安裝轉錄環境（.venv）？\n\n' +
+      '確定 = 停止轉錄並解除安裝\n' +
+      '取消 = 僅停止轉錄，保留環境'
+  );
+
+  let removeModels = false;
+  if (uninstall) {
+    removeModels = confirm(
+      '是否同時刪除 models 快取（約 3～6 GB）？\n\n' +
+        '確定 = 一併刪除（下次安裝需重新下載）\n' +
+        '取消 = 保留 models（下次安裝較快）'
+    );
+  }
+
+  const r = await api('/api/cancel', {
+    method: 'POST',
+    body: JSON.stringify({ uninstall, remove_models: removeModels }),
+  });
+  if (!r.ok) return showToast(r.message || '無法取消');
+  showToast(uninstall ? '正在取消並解除安裝…' : '正在取消轉錄…');
+  setTranscribeUI({ active: true, message: '正在取消轉錄…' });
 }
 
 async function runUninstall(showToast, refreshStatus) {
@@ -419,12 +507,18 @@ async function runTranscribe(onTranscriptReady, showToast, refreshStatus) {
   if (!selectedMp4) return showToast('請先選擇 MP4');
   const r = await api('/api/transcribe', { method: 'POST', body: JSON.stringify({ mp4: selectedMp4 }) });
   if (!r.ok) return showToast(r.message);
+  transcribeBusy = true;
+  setTranscribeUI({ active: true });
   showToast('本機轉錄中…');
-  pollJob(async (ok) => {
-    refreshStatus();
+  pollJob(async (ok, j) => {
+    await refreshStatus();
+    if (j.exit_code === 130) {
+      showToast(j.cancel_uninstall ? '已取消轉錄並解除安裝' : '已取消轉錄');
+      return;
+    }
     if (ok) await importLatest(onTranscriptReady, showToast);
     else showToast('轉錄失敗，請查看記錄');
-  });
+  }, { trackTranscribe: true });
 }
 
 async function importLatest(onTranscriptReady, showToast) {
