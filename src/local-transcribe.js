@@ -5,7 +5,14 @@
 const LOCAL_API = 'http://127.0.0.1:8765';
 
 let pollTimer = null;
+let refreshTimer = null;
 let selectedMp4 = null;
+let uploadBusy = false;
+
+function fmtSize(bytes) {
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
 
 async function api(path, opts = {}) {
   const res = await fetch(`${LOCAL_API}${path}`, { ...opts, mode: 'cors' });
@@ -45,7 +52,7 @@ export function initLocalTranscribe({ onTranscriptReady, showToast }) {
     summary.textContent = '● 本機轉錄助手已連線 — 可直接在此轉 DEMO（音檔不上傳）';
     panel.hidden = false;
     staticBlock.hidden = true;
-    renderPanel(st);
+    if (!uploadBusy) renderPanel(st);
     return st;
   }
 
@@ -82,7 +89,13 @@ export function initLocalTranscribe({ onTranscriptReady, showToast }) {
       <p class="bridge-lead">錄影在本機轉成逐字稿後，會<strong>自動載入</strong>到上方分析區，不需手動上傳 SRT。</p>
       <ul class="bridge-checks">${checkHtml}</ul>
       <div class="bridge-files">${fileHtml}</div>
-      <div class="bridge-drop" id="bridgeDrop">拖曳 MP4 到這裡上傳到本機 input 資料夾</div>
+      <div class="bridge-drop" id="bridgeDrop">
+        <span id="bridgeDropLabel">拖曳 MP4 到這裡，或點擊選擇檔案</span>
+        <span class="bridge-drop-sub">將複製到本機 demo-workspace\\input\\（不上傳雲端）</span>
+      </div>
+      <input type="file" id="bridgeFileInput" accept=".mp4,video/mp4" hidden>
+      <div class="bridge-upload-status hidden" id="bridgeUploadStatus"></div>
+      <div class="bridge-progress hidden" id="bridgeProgress"><div id="bridgeProgressBar"></div></div>
       <input type="password" id="bridgeToken" placeholder="HF_TOKEN（hf_...，首次請貼上）" class="bridge-token" ${st.token_ok ? 'style="display:none"' : ''}>
       <div class="bridge-actions">
         ${!st.venv_ok || !st.whisperx_ok ? '<button type="button" class="btn primary" id="bridgeSetup">一鍵安裝</button>' : ''}
@@ -102,14 +115,24 @@ export function initLocalTranscribe({ onTranscriptReady, showToast }) {
     });
 
     const drop = panel.querySelector('#bridgeDrop');
+    const fileInput = panel.querySelector('#bridgeFileInput');
+    drop.onclick = () => {
+      if (!uploadBusy) fileInput?.click();
+    };
+    fileInput.onchange = () => {
+      const file = fileInput.files?.[0];
+      if (file) uploadMp4(file, showToast, refreshStatus);
+      fileInput.value = '';
+    };
     drop.ondragover = (e) => {
       e.preventDefault();
-      drop.classList.add('drag');
+      if (!uploadBusy) drop.classList.add('drag');
     };
     drop.ondragleave = () => drop.classList.remove('drag');
     drop.ondrop = async (e) => {
       e.preventDefault();
       drop.classList.remove('drag');
+      if (uploadBusy) return;
       const file = e.dataTransfer.files[0];
       if (file) await uploadMp4(file, showToast, refreshStatus);
     };
@@ -123,25 +146,101 @@ export function initLocalTranscribe({ onTranscriptReady, showToast }) {
   }
 
   refreshStatus();
-  setInterval(refreshStatus, 8000);
+  if (refreshTimer) clearInterval(refreshTimer);
+  refreshTimer = setInterval(refreshStatus, 8000);
+}
+
+function setUploadUI({ state, message, pct = 0 }) {
+  const status = document.getElementById('bridgeUploadStatus');
+  const prog = document.getElementById('bridgeProgress');
+  const bar = document.getElementById('bridgeProgressBar');
+  const drop = document.getElementById('bridgeDrop');
+  if (!status) return;
+
+  status.classList.remove('hidden', 'busy', 'ok', 'err');
+  if (state === 'idle') {
+    status.classList.add('hidden');
+    prog?.classList.add('hidden');
+    drop?.classList.remove('busy');
+    return;
+  }
+
+  status.hidden = false;
+  status.classList.add(state === 'uploading' ? 'busy' : state === 'ok' ? 'ok' : 'err');
+  status.textContent = message;
+
+  if (state === 'uploading') {
+    drop?.classList.add('busy');
+    prog?.classList.remove('hidden');
+    if (bar) bar.style.width = `${Math.min(100, Math.max(0, pct))}%`;
+  } else {
+    drop?.classList.remove('busy');
+    prog?.classList.add('hidden');
+  }
+}
+
+function uploadMp4XHR(file) {
+  return new Promise((resolve, reject) => {
+    const xhr = new XMLHttpRequest();
+    xhr.open('POST', `${LOCAL_API}/api/upload`);
+    xhr.upload.onprogress = (e) => {
+      const pct = e.lengthComputable ? (e.loaded / e.total) * 100 : 0;
+      setUploadUI({
+        state: 'uploading',
+        message: `正在複製到本機 input… ${fmtSize(e.loaded)} / ${fmtSize(e.total || file.size)}（${pct.toFixed(0)}%）`,
+        pct,
+      });
+    };
+    xhr.onload = () => {
+      try {
+        const data = JSON.parse(xhr.responseText || '{}');
+        if (xhr.status >= 400 || !data.ok) {
+          reject(new Error(data.message || `上傳失敗（HTTP ${xhr.status}）`));
+          return;
+        }
+        resolve(data);
+      } catch {
+        reject(new Error('伺服器回應異常，請確認轉錄助手已啟動'));
+      }
+    };
+    xhr.onerror = () => reject(new Error('連線失敗，請確認已雙擊 start_demo_app 且視窗未關閉'));
+    xhr.ontimeout = () => reject(new Error('上傳逾時，檔案可能過大或磁碟空間不足'));
+    xhr.timeout = 0;
+    const fd = new FormData();
+    fd.append('file', file);
+    xhr.send(fd);
+  });
 }
 
 async function uploadMp4(file, showToast, refreshStatus) {
   if (!file.name.toLowerCase().endsWith('.mp4')) {
+    setUploadUI({ state: 'err', message: '請選擇 .mp4 錄影檔' });
     showToast('請選擇 MP4 檔案');
     return;
   }
-  const fd = new FormData();
-  fd.append('file', file);
-  const res = await fetch(`${LOCAL_API}/api/upload`, { method: 'POST', body: fd, mode: 'cors' });
-  const r = await res.json();
-  if (!r.ok) {
-    showToast(r.message || '上傳失敗');
-    return;
+
+  uploadBusy = true;
+  setUploadUI({
+    state: 'uploading',
+    message: `準備上傳 ${file.name}（${fmtSize(file.size)}）…`,
+    pct: 0,
+  });
+  showToast(`開始複製 ${file.name} 到本機…`);
+
+  try {
+    const r = await uploadMp4XHR(file);
+    selectedMp4 = r.filename;
+    setUploadUI({ state: 'ok', message: `✓ 已放入本機 input：${r.filename}（${fmtSize(file.size)}）` });
+    showToast(`已放入本機 input：${r.filename}`);
+    await refreshStatus();
+    setTimeout(() => setUploadUI({ state: 'idle' }), 5000);
+  } catch (err) {
+    const msg = err?.message || '上傳失敗';
+    setUploadUI({ state: 'err', message: `✗ ${msg}` });
+    showToast(msg);
+  } finally {
+    uploadBusy = false;
   }
-  selectedMp4 = r.filename;
-  showToast(`已放入本機 input：${r.filename}`);
-  refreshStatus();
 }
 
 function showLog(lines) {
