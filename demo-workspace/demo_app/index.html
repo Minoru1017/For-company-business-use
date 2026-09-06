@@ -78,6 +78,15 @@
       text-align: center; color: var(--muted); margin: 12px 0; font-size: .88rem;
     }
     .drop.drag { border-color: var(--accent); color: var(--text); }
+    .drop.busy { border-color: var(--warn); cursor: wait; opacity: .85; }
+    .upload-status { font-size: .82rem; padding: 10px 12px; border-radius: 8px; margin: 8px 0; display: none; }
+    .upload-status.show { display: block; }
+    .upload-status.busy { background: #1f1a10; border: 1px solid #5d4d1e; color: var(--warn); }
+    .upload-status.ok { background: #122016; border: 1px solid #2f5d43; color: var(--ok); }
+    .upload-status.err { background: #1f1210; border: 1px solid #5d2f28; color: var(--bad); }
+    .progress { height: 6px; background: #242424; border-radius: 6px; overflow: hidden; margin: 8px 0; display: none; }
+    .progress.show { display: block; }
+    .progress div { height: 100%; width: 0%; background: var(--warn); transition: width .15s; }
     .log {
       background: #0e0e0e; border: 1px solid var(--border); border-radius: 10px;
       padding: 12px; max-height: 220px; overflow-y: auto; font-family: var(--mono);
@@ -160,10 +169,12 @@
     <p>選擇或上傳 MP4 錄影檔（建議檔名 <code>demo.mp4</code>，避免 <code>demo.mp4.mp4</code> 雙副檔名）。</p>
 
     <div class="drop" id="dropZone">
-      拖曳 MP4 到這裡，或<br>
+      拖曳 MP4 到這裡，或點擊選擇檔案<br>
       <button class="btn" type="button" id="btnPick" style="margin-top:10px">選擇檔案</button>
       <input type="file" id="fileInput" accept=".mp4,video/mp4" hidden>
     </div>
+    <div class="upload-status" id="uploadStatus"></div>
+    <div class="progress" id="uploadProgress"><div id="uploadProgressBar"></div></div>
 
     <div class="file-list" id="fileList"></div>
 
@@ -346,13 +357,54 @@ drop.ondrop = (e) => {
 async function uploadFile(file) {
   if (!file) return;
   if (!file.name.toLowerCase().endsWith('.mp4')) return alert('請選擇 MP4 檔案');
-  const fd = new FormData();
-  fd.append('file', file);
-  const res = await fetch('/api/upload', { method: 'POST', body: fd });
-  const r = await res.json();
-  if (!r.ok) return alert(r.message || '上傳失敗');
-  selectedMp4 = r.filename;
-  await refresh();
+  const status = $('#uploadStatus');
+  const prog = $('#uploadProgress');
+  const bar = $('#uploadProgressBar');
+  const drop = $('#dropZone');
+  const fmt = (b) => b < 1048576 ? `${(b/1024).toFixed(1)} KB` : `${(b/1048576).toFixed(1)} MB`;
+
+  const setState = (kind, msg, pct = 0) => {
+    status.className = `upload-status show ${kind}`;
+    status.textContent = msg;
+    if (kind === 'busy') {
+      prog.classList.add('show');
+      drop.classList.add('busy');
+      bar.style.width = `${pct}%`;
+    } else {
+      prog.classList.remove('show');
+      drop.classList.remove('busy');
+    }
+  };
+
+  setState('busy', `正在複製 ${file.name}（${fmt(file.size)}）…`, 0);
+
+  try {
+    const r = await new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', '/api/upload');
+      xhr.upload.onprogress = (e) => {
+        const pct = e.lengthComputable ? (e.loaded / e.total) * 100 : 0;
+        setState('busy', `正在複製… ${fmt(e.loaded)} / ${fmt(e.total || file.size)}（${pct.toFixed(0)}%）`, pct);
+      };
+      xhr.onload = () => {
+        try {
+          const data = JSON.parse(xhr.responseText || '{}');
+          if (xhr.status >= 400 || !data.ok) reject(new Error(data.message || '上傳失敗'));
+          else resolve(data);
+        } catch { reject(new Error('伺服器回應異常')); }
+      };
+      xhr.onerror = () => reject(new Error('連線失敗'));
+      const fd = new FormData();
+      fd.append('file', file);
+      xhr.send(fd);
+    });
+    selectedMp4 = r.filename;
+    setState('ok', `✓ 已放入 input：${r.filename}`);
+    await refresh();
+    setTimeout(() => { status.className = 'upload-status'; }, 4000);
+  } catch (err) {
+    setState('err', `✗ ${err.message || '上傳失敗'}`);
+  }
 }
 
 refresh();

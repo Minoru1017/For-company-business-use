@@ -102,8 +102,16 @@ h2 { font-family:var(--disp); font-size:.98rem; margin-bottom:12px; color:var(--
 .bridge-files { margin-bottom: 10px; }
 .bridge-file { display: block; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 6px; font-size: .85rem; cursor: pointer; }
 .bridge-file.on { border-color: var(--accent); background: #1a1210; }
-.bridge-drop { border: 1px dashed #3a3a3a; border-radius: 10px; padding: 16px; text-align: center; color: var(--muted); font-size: .82rem; margin-bottom: 10px; }
-.bridge-drop.drag { border-color: var(--accent); color: var(--text); }
+.bridge-drop { border: 1px dashed #3a3a3a; border-radius: 10px; padding: 16px; text-align: center; color: var(--muted); font-size: .82rem; margin-bottom: 6px; cursor: pointer; transition: .2s; }
+.bridge-drop-sub { display: block; margin-top: 6px; font-size: .72rem; color: #666; }
+.bridge-drop.drag { border-color: var(--accent); color: var(--text); background: #1a1210; }
+.bridge-drop.busy { border-color: var(--warn); color: var(--text); cursor: wait; opacity: .85; }
+.bridge-upload-status { font-size: .82rem; padding: 10px 12px; border-radius: 8px; margin-bottom: 8px; line-height: 1.5; }
+.bridge-upload-status.busy { background: #1f1a10; border: 1px solid #5d4d1e; color: var(--warn); }
+.bridge-upload-status.ok { background: #122016; border: 1px solid #2f5d43; color: var(--ok); }
+.bridge-upload-status.err { background: #1f1210; border: 1px solid #5d2f28; color: var(--bad); }
+.bridge-progress { height: 6px; background: #242424; border-radius: 6px; overflow: hidden; margin-bottom: 10px; }
+.bridge-progress div { height: 100%; width: 0%; background: var(--warn); border-radius: 6px; transition: width .15s; }
 .bridge-token { width: 100%; margin-bottom: 10px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--panel2); color: var(--text); font-family: var(--mono); font-size: .8rem; }
 .bridge-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
 .bridge-log { background: #0e0e0e; border: 1px solid var(--border); border-radius: 8px; padding: 10px; max-height: 180px; overflow-y: auto; font-family: var(--mono); font-size: .7rem; line-height: 1.5; color: #b0b0b0; white-space: pre-wrap; }

@@ -208,7 +208,15 @@ class Handler(BaseHTTPRequestHandler):
         if "multipart/form-data" not in ctype:
             return self._send_json({"ok": False, "message": "需要 multipart 上傳"}, 400)
 
-        form = cgi.FieldStorage(fp=self.rfile, headers=self.headers, environ={"REQUEST_METHOD": "POST"})
+        form = cgi.FieldStorage(
+            fp=self.rfile,
+            headers=self.headers,
+            environ={
+                "REQUEST_METHOD": "POST",
+                "CONTENT_TYPE": ctype,
+                "CONTENT_LENGTH": self.headers.get("Content-Length", "0"),
+            },
+        )
         item = form["file"] if "file" in form else None
         if item is None or not getattr(item, "filename", None):
             return self._send_json({"ok": False, "message": "未選擇檔案"}, 400)
