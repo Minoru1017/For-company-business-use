@@ -1,64 +1,47 @@
-# DEMO 轉錄工作區
+# Call Coach 本機助手（demo-workspace）
 
-把 DEMO 錄影（MP4）在本機轉成逐字稿（SRT），再上傳 [Call Coach](https://minoru1017.github.io/For-company-business-use/) 分析。**音檔全程不上傳雲端。**
+在公司電腦上執行 DEMO 錄影轉逐字稿，並與 [Call Coach](https://minoru1017.github.io/For-company-business-use/) 整合。
 
----
+## 快速開始
 
-## 推薦：與 Call Coach 整合（一頁完成）
-
-1. 雙擊 **`start_demo_app.pyw`**（或 `start_demo_app.cmd` / `啟動轉錄助手.pyw`）
-2. 瀏覽器自動開啟 **Call Coach**，展開「還沒有 DEMO 逐字稿？」
-3. 畫面顯示 **「本機轉錄助手已連線」** → 一鍵安裝 → 貼 Token → 拖曳 MP4 → 開始轉錄
-4. 轉錄完成後 **自動載入逐字稿** 到 Call Coach 分析（不需手動上傳 SRT）
-
-> 找不到檔案？請開啟 **`START_HERE.txt`**。若 `.pyw` 無法雙擊，改用 **`start_demo_app.cmd`** 或在 CMD 執行 `python demo_app.py`。
-
-獨立介面（不開 Call Coach）：執行 `python demo_app.py` 後開啟 http://127.0.0.1:8765/
-
----
-
-## 進階：命令列（封鎖 .bat 時）
-
-```cmd
-cd /d C:\Users\經銷業務\demo-workspace
-python setup_demo.py
-python transcribe_demo.py
-```
-
----
-
-## 若 .bat 可用：一鍵雙擊
-
-| 檔案 | 用途 |
-|------|------|
-| `安裝.bat` | 第一次安裝 |
-| `一鍵轉錄.bat` | MP4 放 `input\` 後雙擊 |
-| `拖放轉錄.bat` | 拖 MP4 到檔案上 |
-
----
+1. 下載整個 `demo-workspace` 資料夾到本機（例如 `C:\Users\經銷業務\demo-workspace`）
+2. 雙擊 **`start_call_coach.pyw`**（或 `start_call_coach.cmd`）
+3. 瀏覽器開啟 Call Coach → 選擇 **DEMO · 錄影轉逐字稿**
+4. 一鍵安裝 → 設定 Token → 放入 MP4 → 開始轉錄 → 自動進入分析
 
 ## 資料夾結構
 
 ```
 demo-workspace/
-├── START_HERE.txt      ← 找不到啟動檔？先看這個
-├── start_demo_app.pyw  ← 推薦：雙擊啟動（英文檔名）
-├── start_demo_app.cmd  ← .pyw 無法用時改雙擊這個
-├── 啟動轉錄助手.pyw    ← 同上（中文檔名）
-├── demo_app.py         ← 轉錄助手主程式
-├── setup_demo.py       ← 命令列安裝
-├── transcribe_demo.py  ← 命令列轉錄
-├── .env                ← HF_TOKEN
-├── input/              ← 放 MP4
-├── output/             ← 取 SRT
-├── .venv/
-└── models/
+├── start_call_coach.pyw   ← 啟動（推薦）
+├── start_call_coach.cmd
+├── demo_app.py            ← 本機 API（127.0.0.1:8765）
+├── demo_core.py           ← 安裝 / 轉錄 / 解除安裝邏輯
+├── input/                 ← 放入 MP4
+├── output/                ← 轉完的 SRT
+├── .env                   ← HF_TOKEN（勿分享）
+├── .venv/                 ← WhisperX 環境（一鍵安裝後產生）
+└── models/                ← AI 模型快取（約 3～6 GB）
 ```
 
----
+## 兩種工作流程
 
-## 相關文件
+| 模式 | 用途 | 操作 |
+|------|------|------|
+| **開發 · 電訪** | Vibe 錄音 < 20 分鐘 | 匯出 `.vibe.json` 上傳 Call Coach |
+| **DEMO · 錄影** | 1～2 小時 MP4 | 本機轉錄後自動載入分析 |
 
-- **CMD 操作手冊**：`DEMO轉錄-CMD操作手冊.html`
-- `疑難排解.md`
-- `docs/whisperx-setup.md`
+電訪模式不需啟動本機助手；DEMO 模式需保持 `start_call_coach` 視窗開啟。
+
+## HF_TOKEN
+
+首次 DEMO 轉錄需 Hugging Face Read Token（用於辨識誰在說話）。在 Call Coach DEMO 模式按「前往取得 Token」，或至 https://huggingface.co/settings/tokens 建立。
+
+需同意三個 pyannote 模型授權（community-1、diarization-3.1、segmentation-3.0）。
+
+## 疑難排解
+
+- **Call Coach 顯示未連線**：確認 `start_call_coach.pyw` 視窗仍開啟，重新整理頁面
+- **大檔 MP4 很慢**：建議手動複製到 `input\`，再按「重新掃描」
+- **轉錄失敗**：查看 Call Coach 下方日誌；常見為 Token 未設定或 ffmpeg 未安裝（`winget install Gyan.FFmpeg`）
+- **解除安裝**：在 DEMO 模式按「解除安裝轉錄環境」

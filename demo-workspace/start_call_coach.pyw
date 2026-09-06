@@ -1,4 +1,4 @@
-# Launch DEMO transcription assistant without console window (Windows)
+# Launch Call Coach local assistant (no console window on Windows)
 import os
 import runpy
 

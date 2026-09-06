@@ -12,6 +12,29 @@ body { font-family:var(--sans); background:var(--bg); color:var(--text);
        background-size:22px 22px; }
 .wrap { max-width:1020px; margin:0 auto; }
 
+.mode-chooser { min-height:100vh; display:flex; align-items:center; justify-content:center; padding:40px 0; }
+.mode-chooser-inner { max-width:760px; width:100%; text-align:center; }
+.mode-chooser-kicker { font-family:var(--mono); font-size:.72rem; letter-spacing:.2em; color:var(--accent); margin-bottom:10px; }
+.mode-chooser-title { font-family:var(--disp); font-size:clamp(1.8rem,4vw,2.4rem); margin-bottom:10px; }
+.mode-chooser-lead { color:var(--muted); margin-bottom:24px; font-size:.95rem; }
+.mode-cards { display:grid; grid-template-columns:repeat(auto-fit,minmax(260px,1fr)); gap:16px; text-align:left; }
+.mode-card { background:var(--panel); border:1px solid var(--border); border-radius:16px; padding:22px; cursor:pointer; color:var(--text); font-family:var(--sans); transition:.2s; }
+.mode-card:hover { border-color:#555; transform:translateY(-2px); }
+.mode-card.accent { border-color:#5d3a2a; background:#1a1210; }
+.mode-card.accent:hover { border-color:var(--accent); }
+.mode-card-tag { display:inline-block; font-family:var(--mono); font-size:.65rem; letter-spacing:.12em; padding:4px 10px; border-radius:99px; border:1px solid var(--border); color:var(--muted); margin-bottom:12px; }
+.mode-card.accent .mode-card-tag { border-color:var(--accent); color:var(--accent); }
+.mode-card h3 { font-size:1.15rem; margin-bottom:8px; }
+.mode-card p { color:var(--muted); font-size:.88rem; line-height:1.6; margin-bottom:14px; }
+.mode-card p code { font-family:var(--mono); font-size:.78rem; color:var(--warn); }
+.mode-card-cta { font-family:var(--mono); font-size:.75rem; color:var(--ok); letter-spacing:.08em; }
+.mode-chooser-hint { margin-top:18px; }
+.mode-bar { display:flex; gap:8px; margin-bottom:16px; }
+.mode-pill { border:1px solid var(--border); background:transparent; color:var(--muted); border-radius:99px; padding:8px 16px; font-size:.78rem; cursor:pointer; font-family:var(--sans); }
+.mode-pill.active { border-color:var(--accent); color:var(--text); background:#1a1210; }
+.demo-offline { background:#1a1210; border:1px solid #5d3a2a; border-radius:12px; padding:16px; margin-top:8px; }
+.demo-offline strong { color:var(--warn); }
+
 .side-label { position:fixed; top:50%; font-family:var(--mono); font-size:.66rem;
               letter-spacing:.35em; color:#4a4a4a; text-transform:uppercase;
               white-space:nowrap; z-index:5; pointer-events:none; writing-mode:vertical-rl; }

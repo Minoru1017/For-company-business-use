@@ -41,7 +41,7 @@ C:\Users\<使用者>\Documents\Vibe\
 
 **最省事做法**：直接上傳 `transcript.vibe.json` 到 Call Coach，不必再匯出 SRT。
 
-> **DEMO（1～2 小時）**：若 Vibe 轉錄太慢，可改用本機 **WhisperX** 產 SRT，詳見 `docs/whisperx-setup.md`。
+> **DEMO（1～2 小時）**：請在 Call Coach 選擇「DEMO · 錄影轉逐字稿」，並啟動 `demo-workspace/start_call_coach.pyw` 本機轉錄。
 
 ---
 

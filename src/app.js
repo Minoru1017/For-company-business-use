@@ -14,6 +14,7 @@ import {
   pickPreferredModel,
 } from './gemini.js';
 import { initLocalTranscribe } from './local-transcribe.js';
+import { initModeChooser, resolveMode } from './mode.js';
 import { bindLabelCollapseHandlers, createLabelController } from './labels.js';
 import { applyBuiltinSpeakerLabels, enrichSegments, parse, parseVibeJson } from './parser.js';
 import { bumpUsage, checkQuotaBefore, getLimit, getUsage, quotaPercent, saveUsage } from './quota.js';
@@ -384,14 +385,20 @@ function init() {
     $('modelList').appendChild(opt);
   });
 
+  initModeChooser({
+    onModeChange: (mode) => {
+      if (mode === 'demo') window.__refreshBridge?.();
+    },
+  });
+
   initLocalTranscribe({
     onTranscriptReady: (text, filename) => {
       if (loadTranscriptText(text, filename)) {
-        document.querySelector('.demo-guide')?.removeAttribute('open');
         $('labelCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
     },
     showToast,
+    getMode: resolveMode,
   });
 }
 

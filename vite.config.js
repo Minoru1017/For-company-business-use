@@ -8,7 +8,6 @@ export default defineConfig(({ command }) => ({
     rollupOptions: {
       input: {
         main: 'index.html',
-        legacy: 'sales-call-coach.html',
       },
     },
   },
