@@ -30,6 +30,35 @@ HF_LINKS = {
 
 LogFn = Callable[[str], None]
 
+CANCEL_EXIT = 130
+
+
+class JobHooks:
+    """Optional hooks for cancellable subprocess jobs."""
+
+    def register_proc(self, proc: subprocess.Popen | None) -> None:
+        return None
+
+    def is_cancelled(self) -> bool:
+        return False
+
+
+def kill_proc(proc: subprocess.Popen) -> None:
+    if proc.poll() is not None:
+        return
+    if sys.platform == "win32":
+        subprocess.run(
+            ["taskkill", "/F", "/T", "/PID", str(proc.pid)],
+            capture_output=True,
+            check=False,
+        )
+    else:
+        proc.terminate()
+        try:
+            proc.wait(timeout=5)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+
 
 def default_log(msg: str) -> None:
     print(msg, flush=True)
@@ -189,8 +218,17 @@ def get_status() -> EnvStatus:
     )
 
 
-def run_command(cmd: list[str], log: LogFn = default_log, env: dict[str, str] | None = None) -> int:
+def run_command(
+    cmd: list[str],
+    log: LogFn = default_log,
+    env: dict[str, str] | None = None,
+    hooks: JobHooks | None = None,
+) -> int:
     log("> " + " ".join(cmd))
+    if hooks and hooks.is_cancelled():
+        log("[已取消] 轉錄已停止")
+        return CANCEL_EXIT
+
     proc = subprocess.Popen(
         cmd,
         cwd=ROOT,
@@ -202,10 +240,23 @@ def run_command(cmd: list[str], log: LogFn = default_log, env: dict[str, str] | 
         errors="replace",
         bufsize=1,
     )
-    assert proc.stdout is not None
-    for line in proc.stdout:
-        log(line.rstrip())
-    return proc.wait()
+    if hooks:
+        hooks.register_proc(proc)
+    try:
+        assert proc.stdout is not None
+        for line in proc.stdout:
+            if hooks and hooks.is_cancelled():
+                log("[已取消] 正在停止程序…")
+                kill_proc(proc)
+                return CANCEL_EXIT
+            log(line.rstrip())
+        code = proc.wait()
+        if hooks and hooks.is_cancelled():
+            return CANCEL_EXIT
+        return code
+    finally:
+        if hooks:
+            hooks.register_proc(None)
 
 
 def run_setup(log: LogFn = default_log) -> int:
@@ -270,8 +321,12 @@ def run_uninstall(remove_models: bool = False, log: LogFn = default_log) -> int:
     return 0
 
 
-def run_transcribe(mp4_name: str | None = None, log: LogFn = default_log) -> int:
+def run_transcribe(mp4_name: str | None = None, log: LogFn = default_log, hooks: JobHooks | None = None) -> int:
     log("=== 開始轉錄 DEMO ===")
+
+    if hooks and hooks.is_cancelled():
+        log("[已取消] 轉錄已停止")
+        return CANCEL_EXIT
 
     if not VENV_PY.exists():
         log("[錯誤] 尚未安裝，請先按「一鍵安裝」")
@@ -322,13 +377,20 @@ def run_transcribe(mp4_name: str | None = None, log: LogFn = default_log) -> int
             ],
             log=log,
             env=env_vars,
+            hooks=hooks,
         )
+        if code == CANCEL_EXIT:
+            return code
         if code != 0:
             log("[錯誤] 音軌抽取失敗")
             return code
         audio = wav
     else:
         log("[提醒] 未安裝 ffmpeg，直接對 MP4 轉錄")
+
+    if hooks and hooks.is_cancelled():
+        log("[已取消] 轉錄已停止")
+        return CANCEL_EXIT
 
     token = load_env().get("HF_TOKEN", "").strip()
     log("[2/2] 開始轉錄（2 小時 DEMO 約 1.5～3 小時，請接電源）...")
@@ -362,7 +424,11 @@ def run_transcribe(mp4_name: str | None = None, log: LogFn = default_log) -> int
         ],
         log=log,
         env=env_vars,
+        hooks=hooks,
     )
+    if code == CANCEL_EXIT:
+        log("[已取消] 轉錄已停止")
+        return code
     if code != 0:
         log("[錯誤] 轉錄失敗")
         return code

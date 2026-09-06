@@ -14,6 +14,7 @@ import cgi
 import json
 import mimetypes
 import os
+import subprocess
 import sys
 import threading
 import webbrowser
@@ -36,6 +37,10 @@ class JobState:
         self.kind = ""
         self.logs: list[str] = []
         self.exit_code: int | None = None
+        self.cancel_requested = False
+        self.cancel_uninstall = False
+        self.cancel_remove_models = False
+        self.current_proc: subprocess.Popen | None = None
 
     def reset(self, kind: str) -> bool:
         with self.lock:
@@ -45,6 +50,10 @@ class JobState:
             self.kind = kind
             self.logs = []
             self.exit_code = None
+            self.cancel_requested = False
+            self.cancel_uninstall = False
+            self.cancel_remove_models = False
+            self.current_proc = None
             return True
 
     def append(self, msg: str) -> None:
@@ -55,6 +64,21 @@ class JobState:
         with self.lock:
             self.exit_code = code
             self.running = False
+            self.current_proc = None
+
+    def request_cancel(self, uninstall: bool = False, remove_models: bool = False) -> tuple[bool, str]:
+        with self.lock:
+            if not self.running:
+                return False, "目前沒有進行中的工作"
+            if self.kind != "transcribe":
+                return False, "僅轉錄進行中時可取消"
+            self.cancel_requested = True
+            self.cancel_uninstall = uninstall
+            self.cancel_remove_models = remove_models
+            proc = self.current_proc
+        if proc is not None:
+            demo_core.kill_proc(proc)
+        return True, "正在取消轉錄…"
 
     def snapshot(self) -> dict:
         with self.lock:
@@ -63,7 +87,22 @@ class JobState:
                 "kind": self.kind,
                 "logs": list(self.logs),
                 "exit_code": self.exit_code,
+                "cancel_requested": self.cancel_requested,
+                "cancel_uninstall": self.cancel_uninstall,
             }
+
+
+class JobHooks(demo_core.JobHooks):
+    def __init__(self, job: JobState) -> None:
+        self.job = job
+
+    def register_proc(self, proc: subprocess.Popen | None) -> None:
+        with self.job.lock:
+            self.job.current_proc = proc
+
+    def is_cancelled(self) -> bool:
+        with self.job.lock:
+            return self.job.cancel_requested
 
 
 JOB = JobState()
@@ -74,8 +113,22 @@ def run_job(kind: str, fn) -> tuple[bool, str]:
         return False, "已有工作進行中，請稍候"
 
     def worker() -> None:
+        code = 0
         try:
             code = fn(JOB.append)
+            with JOB.lock:
+                cancelled = JOB.cancel_requested
+                do_uninstall = JOB.cancel_uninstall
+                remove_models = JOB.cancel_remove_models
+            if cancelled:
+                JOB.append("[已取消] 轉錄已停止")
+            if do_uninstall:
+                JOB.append("--- 接續解除安裝轉錄環境 ---")
+                uninstall_code = demo_core.run_uninstall(remove_models=remove_models, log=JOB.append)
+                if not cancelled and uninstall_code != 0:
+                    code = uninstall_code
+            if cancelled:
+                code = demo_core.CANCEL_EXIT
         except Exception as e:  # noqa: BLE001
             JOB.append(f"[錯誤] {e}")
             code = 1
@@ -174,8 +227,20 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/transcribe":
             data = json.loads(body.decode("utf-8") or "{}")
             mp4 = data.get("mp4")
-            ok, msg = run_job("transcribe", lambda log: demo_core.run_transcribe(mp4, log))
+            hooks = JobHooks(JOB)
+            ok, msg = run_job(
+                "transcribe",
+                lambda log: demo_core.run_transcribe(mp4, log, hooks=hooks),
+            )
             return self._send_json({"ok": ok, "message": msg})
+
+        if path == "/api/cancel":
+            data = json.loads(body.decode("utf-8") or "{}")
+            uninstall = bool(data.get("uninstall"))
+            remove_models = bool(data.get("remove_models"))
+            ok, msg = JOB.request_cancel(uninstall=uninstall, remove_models=remove_models)
+            status = 200 if ok else 409
+            return self._send_json({"ok": ok, "message": msg}, status)
 
         if path == "/api/token":
             data = json.loads(body.decode("utf-8") or "{}")
