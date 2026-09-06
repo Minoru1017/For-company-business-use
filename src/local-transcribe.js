@@ -62,30 +62,21 @@ export async function checkLocalBridge() {
   }
 }
 
-export function initLocalTranscribe({ onTranscriptReady, showToast }) {
-  const details = document.querySelector('.demo-guide');
-  const summary = details?.querySelector('summary');
-  const staticBlock = document.getElementById('demoGuideStatic');
+export function initLocalTranscribe({ onTranscriptReady, showToast, getMode }) {
   const panel = document.getElementById('localBridgePanel');
-  if (!details || !staticBlock || !panel) return;
-
-  const openIfHash = () => {
-    if (location.hash === '#transcribe') details.open = true;
-  };
-  openIfHash();
-  window.addEventListener('hashchange', openIfHash);
+  const offline = document.getElementById('demoOfflineHint');
+  if (!panel) return;
 
   async function refreshStatus() {
     const st = await checkLocalBridge();
+    const inDemo = getMode?.() === 'demo';
     if (!st) {
-      summary.textContent = '還沒有 DEMO 逐字稿？本機轉錄指引（1～2 小時錄影・不上雲）';
       panel.hidden = true;
-      staticBlock.hidden = false;
+      if (offline) offline.classList.toggle('hidden', !inDemo);
       return null;
     }
-    summary.textContent = '● 本機轉錄助手已連線 — 可直接在此轉 DEMO（音檔不上傳）';
+    if (offline) offline.classList.add('hidden');
     panel.hidden = false;
-    staticBlock.hidden = true;
     if (!uploadBusy) renderPanel(st);
     return st;
   }
@@ -213,6 +204,7 @@ export function initLocalTranscribe({ onTranscriptReady, showToast }) {
   refreshStatus();
   if (refreshTimer) clearInterval(refreshTimer);
   refreshTimer = setInterval(refreshStatus, 8000);
+  window.__refreshBridge = refreshStatus;
 }
 
 function setUploadUI({ state, message, pct = 0, showCancel = false }) {
@@ -278,7 +270,7 @@ function uploadMp4XHR(file, onProgress) {
     };
     uploadXhr.onerror = () => {
       uploadXhr = null;
-      reject(new Error('連線失敗，請確認已雙擊 start_demo_app 且視窗未關閉'));
+      reject(new Error('連線失敗，請確認已雙擊 start_call_coach 且視窗未關閉'));
     };
     uploadXhr.onabort = () => {
       uploadXhr = null;

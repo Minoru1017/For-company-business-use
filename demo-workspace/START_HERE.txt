@@ -1,16 +1,17 @@
-DEMO 轉錄助手 — 從這裡開始
-========================
+Call Coach 本機助手 — 從這裡開始
+==============================
 
 請雙擊以下任一檔案啟動（在這個資料夾內）：
 
-  1. start_demo_app.pyw     ← 推薦（英文檔名，較好找）
-  2. start_demo_app.cmd     ← 若 .pyw 雙擊沒反應，用這個
-  3. 啟動轉錄助手.pyw       ← 與 1 相同（中文檔名）
+  1. start_call_coach.pyw     ← 推薦（無黑窗）
+  2. start_call_coach.cmd     ← 若 .pyw 雙擊沒反應，用這個
 
-啟動後會自動開啟 Call Coach，展開「還沒有 DEMO 逐字稿？」即可轉錄。
+啟動後會自動開啟 Call Coach，請選擇：
+  - 開發 · 電訪逐字稿（Vibe 匯出檔）
+  - DEMO · 錄影轉逐字稿（本機 MP4 轉錄）
 
-若以上都無法執行：
+若無法執行：
   - 在資料夾網址列輸入 cmd，執行：python demo_app.py
   - 需先安裝 Python 3.10+（https://www.python.org/downloads/）
 
-完整說明見 README.md
+說明見 README.md

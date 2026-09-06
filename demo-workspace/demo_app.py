@@ -1,13 +1,12 @@
 #!/usr/bin/env python3
 """
-DEMO 轉錄助手 — 本機圖形化操作介面（不需 CMD）
+Call Coach 本機助手 — 整合 DEMO 轉錄與電訪分析
 
 用法:
   python demo_app.py
-  或雙擊 start_demo_app.pyw / start_demo_app.cmd
+  或雙擊 start_call_coach.pyw / start_call_coach.cmd
 
-會在瀏覽器開啟 http://127.0.0.1:8765
-音檔全程在本機處理，不上傳雲端。
+會在瀏覽器開啟 Call Coach，並在本機提供轉錄 API（127.0.0.1:8765）。
 """
 from __future__ import annotations
 
@@ -27,7 +26,7 @@ import demo_core
 ROOT = demo_core.ROOT
 STATIC = ROOT / "demo_app"
 PORT = 8765
-CALL_COACH_URL = demo_core.CALL_COACH_URL + "#transcribe"
+CALL_COACH_URL = demo_core.CALL_COACH_URL
 
 
 class JobState:
@@ -280,11 +279,10 @@ def main() -> int:
 
     host = "127.0.0.1"
     url = CALL_COACH_URL
-    wizard_url = f"http://{host}:{PORT}/"
-    print("=== DEMO 轉錄助手 ===")
+    print("=== Call Coach 本機助手 ===")
     print(f"工作目錄: {ROOT}")
-    print(f"Call Coach（整合模式）: {url}")
-    print(f"獨立轉錄介面: {wizard_url}")
+    print(f"Call Coach: {url}")
+    print(f"本機 API: http://{host}:{PORT}/api/status")
     print("（關閉此視窗即停止服務）\n")
 
     server = ThreadingHTTPServer((host, PORT), Handler)

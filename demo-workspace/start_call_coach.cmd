@@ -1,7 +1,7 @@
 @echo off
 chcp 65001 >nul
 cd /d "%~dp0"
-echo === DEMO 轉錄助手 ===
+echo === Call Coach 本機助手 ===
 echo 資料夾: %CD%
 echo.
 python demo_app.py

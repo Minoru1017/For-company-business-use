@@ -12,84 +12,60 @@
 <body>
 <div class="side-label l">SALES CALL ANALYSIS — CONSULTATIVE SELLING</div>
 <div class="side-label r">FOCUS MODE / LOCAL PROCESSING</div>
-<div class="wrap">
+
+<section class="mode-chooser" id="modeChooser">
+  <div class="mode-chooser-inner">
+    <p class="mode-chooser-kicker">CALL COACH</p>
+    <h2 class="mode-chooser-title">選擇工作流程</h2>
+    <p class="mode-chooser-lead">同一套工具，依情境選擇電訪分析或 DEMO 錄影轉錄。</p>
+    <div class="mode-cards">
+      <button type="button" class="mode-card" data-mode="dev">
+        <span class="mode-card-tag">開發</span>
+        <h3>電訪逐字稿</h3>
+        <p>從 Vibe 匯出 <code>.vibe.json</code> 或 SRT，上傳後分析通話品質。</p>
+        <span class="mode-card-cta">上傳分析 →</span>
+      </button>
+      <button type="button" class="mode-card accent" data-mode="demo">
+        <span class="mode-card-tag">DEMO</span>
+        <h3>錄影轉逐字稿</h3>
+        <p>1～2 小時 MP4 在本機轉錄（不上雲），完成後自動進入分析。</p>
+        <span class="mode-card-cta">本機轉錄 →</span>
+      </button>
+    </div>
+    <p class="hint mode-chooser-hint">首次使用 DEMO 請先雙擊 <code>demo-workspace/start_call_coach.pyw</code> 啟動本機助手。</p>
+  </div>
+</section>
+
+<div class="wrap" id="mainApp" hidden>
   <header class="hero">
     <div class="hero-meta">
       <span class="pill red">●●● CALL COACH</span>
       <span class="pill">顧問式銷售 6 步驟</span>
       <span class="pill">理解需求 → 判斷適配 → 幫助決策</span>
     </div>
+    <nav class="mode-bar" id="modeBar" hidden>
+      <button type="button" class="mode-pill" data-mode="dev">開發 · 電訪</button>
+      <button type="button" class="mode-pill" data-mode="demo">DEMO · 轉錄</button>
+    </nav>
     <h1 class="display">CALL<br><span class="ghost">COACH</span></h1>
-    <p class="tagline">電訪逐字稿分析工具——把每一通電話變成可複盤的專業判斷。<br>
+    <p class="tagline" id="heroTagline">電訪逐字稿分析工具——把每一通電話變成可複盤的專業判斷。<br>
     <span>VIBE SRT / VTT / TXT ・ 規則分析全程本地 ・ 僅 AI 功能會傳送至 Google</span></p>
   </header>
 
-  <section class="sec">
-    <div class="sec-head"><span class="num">01</span><h2>上傳逐字稿</h2><span class="tag">Upload / SRT・VTT・TXT</span></div>
+  <section class="sec" id="devSection" hidden>
+    <div class="sec-head"><span class="num">01</span><h2>上傳逐字稿</h2><span class="tag">Vibe / SRT・VTT・TXT</span></div>
     <div id="drop">點擊選擇 或 拖曳逐字稿檔到這裡<br><span class="mono-hint" style="font-family:var(--mono);font-size:.7rem;letter-spacing:.15em;color:#555">VIBE .JSON / SRT / VTT / TXT — LOCAL ONLY</span><div id="fname"></div></div>
     <input type="file" id="file" accept=".vibe.json,.json,.srt,.vtt,.txt,text/plain,application/json" hidden>
+    <p class="hint" style="margin-top:10px">電訪建議用 Vibe 錄音並匯出 <code>transcript.vibe.json</code>（見 <a href="https://github.com/Minoru1017/For-company-business-use/blob/main/docs/vibe-export-checklist.md" target="_blank" rel="noopener noreferrer">Vibe 檢查清單</a>）。</p>
+  </section>
 
-    <details class="demo-guide" id="demoGuide">
-      <summary>還沒有 DEMO 逐字稿？本機轉錄指引（1～2 小時錄影・不上雲）</summary>
-      <div class="demo-guide-body">
-        <div id="localBridgePanel" class="local-bridge" hidden></div>
-        <div id="demoGuideStatic">
-        <p class="demo-guide-lead">DEMO 錄影需先在<strong>公司電腦本機</strong>轉成 SRT，再回來上傳分析。音檔不會上傳至任何雲端服務。</p>
-        <div class="box" style="background:#1a1210;border:1px solid #5d3a2a;border-radius:10px;padding:12px 14px;margin-bottom:12px">
-          <strong style="color:var(--text)">推薦：整合本機轉錄</strong>
-          <p class="hint" style="margin:6px 0 0">下載 <code>demo-workspace</code> 後，雙擊 <code>start_demo_app.pyw</code>（或 <code>start_demo_app.cmd</code>）→ 自動開啟 Call Coach → 展開本區塊轉錄，完成後<strong>自動載入</strong>逐字稿。</p>
-        </div>
-        <ol class="demo-guide-steps">
-          <li>從 GitHub 下載最新 <code>demo-workspace</code> 資料夾（見下方連結）</li>
-          <li>雙擊 <code>start_demo_app.pyw</code>；找不到檔請開 <code>START_HERE.txt</code></li>
-          <li>在 Call Coach 本區塊：安裝 → 貼 Token → 拖曳 MP4 → 開始轉錄</li>
-          <li>轉錄完成後自動進入「標記說話者」→ 開始分析</li>
-        </ol>
-
-        <p class="demo-guide-sub">資料夾結構（全部放在同一層，不要拆散）</p>
-        <pre class="demo-guide-tree">C:\Users\經銷業務\demo-workspace\
-├── <span class="hi">input\</span>              ← 放 DEMO 錄影（demo.mp4）
-├── <span class="hi">output\</span>             ← 轉完在這裡取 .srt
-├── .env                ← HF_TOKEN（勿分享）
-├── setup_demo.py       ← 第一次：python setup_demo.py
-├── transcribe_demo.py  ← 每次轉錄：python transcribe_demo.py
-├── .venv\
-│   └── Scripts\
-│       └── <span class="hi">whisperx.exe</span>   ← CMD 轉錄用這個（不是 Scripts\）
-└── models\             ← AI 模型快取（約 3～6 GB，自動建立）</pre>
-        <table class="demo-guide-table">
-          <thead><tr><th>路徑</th><th>用途</th></tr></thead>
-          <tbody>
-            <tr><td>input\demo.mp4</td><td>放入 DEMO 錄影（避免 demo.mp4.mp4 雙副檔名）</td></tr>
-            <tr><td>output\*.srt</td><td>轉錄完成後上傳到本頁</td></tr>
-            <tr><td>.venv\Scripts\whisperx.exe</td><td>CMD 轉錄指令要用的程式</td></tr>
-            <tr><td>.env</td><td>HF_TOKEN=hf_你的token</td></tr>
-          </tbody>
-        </table>
-
-        <p class="demo-guide-sub">HF_TOKEN 取得方式（首次設定，約 5 分鐘）</p>
-        <p class="hint" style="margin:0 0 8px">用於 WhisperX「誰在說話」分軌。Token 只寫在本機 <code>.env</code>，不會上傳到 Call Coach。</p>
-        <ol class="demo-guide-token">
-          <li>註冊 Hugging Face 帳號：<a href="https://huggingface.co/join" target="_blank" rel="noopener noreferrer">huggingface.co/join</a></li>
-          <li>建立 Read Token：<a href="https://huggingface.co/settings/tokens" target="_blank" rel="noopener noreferrer">Settings → Access Tokens</a> → 點 <strong>New token</strong> → Type 選 <strong>Read</strong> → 複製（開頭 <code>hf_</code>，只顯示一次）</li>
-          <li>同意三個模型授權（同一帳號登入，各頁按 Agree）：
-            <a href="https://huggingface.co/pyannote/speaker-diarization-community-1" target="_blank" rel="noopener noreferrer">community-1</a>、
-            <a href="https://huggingface.co/pyannote/speaker-diarization-3.1" target="_blank" rel="noopener noreferrer">diarization-3.1</a>、
-            <a href="https://huggingface.co/pyannote/segmentation-3.0" target="_blank" rel="noopener noreferrer">segmentation-3.0</a>
-          </li>
-          <li>用記事本開啟 <code>demo-workspace\.env</code>，填入一行（等號前後<strong>不要空格</strong>、不要引號）：<br><code>HF_TOKEN=hf_貼上你的token</code></li>
-        </ol>
-
-        <div class="demo-guide-links">
-          <a class="demo-guide-btn" href="./demo-transcribe-cmd-guide.html" target="_blank" rel="noopener noreferrer">開啟 CMD 操作手冊（完整版）</a>
-          <a class="demo-guide-link" href="https://github.com/Minoru1017/For-company-business-use/tree/main/demo-workspace" target="_blank" rel="noopener noreferrer">demo-workspace 資料夾</a>
-          <span class="demo-guide-sep">｜</span>
-          <a class="demo-guide-link" href="https://github.com/Minoru1017/For-company-business-use/blob/main/docs/vibe-export-checklist.md" target="_blank" rel="noopener noreferrer">電訪用 Vibe 檢查清單（&lt;20 分鐘）</a>
-        </div>
-        <p class="hint demo-guide-note">轉錄約需 1.5～3 小時（CPU 筆電），請接電源。路徑請用 <code>.venv\Scripts\whisperx.exe</code>（不是 <code>Scripts\</code>）。</p>
-        </div>
-      </div>
-    </details>
+  <section class="sec" id="demoSection" hidden>
+    <div class="sec-head"><span class="num">01</span><h2>DEMO 本機轉錄</h2><span class="tag">MP4 → SRT · 不上雲</span></div>
+    <div id="localBridgePanel" class="local-bridge"></div>
+    <div id="demoOfflineHint" class="demo-offline hidden">
+      <p><strong>尚未連線本機轉錄助手</strong></p>
+      <p class="hint">請雙擊 <code>demo-workspace/start_call_coach.pyw</code>，保持視窗開啟後重新整理此頁。</p>
+    </div>
   </section>
 
   <section class="sec" id="labelCard" hidden>
