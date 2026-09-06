@@ -2,6 +2,7 @@
 from __future__ import annotations
 
 import os
+import re
 import shutil
 import subprocess
 import sys
@@ -97,6 +98,10 @@ def save_hf_token(token: str) -> None:
     if not replaced:
         lines.append(f"HF_TOKEN={token}")
     env_file.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    try:
+        os.chmod(env_file, 0o600)
+    except OSError:
+        pass
 
 
 def has_valid_token() -> bool:
@@ -113,6 +118,29 @@ def whisperx_cmd() -> list[str]:
     return [str(VENV_PY), "-m", "whisperx"]
 
 
+SAFE_MP4_RE = re.compile(r"^[A-Za-z0-9._ -]+\.mp4$", re.IGNORECASE)
+
+
+def safe_mp4_name(name: str) -> str:
+    base = Path(name).name
+    if not base or not SAFE_MP4_RE.match(base):
+        raise ValueError("檔名僅允許英數、空格、.-_，且須為 .mp4")
+    return base
+
+
+def format_cmd_for_log(cmd: list[str]) -> str:
+    out: list[str] = []
+    i = 0
+    while i < len(cmd):
+        if cmd[i] in ("--hf_token", "--hf-token") and i + 1 < len(cmd):
+            out.extend([cmd[i], "***"])
+            i += 2
+        else:
+            out.append(cmd[i])
+            i += 1
+    return "> " + " ".join(out)
+
+
 def list_mp4_files() -> list[Path]:
     input_dir = ROOT / "input"
     if not input_dir.exists():
@@ -121,13 +149,13 @@ def list_mp4_files() -> list[Path]:
 
 
 def find_mp4(arg: str | None = None) -> Path:
+    input_root = (ROOT / "input").resolve()
     if arg:
-        p = Path(arg)
-        if not p.is_absolute():
-            p = ROOT / p
-        if p.exists():
+        name = safe_mp4_name(arg)
+        p = input_root / name
+        if p.is_file():
             return p
-        raise FileNotFoundError(f"找不到: {p}")
+        raise FileNotFoundError(f"找不到: {name}")
 
     preferred = ROOT / "input" / "demo.mp4"
     if preferred.exists():
@@ -224,7 +252,7 @@ def run_command(
     env: dict[str, str] | None = None,
     hooks: JobHooks | None = None,
 ) -> int:
-    log("> " + " ".join(cmd))
+    log(format_cmd_for_log(cmd))
     if hooks and hooks.is_cancelled():
         log("[已取消] 轉錄已停止")
         return CANCEL_EXIT
@@ -392,7 +420,6 @@ def run_transcribe(mp4_name: str | None = None, log: LogFn = default_log, hooks:
         log("[已取消] 轉錄已停止")
         return CANCEL_EXIT
 
-    token = load_env().get("HF_TOKEN", "").strip()
     log("[2/2] 開始轉錄（2 小時 DEMO 約 1.5～3 小時，請接電源）...")
     code = run_command(
         whisperx_cmd()
@@ -411,8 +438,6 @@ def run_transcribe(mp4_name: str | None = None, log: LogFn = default_log, hooks:
             "--batch_size",
             str(BATCH),
             "--diarize",
-            "--hf_token",
-            token,
             "--min_speakers",
             "2",
             "--max_speakers",

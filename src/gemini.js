@@ -95,10 +95,17 @@ export function mergeAIResults(results) {
   return merged;
 }
 
+function geminiHeaders(apiKey) {
+  return {
+    'Content-Type': 'application/json',
+    'x-goog-api-key': apiKey,
+  };
+}
+
 export async function listGeminiModels(apiKey, fetchImpl = fetch) {
-  const res = await fetchImpl(
-    `https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(apiKey)}`
-  );
+  const res = await fetchImpl('https://generativelanguage.googleapis.com/v1beta/models', {
+    headers: geminiHeaders(apiKey),
+  });
   if (!res.ok) {
     const err = await res.json().catch(() => ({}));
     throw new Error(err?.error?.message || `無法取得模型清單（HTTP ${res.status}）`);
@@ -127,10 +134,10 @@ export function formatApiError(status, errBody) {
 
 export async function callGemini({ apiKey, model, text, signal, fetchImpl = fetch }) {
   const res = await fetchImpl(
-    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${encodeURIComponent(apiKey)}`,
+    `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
     {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: geminiHeaders(apiKey),
       signal,
       body: JSON.stringify({
         contents: [{ parts: [{ text }] }],

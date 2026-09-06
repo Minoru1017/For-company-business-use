@@ -40,5 +40,7 @@ npm test         # Vitest
 ## 安全與隱私
 
 - DEMO 音檔全程本機處理，不上傳
-- API Key 可選擇不記住（僅 sessionStorage）
+- 本機 API 需工作階段 Token，且僅允許 Call Coach 官方來源跨域存取
+- HF Token 不寫入程序參數或日誌；`.env` 權限設為僅本機使用者可讀
+- Gemini API Key 預設僅保留在本次瀏覽器分頁（需勾選才記住）
 - AI 分析前需勾選同意傳送至 Google

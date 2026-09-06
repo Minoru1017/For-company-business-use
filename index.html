@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' https://fonts.googleapis.com 'unsafe-inline'; font-src https://fonts.gstatic.com; connect-src 'self' http://127.0.0.1:8765 https://generativelanguage.googleapis.com ws: wss:; img-src 'self' data:;">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' https://fonts.googleapis.com 'unsafe-inline'; font-src https://fonts.gstatic.com; connect-src 'self' http://127.0.0.1:8765 https://generativelanguage.googleapis.com; img-src 'self' data:; base-uri 'self'; object-src 'none'; frame-ancestors 'none';">
   <title>CALL COACH｜顧問式銷售電訪分析</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=JetBrains+Mono:wght@400;600&family=Noto+Sans+TC:wght@400;500;700;900&family=Noto+Serif+TC:wght@600;700&display=swap" rel="stylesheet">
@@ -178,7 +178,7 @@
           <button id="aiCancel" type="button" hidden>取消</button>
         </div>
         <div class="row" style="margin-top:10px;font-size:.82rem">
-          <label><input type="checkbox" id="rememberKey" checked> 記住 API Key（存在本機瀏覽器）</label>
+          <label><input type="checkbox" id="rememberKey"> 記住 API Key（存在本機瀏覽器，預設僅本次分頁）</label>
           <label style="margin-left:16px"><input type="checkbox" id="aiConsent"> 我已去識別化並同意傳送至 Google 分析</label>
         </div>
         <div class="hint">敏感通話請先去識別化。取消勾選「記住 API Key」時，Key 僅保留在目前分頁（關閉即清除）。免費申請：aistudio.google.com/apikey</div>

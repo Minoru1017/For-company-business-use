@@ -30,7 +30,7 @@ let labelCtrl = null;
 
 const keyStorage = {
   get remember() {
-    return localStorage.getItem('gemini_remember_key') !== '0';
+    return localStorage.getItem('gemini_remember_key') === '1';
   },
   load() {
     if (this.remember) return localStorage.getItem('gemini_key') || '';
