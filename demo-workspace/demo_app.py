@@ -4,7 +4,7 @@ DEMO 轉錄助手 — 本機圖形化操作介面（不需 CMD）
 
 用法:
   python demo_app.py
-  或雙擊「啟動轉錄助手.pyw」
+  或雙擊 start_demo_app.pyw / start_demo_app.cmd
 
 會在瀏覽器開啟 http://127.0.0.1:8765
 音檔全程在本機處理，不上傳雲端。

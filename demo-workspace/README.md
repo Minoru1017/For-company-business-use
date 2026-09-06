@@ -6,12 +6,12 @@
 
 ## 推薦：與 Call Coach 整合（一頁完成）
 
-1. 雙擊 **`啟動轉錄助手.pyw`**
+1. 雙擊 **`start_demo_app.pyw`**（或 `start_demo_app.cmd` / `啟動轉錄助手.pyw`）
 2. 瀏覽器自動開啟 **Call Coach**，展開「還沒有 DEMO 逐字稿？」
 3. 畫面顯示 **「本機轉錄助手已連線」** → 一鍵安裝 → 貼 Token → 拖曳 MP4 → 開始轉錄
 4. 轉錄完成後 **自動載入逐字稿** 到 Call Coach 分析（不需手動上傳 SRT）
 
-> 音檔全程在本機 `demo-workspace` 處理，不上傳雲端。僅完成的 SRT 文字載入 Call Coach。
+> 找不到檔案？請開啟 **`START_HERE.txt`**。若 `.pyw` 無法雙擊，改用 **`start_demo_app.cmd`** 或在 CMD 執行 `python demo_app.py`。
 
 獨立介面（不開 Call Coach）：執行 `python demo_app.py` 後開啟 http://127.0.0.1:8765/
 
@@ -41,7 +41,10 @@ python transcribe_demo.py
 
 ```
 demo-workspace/
-├── 啟動轉錄助手.pyw    ← 推薦：雙擊開啟圖形介面
+├── START_HERE.txt      ← 找不到啟動檔？先看這個
+├── start_demo_app.pyw  ← 推薦：雙擊啟動（英文檔名）
+├── start_demo_app.cmd  ← .pyw 無法用時改雙擊這個
+├── 啟動轉錄助手.pyw    ← 同上（中文檔名）
 ├── demo_app.py         ← 轉錄助手主程式
 ├── setup_demo.py       ← 命令列安裝
 ├── transcribe_demo.py  ← 命令列轉錄
