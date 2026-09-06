@@ -345,15 +345,36 @@ function showLog(el, lines) {
   el.scrollTop = el.scrollHeight;
 }
 
+function extractJobError(logs) {
+  for (let i = (logs || []).length - 1; i >= 0; i--) {
+    const line = logs[i];
+    if (line.includes('[錯誤]')) return line.replace(/^\[錯誤\]\s*/, '');
+    if (/error|failed|exception/i.test(line)) return line;
+  }
+  return null;
+}
+
+function alertJobFailure(logs, fallback) {
+  const detail = extractJobError(logs);
+  alert(detail ? `${fallback}\n\n${detail}\n\n詳細記錄請見下方日誌。` : `${fallback}\n\n詳細記錄請見下方日誌。`);
+}
+
 async function pollJob(logEl, onDone) {
   clearInterval(pollTimer);
   pollTimer = setInterval(async () => {
-    const j = await api('/api/job');
-    showLog(logEl, j.logs || []);
-    if (!j.running && j.exit_code !== null) {
+    try {
+      const j = await api('/api/job');
+      showLog(logEl, j.logs || []);
+      if (!j.running && j.exit_code !== null) {
+        clearInterval(pollTimer);
+        await refresh();
+        onDone(j.exit_code === 0, j.logs || []);
+      }
+    } catch {
       clearInterval(pollTimer);
-      await refresh();
-      onDone(j.exit_code === 0);
+      const logs = ['[錯誤] 無法連線轉錄助手，請確認視窗仍開啟'];
+      showLog(logEl, logs);
+      onDone(false, logs);
     }
   }, 800);
 }
@@ -368,8 +389,9 @@ $('#btnSetup').onclick = async () => {
   const logEl = $('#setupLog');
   const r = await api('/api/setup', { method: 'POST' });
   if (!r.ok) { alert(r.message); $('#btnSetup').disabled = false; return; }
-  pollJob(logEl, (ok) => {
+  pollJob(logEl, (ok, logs) => {
     $('#btnSetup').disabled = false;
+    if (!ok) alertJobFailure(logs, '安裝失敗');
     if (ok) refresh().then((st) => {
       if (st && !st.token_ok) showStep(1, true);
       else refresh();
@@ -395,8 +417,9 @@ $('#btnUninstall').onclick = async () => {
     body: JSON.stringify({ remove_models: removeModels }),
   });
   if (!r.ok) return alert(r.message);
-  pollJob(logEl, (ok) => {
+  pollJob(logEl, (ok, logs) => {
     alert(ok ? '已解除安裝' : '解除安裝失敗');
+    if (!ok) alertJobFailure(logs, '解除安裝失敗');
     refresh();
   });
 };
@@ -423,9 +446,10 @@ $('#btnTranscribe').onclick = async () => {
   const logEl = $('#transcribeLog');
   const r = await api('/api/transcribe', { method: 'POST', body: JSON.stringify({ mp4: selectedMp4 }) });
   if (!r.ok) { alert(r.message); $('#btnTranscribe').disabled = false; return; }
-  pollJob(logEl, (ok) => {
+  pollJob(logEl, (ok, logs) => {
     $('#btnTranscribe').disabled = false;
     if (ok) api('/api/status').then(st => showDone(st.srt_files));
+    else alertJobFailure(logs, '轉錄失敗');
   });
 };
 

@@ -360,14 +360,40 @@ function showLog(lines) {
   el.scrollTop = el.scrollHeight;
 }
 
+function extractJobError(logs) {
+  for (let i = (logs || []).length - 1; i >= 0; i--) {
+    const line = logs[i];
+    if (line.includes('[錯誤]')) return line.replace(/^\[錯誤\]\s*/, '');
+    if (/error|failed|exception/i.test(line)) return line;
+  }
+  return null;
+}
+
+function showJobError(showToast, logs, fallback) {
+  const detail = extractJobError(logs);
+  const msg = detail ? `${fallback}：${detail}` : fallback;
+  showToast(msg);
+  const status = document.getElementById('bridgeUploadStatus');
+  if (status) {
+    status.classList.remove('hidden', 'busy', 'ok');
+    status.classList.add('err');
+    status.textContent = `✗ ${msg}`;
+  }
+}
+
 async function pollJob(onDone) {
   clearInterval(pollTimer);
   pollTimer = setInterval(async () => {
-    const j = await api('/api/job');
-    showLog(j.logs);
-    if (!j.running && j.exit_code !== null) {
+    try {
+      const j = await api('/api/job');
+      showLog(j.logs);
+      if (!j.running && j.exit_code !== null) {
+        clearInterval(pollTimer);
+        onDone(j.exit_code === 0, j.logs || []);
+      }
+    } catch {
       clearInterval(pollTimer);
-      onDone(j.exit_code === 0);
+      onDone(false, ['[錯誤] 無法連線本機轉錄助手，請確認視窗仍開啟']);
     }
   }, 800);
 }
@@ -376,8 +402,9 @@ async function runSetup(showToast, refreshStatus) {
   const r = await api('/api/setup', { method: 'POST' });
   if (!r.ok) return showToast(r.message);
   showToast('開始安裝…');
-  pollJob((ok) => {
+  pollJob((ok, logs) => {
     showToast(ok ? '安裝完成' : '安裝失敗');
+    if (!ok) showJobError(showToast, logs, '安裝失敗');
     refreshStatus().then((st) => {
       if (ok && st && !st.token_ok) openTokenPage(showToast);
     });
@@ -404,8 +431,9 @@ async function runUninstall(showToast, refreshStatus) {
   });
   if (!r.ok) return showToast(r.message);
   showToast('開始解除安裝…');
-  pollJob((ok) => {
+  pollJob((ok, logs) => {
     showToast(ok ? '已解除安裝' : '解除安裝失敗');
+    if (!ok) showJobError(showToast, logs, '解除安裝失敗');
     refreshStatus();
   });
 }
@@ -428,10 +456,10 @@ async function runTranscribe(onTranscriptReady, showToast, refreshStatus) {
   const r = await api('/api/transcribe', { method: 'POST', body: JSON.stringify({ mp4: selectedMp4 }) });
   if (!r.ok) return showToast(r.message);
   showToast('本機轉錄中…');
-  pollJob(async (ok) => {
+  pollJob(async (ok, logs) => {
     refreshStatus();
     if (ok) await importLatest(onTranscriptReady, showToast);
-    else showToast('轉錄失敗，請查看記錄');
+    else showJobError(showToast, logs, '轉錄失敗');
   });
 }
 
