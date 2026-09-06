@@ -4,16 +4,16 @@
 
 ---
 
-## 推薦：圖形化轉錄助手（不需 CMD）
+## 推薦：與 Call Coach 整合（一頁完成）
 
-適合非資訊背景同事，四步驟完成：
+1. 雙擊 **`啟動轉錄助手.pyw`**
+2. 瀏覽器自動開啟 **Call Coach**，展開「還沒有 DEMO 逐字稿？」
+3. 畫面顯示 **「本機轉錄助手已連線」** → 一鍵安裝 → 貼 Token → 拖曳 MP4 → 開始轉錄
+4. 轉錄完成後 **自動載入逐字稿** 到 Call Coach 分析（不需手動上傳 SRT）
 
-1. 雙擊 **`啟動轉錄助手.pyw`**（或執行 `python demo_app.py`）
-2. 瀏覽器會開啟本機操作介面 → 按「**一鍵安裝**」
-3. 貼上 **HF_TOKEN** → 拖曳 MP4 錄影 → 按「**開始轉錄**」
-4. 完成後按「**開啟 output 資料夾**」→ 上傳 `.srt` 到 Call Coach
+> 音檔全程在本機 `demo-workspace` 處理，不上傳雲端。僅完成的 SRT 文字載入 Call Coach。
 
-> 若雙擊 `.pyw` 沒反應：在資料夾網址列輸入 `cmd`，執行 `python demo_app.py`
+獨立介面（不開 Call Coach）：執行 `python demo_app.py` 後開啟 http://127.0.0.1:8765/
 
 ---
 

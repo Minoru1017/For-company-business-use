@@ -357,3 +357,25 @@ def open_folder(folder: str) -> None:
         subprocess.run(["open", str(path)], check=False)
     else:
         subprocess.run(["xdg-open", str(path)], check=False)
+
+
+def list_srt_files() -> list[Path]:
+    output_dir = ROOT / "output"
+    if not output_dir.exists():
+        return []
+    return sorted(output_dir.glob("*.srt"), key=lambda p: p.stat().st_mtime, reverse=True)
+
+
+def get_latest_srt() -> Path | None:
+    files = list_srt_files()
+    return files[0] if files else None
+
+
+def read_srt(filename: str | None = None) -> tuple[str, str]:
+    if filename:
+        path = ROOT / "output" / Path(filename).name
+    else:
+        path = get_latest_srt()
+    if not path or not path.exists():
+        raise FileNotFoundError("找不到 SRT 逐字稿")
+    return path.name, path.read_text(encoding="utf-8")

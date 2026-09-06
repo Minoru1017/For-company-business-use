@@ -92,6 +92,22 @@ h2 { font-family:var(--disp); font-size:.98rem; margin-bottom:12px; color:var(--
 .demo-guide-token a:hover { text-decoration:underline; }
 .demo-guide-token code { font-family:var(--mono); font-size:.75rem; color:var(--warn); }
 
+.local-bridge { margin-bottom: 4px; }
+.bridge-lead { margin-bottom: 12px; color: var(--text); font-size: .9rem; }
+.bridge-checks { list-style: none; margin: 0 0 12px; display: flex; flex-wrap: wrap; gap: 8px; }
+.bridge-checks li { display: flex; align-items: center; gap: 6px; font-size: .78rem; color: var(--muted); }
+.bridge-badge { font-family: var(--mono); font-size: .65rem; padding: 2px 7px; border-radius: 99px; border: 1px solid var(--border); }
+.bridge-badge.ok { color: var(--ok); border-color: #2f5d43; }
+.bridge-badge.bad { color: var(--warn); border-color: #5d4d1e; }
+.bridge-files { margin-bottom: 10px; }
+.bridge-file { display: block; padding: 8px 12px; border: 1px solid var(--border); border-radius: 8px; margin-bottom: 6px; font-size: .85rem; cursor: pointer; }
+.bridge-file.on { border-color: var(--accent); background: #1a1210; }
+.bridge-drop { border: 1px dashed #3a3a3a; border-radius: 10px; padding: 16px; text-align: center; color: var(--muted); font-size: .82rem; margin-bottom: 10px; }
+.bridge-drop.drag { border-color: var(--accent); color: var(--text); }
+.bridge-token { width: 100%; margin-bottom: 10px; padding: 10px 12px; border-radius: 10px; border: 1px solid var(--border); background: var(--panel2); color: var(--text); font-family: var(--mono); font-size: .8rem; }
+.bridge-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
+.bridge-log { background: #0e0e0e; border: 1px solid var(--border); border-radius: 8px; padding: 10px; max-height: 180px; overflow-y: auto; font-family: var(--mono); font-size: .7rem; line-height: 1.5; color: #b0b0b0; white-space: pre-wrap; }
+
 button { background:transparent; color:var(--text); border:1px solid var(--border);
          border-radius:99px; padding:10px 20px; font-size:.85rem; cursor:pointer;
          font-family:var(--sans); letter-spacing:.04em; transition:.15s; }

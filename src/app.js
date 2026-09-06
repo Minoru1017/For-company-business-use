@@ -13,6 +13,7 @@ import {
   mergeAIResults,
   pickPreferredModel,
 } from './gemini.js';
+import { initLocalTranscribe } from './local-transcribe.js';
 import { bindLabelCollapseHandlers, createLabelController } from './labels.js';
 import { applyBuiltinSpeakerLabels, enrichSegments, parse, parseVibeJson } from './parser.js';
 import { bumpUsage, checkQuotaBefore, getLimit, getUsage, quotaPercent, saveUsage } from './quota.js';
@@ -72,38 +73,42 @@ function bindUpload() {
   $('file').onchange = () => $('file').files[0] && loadFile($('file').files[0]);
 }
 
+function loadTranscriptText(text, filename = 'transcript.srt') {
+  const isVibe = /\.vibe\.json$/i.test(filename);
+  try {
+    if (isVibe) {
+      segs = parseVibeJson(text);
+    } else {
+      segs = parse(text);
+      applyBuiltinSpeakerLabels(segs);
+    }
+  } catch {
+    $('fname').textContent = isVibe
+      ? '無法解析 Vibe 檔案，請確認是 transcript.vibe.json'
+      : '無法解析，請用 Vibe 的 .vibe.json、SRT/VTT 或含 [mm:ss] 的 TXT';
+    return false;
+  }
+  if (!segs.length) {
+    $('fname').textContent = '無法解析，請用 Vibe 的 .vibe.json、SRT/VTT 或含 [mm:ss] 的 TXT';
+    return false;
+  }
+  if (labeledRatio(segs) < 0.5) autoGuess(segs);
+  enrichSegments(segs);
+  const src = isVibe ? 'Vibe' : '逐字稿';
+  $('fname').textContent = `已載入（${segs.length} 句，來源：${src}）`;
+  labelCtrl = createLabelController({ segs, onToast: showToast });
+  labelCtrl.resetFocus();
+  labelCtrl.renderLabels();
+  showToast(`已載入 ${segs.length} 句逐字稿`);
+  $('labelCard').hidden = false;
+  $('result').hidden = true;
+  return true;
+}
+
 function loadFile(f) {
   const r = new FileReader();
   const isVibe = /\.vibe\.json$/i.test(f.name);
-  r.onload = () => {
-    try {
-      if (isVibe) {
-        segs = parseVibeJson(r.result);
-      } else {
-        segs = parse(r.result);
-        applyBuiltinSpeakerLabels(segs);
-      }
-    } catch {
-      $('fname').textContent = isVibe
-        ? '無法解析 Vibe 檔案，請確認是 transcript.vibe.json'
-        : '無法解析，請用 Vibe 的 .vibe.json、SRT/VTT 或含 [mm:ss] 的 TXT';
-      return;
-    }
-    if (!segs.length) {
-      $('fname').textContent = '無法解析，請用 Vibe 的 .vibe.json、SRT/VTT 或含 [mm:ss] 的 TXT';
-      return;
-    }
-    if (labeledRatio(segs) < 0.5) autoGuess(segs);
-    enrichSegments(segs);
-    const src = isVibe ? 'Vibe' : '逐字稿';
-    $('fname').textContent = `已載入（${segs.length} 句，來源：${src}）`;
-    labelCtrl = createLabelController({ segs, onToast: showToast });
-    labelCtrl.resetFocus();
-    labelCtrl.renderLabels();
-    showToast(`已載入 ${segs.length} 句逐字稿`);
-    $('labelCard').hidden = false;
-    $('result').hidden = true;
-  };
+  r.onload = () => loadTranscriptText(r.result, f.name);
   r.readAsText(f, 'utf-8');
 }
 
@@ -377,6 +382,16 @@ function init() {
     const opt = document.createElement('option');
     opt.value = m;
     $('modelList').appendChild(opt);
+  });
+
+  initLocalTranscribe({
+    onTranscriptReady: (text, filename) => {
+      if (loadTranscriptText(text, filename)) {
+        document.querySelector('.demo-guide')?.removeAttribute('open');
+        $('labelCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    },
+    showToast,
   });
 }
 
