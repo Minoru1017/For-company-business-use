@@ -8,10 +8,25 @@ let pollTimer = null;
 let refreshTimer = null;
 let selectedMp4 = null;
 let uploadBusy = false;
+let uploadXhr = null;
+let uploadStartAt = 0;
+
+const LARGE_FILE_MB = 80;
 
 function fmtSize(bytes) {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+
+function fmtSpeed(bps) {
+  if (!bps || bps < 1024) return '計算中…';
+  if (bps < 1024 * 1024) return `${(bps / 1024).toFixed(0)} KB/s`;
+  return `${(bps / (1024 * 1024)).toFixed(1)} MB/s`;
+}
+
+function fmtElapsed(sec) {
+  if (sec < 60) return `${sec} 秒`;
+  return `${Math.floor(sec / 60)} 分 ${sec % 60} 秒`;
 }
 
 async function api(path, opts = {}) {
@@ -88,6 +103,18 @@ export function initLocalTranscribe({ onTranscriptReady, showToast }) {
     panel.innerHTML = `
       <p class="bridge-lead">錄影在本機轉成逐字稿後，會<strong>自動載入</strong>到上方分析區，不需手動上傳 SRT。</p>
       <ul class="bridge-checks">${checkHtml}</ul>
+
+      <div class="bridge-manual">
+        <strong>推薦：大檔 DEMO 請手動複製（比拖曳快）</strong>
+        <p class="hint" style="margin:6px 0 8px">用檔案總管將 MP4 <strong>複製</strong>到下方資料夾，再按「重新掃描」：</p>
+        <code class="bridge-path">${st.input_folder || 'demo-workspace\\input'}</code>
+        <div class="bridge-actions" style="margin-top:10px">
+          <button type="button" class="btn primary" id="bridgeOpenInput">開啟 input 資料夾</button>
+          <button type="button" class="btn" id="bridgeRescan">重新掃描檔案</button>
+        </div>
+      </div>
+
+      <p class="bridge-or">或透過瀏覽器拖曳（小檔較快；大檔可能需 5～15 分鐘）</p>
       <div class="bridge-files">${fileHtml}</div>
       <div class="bridge-drop" id="bridgeDrop">
         <span id="bridgeDropLabel">拖曳 MP4 到這裡，或點擊選擇檔案</span>
@@ -96,9 +123,11 @@ export function initLocalTranscribe({ onTranscriptReady, showToast }) {
       <input type="file" id="bridgeFileInput" accept=".mp4,video/mp4" hidden>
       <div class="bridge-upload-status hidden" id="bridgeUploadStatus"></div>
       <div class="bridge-progress hidden" id="bridgeProgress"><div id="bridgeProgressBar"></div></div>
+      <button type="button" class="btn bridge-cancel hidden" id="bridgeCancelUpload">取消複製</button>
       <input type="password" id="bridgeToken" placeholder="HF_TOKEN（hf_...，首次請貼上）" class="bridge-token" ${st.token_ok ? 'style="display:none"' : ''}>
       <div class="bridge-actions">
         ${!st.venv_ok || !st.whisperx_ok ? '<button type="button" class="btn primary" id="bridgeSetup">一鍵安裝</button>' : ''}
+        ${st.can_uninstall ? '<button type="button" class="btn bridge-uninstall" id="bridgeUninstall">解除安裝轉錄環境</button>' : ''}
         ${!st.token_ok ? '<button type="button" class="btn" id="bridgeSaveToken">儲存 Token</button>' : ''}
         <button type="button" class="btn primary" id="bridgeTranscribe" ${st.ready_to_transcribe && selectedMp4 ? '' : 'disabled'}>開始本機轉錄</button>
         <button type="button" class="btn" id="bridgeImport" ${st.srt_files?.length ? '' : 'disabled'}>載入最新 SRT</button>
@@ -137,7 +166,21 @@ export function initLocalTranscribe({ onTranscriptReady, showToast }) {
       if (file) await uploadMp4(file, showToast, refreshStatus);
     };
 
+    panel.querySelector('#bridgeOpenInput')?.addEventListener('click', async () => {
+      await api('/api/open-folder', { method: 'POST', body: JSON.stringify({ folder: 'input' }) });
+      showToast('已開啟 input 資料夾 — 複製 MP4 後按「重新掃描」');
+    });
+    panel.querySelector('#bridgeRescan')?.addEventListener('click', async () => {
+      showToast('正在掃描 input 資料夾…');
+      await refreshStatus();
+      showToast(selectedMp4 ? `已找到：${selectedMp4}` : '尚未找到 MP4，請確認已複製到 input');
+    });
     panel.querySelector('#bridgeSetup')?.addEventListener('click', () => runSetup(showToast, refreshStatus));
+    panel.querySelector('#bridgeUninstall')?.addEventListener('click', () => runUninstall(showToast, refreshStatus));
+    panel.querySelector('#bridgeCancelUpload')?.addEventListener('click', () => {
+      if (uploadXhr) uploadXhr.abort();
+    });
+
     panel.querySelector('#bridgeSaveToken')?.addEventListener('click', () => saveToken(showToast, refreshStatus));
     panel.querySelector('#bridgeTranscribe')?.addEventListener('click', () =>
       runTranscribe(onTranscriptReady, showToast, refreshStatus)
@@ -150,11 +193,12 @@ export function initLocalTranscribe({ onTranscriptReady, showToast }) {
   refreshTimer = setInterval(refreshStatus, 8000);
 }
 
-function setUploadUI({ state, message, pct = 0 }) {
+function setUploadUI({ state, message, pct = 0, showCancel = false }) {
   const status = document.getElementById('bridgeUploadStatus');
   const prog = document.getElementById('bridgeProgress');
   const bar = document.getElementById('bridgeProgressBar');
   const drop = document.getElementById('bridgeDrop');
+  const cancel = document.getElementById('bridgeCancelUpload');
   if (!status) return;
 
   status.classList.remove('hidden', 'busy', 'ok', 'err');
@@ -162,6 +206,7 @@ function setUploadUI({ state, message, pct = 0 }) {
     status.classList.add('hidden');
     prog?.classList.add('hidden');
     drop?.classList.remove('busy');
+    cancel?.classList.add('hidden');
     return;
   }
 
@@ -173,25 +218,31 @@ function setUploadUI({ state, message, pct = 0 }) {
     drop?.classList.add('busy');
     prog?.classList.remove('hidden');
     if (bar) bar.style.width = `${Math.min(100, Math.max(0, pct))}%`;
+    if (showCancel) cancel?.classList.remove('hidden');
+    else cancel?.classList.add('hidden');
   } else {
     drop?.classList.remove('busy');
     prog?.classList.add('hidden');
+    cancel?.classList.add('hidden');
   }
 }
 
-function uploadMp4XHR(file) {
+function uploadMp4XHR(file, onProgress) {
   return new Promise((resolve, reject) => {
-    const xhr = new XMLHttpRequest();
-    xhr.open('POST', `${LOCAL_API}/api/upload`);
-    xhr.upload.onprogress = (e) => {
-      const pct = e.lengthComputable ? (e.loaded / e.total) * 100 : 0;
-      setUploadUI({
-        state: 'uploading',
-        message: `正在複製到本機 input… ${fmtSize(e.loaded)} / ${fmtSize(e.total || file.size)}（${pct.toFixed(0)}%）`,
-        pct,
-      });
+    uploadXhr = new XMLHttpRequest();
+    uploadStartAt = Date.now();
+    uploadXhr.open('POST', `${LOCAL_API}/api/upload`);
+    uploadXhr.upload.onprogress = (e) => {
+      const loaded = e.loaded;
+      const total = e.lengthComputable ? e.total : file.size;
+      const pct = total ? (loaded / total) * 100 : 0;
+      const sec = Math.max(1, Math.floor((Date.now() - uploadStartAt) / 1000));
+      const speed = loaded / sec;
+      onProgress({ loaded, total, pct, sec, speed });
     };
-    xhr.onload = () => {
+    uploadXhr.onload = () => {
+      const xhr = uploadXhr;
+      uploadXhr = null;
       try {
         const data = JSON.parse(xhr.responseText || '{}');
         if (xhr.status >= 400 || !data.ok) {
@@ -203,12 +254,22 @@ function uploadMp4XHR(file) {
         reject(new Error('伺服器回應異常，請確認轉錄助手已啟動'));
       }
     };
-    xhr.onerror = () => reject(new Error('連線失敗，請確認已雙擊 start_demo_app 且視窗未關閉'));
-    xhr.ontimeout = () => reject(new Error('上傳逾時，檔案可能過大或磁碟空間不足'));
-    xhr.timeout = 0;
+    uploadXhr.onerror = () => {
+      uploadXhr = null;
+      reject(new Error('連線失敗，請確認已雙擊 start_demo_app 且視窗未關閉'));
+    };
+    uploadXhr.onabort = () => {
+      uploadXhr = null;
+      reject(new Error('已取消複製'));
+    };
+    uploadXhr.ontimeout = () => {
+      uploadXhr = null;
+      reject(new Error('複製逾時，建議改用「開啟 input 資料夾」手動複製'));
+    };
+    uploadXhr.timeout = 0;
     const fd = new FormData();
     fd.append('file', file);
-    xhr.send(fd);
+    uploadXhr.send(fd);
   });
 }
 
@@ -219,16 +280,41 @@ async function uploadMp4(file, showToast, refreshStatus) {
     return;
   }
 
+  const sizeMb = file.size / (1024 * 1024);
+  if (sizeMb >= LARGE_FILE_MB) {
+    const manual = confirm(
+      `檔案約 ${fmtSize(file.size)}，透過瀏覽器複製可能很慢（5～15 分鐘），進度也可能暫停。\n\n` +
+        `建議：按「開啟 input 資料夾」手動複製 MP4，再按「重新掃描」。\n\n` +
+        `仍要用瀏覽器複製嗎？`
+    );
+    if (!manual) {
+      showToast('建議手動複製到 input 資料夾');
+      return;
+    }
+  }
+
   uploadBusy = true;
   setUploadUI({
     state: 'uploading',
-    message: `準備上傳 ${file.name}（${fmtSize(file.size)}）…`,
+    message: `準備複製 ${file.name}（${fmtSize(file.size)}）…`,
     pct: 0,
+    showCancel: true,
   });
-  showToast(`開始複製 ${file.name} 到本機…`);
+  showToast(`開始複製 ${file.name}…（大檔請耐心等候）`);
 
   try {
-    const r = await uploadMp4XHR(file);
+    const r = await uploadMp4XHR(file, ({ loaded, total, pct, sec, speed }) => {
+      const stalled = pct < 1 && sec > 30;
+      setUploadUI({
+        state: 'uploading',
+        message:
+          `正在複製… ${fmtSize(loaded)} / ${fmtSize(total)}（${pct.toFixed(0)}%）` +
+          ` · 已 ${fmtElapsed(sec)} · ${fmtSpeed(speed)}` +
+          (stalled ? ' · 若長時間無進度，請取消並改用手動複製' : ''),
+        pct,
+        showCancel: true,
+      });
+    });
     selectedMp4 = r.filename;
     setUploadUI({ state: 'ok', message: `✓ 已放入本機 input：${r.filename}（${fmtSize(file.size)}）` });
     showToast(`已放入本機 input：${r.filename}`);
@@ -240,6 +326,7 @@ async function uploadMp4(file, showToast, refreshStatus) {
     showToast(msg);
   } finally {
     uploadBusy = false;
+    uploadXhr = null;
   }
 }
 
@@ -269,6 +356,32 @@ async function runSetup(showToast, refreshStatus) {
   showToast('開始安裝…');
   pollJob((ok) => {
     showToast(ok ? '安裝完成' : '安裝失敗');
+    refreshStatus();
+  });
+}
+
+async function runUninstall(showToast, refreshStatus) {
+  const sure = confirm(
+    '確定要解除安裝轉錄環境嗎？\n\n' +
+      '將刪除：.venv（WhisperX）\n' +
+      '保留：input / output / .env / models'
+  );
+  if (!sure) return;
+
+  const removeModels = confirm(
+    '是否同時刪除 models 快取（約 3～6 GB）？\n\n' +
+      '確定 = 一併刪除（下次安裝需重新下載）\n' +
+      '取消 = 保留 models（下次安裝較快）'
+  );
+
+  const r = await api('/api/uninstall', {
+    method: 'POST',
+    body: JSON.stringify({ remove_models: removeModels }),
+  });
+  if (!r.ok) return showToast(r.message);
+  showToast('開始解除安裝…');
+  pollJob((ok) => {
+    showToast(ok ? '已解除安裝' : '解除安裝失敗');
     refreshStatus();
   });
 }

@@ -151,6 +151,8 @@ class EnvStatus:
             "srt_files": self.srt_files,
             "ready_to_transcribe": self.ready_to_transcribe,
             "root": str(ROOT),
+            "input_folder": str(ROOT / "input"),
+            "can_uninstall": self.venv_ok,
             "call_coach_url": CALL_COACH_URL,
             "hf_links": HF_LINKS,
         }
@@ -240,6 +242,31 @@ def run_setup(log: LogFn = default_log) -> int:
         log("[提醒] 找不到 ffmpeg，請安裝: winget install Gyan.FFmpeg")
 
     log("=== 安裝完成 ===")
+    return 0
+
+
+def run_uninstall(remove_models: bool = False, log: LogFn = default_log) -> int:
+    log("=== 解除安裝轉錄環境 ===")
+    venv = ROOT / ".venv"
+    if venv.exists():
+        log("刪除 .venv（WhisperX 虛擬環境）...")
+        shutil.rmtree(venv, ignore_errors=True)
+    else:
+        log(".venv 不存在，略過")
+
+    if remove_models:
+        models = ROOT / "models"
+        if models.exists():
+            log("刪除 models（AI 模型快取，約 3～6 GB）...")
+            shutil.rmtree(models, ignore_errors=True)
+        else:
+            log("models 不存在，略過")
+    else:
+        log("保留 models 快取（下次安裝可省時）")
+
+    log("已保留：input / output / .env")
+    log("=== 解除安裝完成 ===")
+    log("需要時可再次按「一鍵安裝」。")
     return 0
 
 

@@ -104,6 +104,20 @@
     .nav-row { display: flex; justify-content: space-between; margin-top: 18px; flex-wrap: wrap; gap: 8px; }
     .hint { font-size: .78rem; color: var(--muted); margin-top: 8px; }
     code { font-family: var(--mono); color: var(--warn); font-size: .82rem; }
+    .manual-box {
+      background: #121a14; border: 1px solid #2f5d43; border-radius: 10px;
+      padding: 14px; margin: 12px 0; font-size: .88rem;
+    }
+    .manual-box strong { color: var(--ok); }
+    .path-code {
+      display: block; margin: 8px 0; padding: 8px 10px; background: #0e0e0e;
+      border: 1px solid var(--border); border-radius: 6px; font-family: var(--mono);
+      font-size: .75rem; color: var(--warn); word-break: break-all;
+    }
+    .or-divider { text-align: center; color: var(--muted); font-size: .78rem; margin: 10px 0; }
+    .btn.danger { border-color: #5d2f28; color: var(--muted); }
+    .btn.danger:hover { border-color: #ff5a3c; color: #ff5a3c; }
+    .btn.cancel { border-color: #5d2f28; color: #ff5a3c; margin-bottom: 8px; }
   </style>
 </head>
 <body>
@@ -127,6 +141,7 @@
     <ul class="check-list" id="checkList"></ul>
     <div class="btn-row">
       <button class="btn primary" id="btnSetup">一鍵安裝轉錄工具</button>
+      <button class="btn danger hidden" id="btnUninstall">解除安裝轉錄環境</button>
       <button class="btn" id="btnRefresh">重新檢查</button>
     </div>
     <div class="log hidden" id="setupLog"></div>
@@ -166,7 +181,21 @@
   <!-- Step 2: File + Transcribe -->
   <section class="card hidden" id="panel2">
     <h2>步驟三：選擇 DEMO 錄影並開始轉錄</h2>
-    <p>選擇或上傳 MP4 錄影檔（建議檔名 <code>demo.mp4</code>，避免 <code>demo.mp4.mp4</code> 雙副檔名）。</p>
+    <p>建議大檔 DEMO 用手動複製（比瀏覽器拖曳快很多）。</p>
+
+    <div class="manual-box" id="manualBox">
+      <strong>推薦：手動複製 MP4 到 input 資料夾</strong>
+      <p class="hint" style="margin:6px 0 8px">用檔案總管將 MP4 <strong>複製</strong>到下方路徑，再按「重新掃描」：</p>
+      <code class="path-code" id="inputPath">demo-workspace\input</code>
+      <div class="btn-row" style="margin-top:8px">
+        <button class="btn primary" type="button" id="btnOpenInput2">開啟 input 資料夾</button>
+        <button class="btn" type="button" id="btnRescan">重新掃描檔案</button>
+      </div>
+    </div>
+
+    <p class="or-divider">或透過瀏覽器拖曳（小檔較快；大檔可能需 5～15 分鐘）</p>
+
+    <div class="file-list" id="fileList"></div>
 
     <div class="drop" id="dropZone">
       拖曳 MP4 到這裡，或點擊選擇檔案<br>
@@ -175,8 +204,7 @@
     </div>
     <div class="upload-status" id="uploadStatus"></div>
     <div class="progress" id="uploadProgress"><div id="uploadProgressBar"></div></div>
-
-    <div class="file-list" id="fileList"></div>
+    <button class="btn cancel hidden" type="button" id="btnCancelUpload">取消複製</button>
 
     <div class="btn-row">
       <button class="btn primary" id="btnTranscribe" disabled>開始轉錄</button>
@@ -211,6 +239,23 @@ const $ = (s) => document.querySelector(s);
 let currentStep = 0;
 let selectedMp4 = null;
 let pollTimer = null;
+let uploadXhr = null;
+let uploadStartAt = 0;
+const LARGE_FILE_MB = 80;
+
+function fmtSize(bytes) {
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+}
+function fmtSpeed(bps) {
+  if (!bps || bps < 1024) return '計算中…';
+  if (bps < 1024 * 1024) return `${(bps / 1024).toFixed(0)} KB/s`;
+  return `${(bps / (1024 * 1024)).toFixed(1)} MB/s`;
+}
+function fmtElapsed(sec) {
+  if (sec < 60) return `${sec} 秒`;
+  return `${Math.floor(sec / 60)} 分 ${sec % 60} 秒`;
+}
 
 const checks = [
   { key: 'python_ok', label: 'Python 3.10+' },
@@ -244,6 +289,9 @@ function renderChecks(st) {
   $('#toStep1').disabled = !setupOk;
   $('#toStep2').disabled = !st.token_ok;
   $('#btnTranscribe').disabled = !st.ready_to_transcribe || !selectedMp4;
+  $('#btnSetup').classList.toggle('hidden', setupOk);
+  $('#btnUninstall').classList.toggle('hidden', !st.can_uninstall);
+  if (st.input_folder) $('#inputPath').textContent = st.input_folder;
 }
 
 function renderFiles(st) {
@@ -311,6 +359,30 @@ $('#btnSetup').onclick = async () => {
   pollJob(logEl, (ok) => { $('#btnSetup').disabled = false; if (ok) refresh(); });
 };
 
+$('#btnUninstall').onclick = async () => {
+  const sure = confirm(
+    '確定要解除安裝轉錄環境嗎？\n\n' +
+      '將刪除：.venv（WhisperX）\n' +
+      '保留：input / output / .env / models'
+  );
+  if (!sure) return;
+  const removeModels = confirm(
+    '是否同時刪除 models 快取（約 3～6 GB）？\n\n' +
+      '確定 = 一併刪除（下次安裝需重新下載）\n' +
+      '取消 = 保留 models（下次安裝較快）'
+  );
+  const logEl = $('#setupLog');
+  const r = await api('/api/uninstall', {
+    method: 'POST',
+    body: JSON.stringify({ remove_models: removeModels }),
+  });
+  if (!r.ok) return alert(r.message);
+  pollJob(logEl, (ok) => {
+    alert(ok ? '已解除安裝' : '解除安裝失敗');
+    refresh();
+  });
+};
+
 $('#btnRefresh').onclick = refresh;
 
 $('#btnSaveToken').onclick = async () => {
@@ -335,6 +407,11 @@ $('#btnTranscribe').onclick = async () => {
 };
 
 $('#btnOpenInput').onclick = () => api('/api/open-folder', { method: 'POST', body: JSON.stringify({ folder: 'input' }) });
+$('#btnOpenInput2').onclick = () => api('/api/open-folder', { method: 'POST', body: JSON.stringify({ folder: 'input' }) });
+$('#btnRescan').onclick = async () => {
+  await refresh();
+  alert(selectedMp4 ? `已找到：${selectedMp4}` : '尚未找到 MP4，請確認已複製到 input');
+};
 $('#btnOpenOutput').onclick = () => api('/api/open-folder', { method: 'POST', body: JSON.stringify({ folder: 'output' }) });
 
 $('#toStep1').onclick = () => showStep(1);
@@ -357,55 +434,88 @@ drop.ondrop = (e) => {
 async function uploadFile(file) {
   if (!file) return;
   if (!file.name.toLowerCase().endsWith('.mp4')) return alert('請選擇 MP4 檔案');
+
+  const sizeMb = file.size / (1024 * 1024);
+  if (sizeMb >= LARGE_FILE_MB) {
+    const manual = confirm(
+      `檔案約 ${fmtSize(file.size)}，透過瀏覽器複製可能很慢（5～15 分鐘），進度也可能暫停。\n\n` +
+        `建議：按「開啟 input 資料夾」手動複製 MP4，再按「重新掃描」。\n\n` +
+        `仍要用瀏覽器複製嗎？`
+    );
+    if (!manual) return;
+  }
+
   const status = $('#uploadStatus');
   const prog = $('#uploadProgress');
   const bar = $('#uploadProgressBar');
   const drop = $('#dropZone');
-  const fmt = (b) => b < 1048576 ? `${(b/1024).toFixed(1)} KB` : `${(b/1048576).toFixed(1)} MB`;
+  const cancelBtn = $('#btnCancelUpload');
 
-  const setState = (kind, msg, pct = 0) => {
+  const setState = (kind, msg, pct = 0, showCancel = false) => {
     status.className = `upload-status show ${kind}`;
     status.textContent = msg;
     if (kind === 'busy') {
       prog.classList.add('show');
       drop.classList.add('busy');
       bar.style.width = `${pct}%`;
+      cancelBtn.classList.toggle('hidden', !showCancel);
     } else {
       prog.classList.remove('show');
       drop.classList.remove('busy');
+      cancelBtn.classList.add('hidden');
     }
   };
 
-  setState('busy', `正在複製 ${file.name}（${fmt(file.size)}）…`, 0);
+  setState('busy', `準備複製 ${file.name}（${fmtSize(file.size)}）…`, 0, true);
+  uploadStartAt = Date.now();
 
   try {
     const r = await new Promise((resolve, reject) => {
-      const xhr = new XMLHttpRequest();
-      xhr.open('POST', '/api/upload');
-      xhr.upload.onprogress = (e) => {
-        const pct = e.lengthComputable ? (e.loaded / e.total) * 100 : 0;
-        setState('busy', `正在複製… ${fmt(e.loaded)} / ${fmt(e.total || file.size)}（${pct.toFixed(0)}%）`, pct);
+      uploadXhr = new XMLHttpRequest();
+      uploadXhr.open('POST', '/api/upload');
+      uploadXhr.upload.onprogress = (e) => {
+        const loaded = e.loaded;
+        const total = e.lengthComputable ? e.total : file.size;
+        const pct = total ? (loaded / total) * 100 : 0;
+        const sec = Math.max(1, Math.floor((Date.now() - uploadStartAt) / 1000));
+        const speed = loaded / sec;
+        const stalled = pct < 1 && sec > 30;
+        setState(
+          'busy',
+          `正在複製… ${fmtSize(loaded)} / ${fmtSize(total)}（${pct.toFixed(0)}%）` +
+            ` · 已 ${fmtElapsed(sec)} · ${fmtSpeed(speed)}` +
+            (stalled ? ' · 若長時間無進度，請取消並改用手動複製' : ''),
+          pct,
+          true
+        );
       };
-      xhr.onload = () => {
+      uploadXhr.onload = () => {
+        const xhr = uploadXhr;
+        uploadXhr = null;
         try {
           const data = JSON.parse(xhr.responseText || '{}');
           if (xhr.status >= 400 || !data.ok) reject(new Error(data.message || '上傳失敗'));
           else resolve(data);
         } catch { reject(new Error('伺服器回應異常')); }
       };
-      xhr.onerror = () => reject(new Error('連線失敗'));
+      uploadXhr.onerror = () => { uploadXhr = null; reject(new Error('連線失敗')); };
+      uploadXhr.onabort = () => { uploadXhr = null; reject(new Error('已取消複製')); };
       const fd = new FormData();
       fd.append('file', file);
-      xhr.send(fd);
+      uploadXhr.send(fd);
     });
     selectedMp4 = r.filename;
-    setState('ok', `✓ 已放入 input：${r.filename}`);
+    setState('ok', `✓ 已放入 input：${r.filename}（${fmtSize(file.size)}）`);
     await refresh();
-    setTimeout(() => { status.className = 'upload-status'; }, 4000);
+    setTimeout(() => { status.className = 'upload-status'; }, 5000);
   } catch (err) {
     setState('err', `✗ ${err.message || '上傳失敗'}`);
+  } finally {
+    uploadXhr = null;
   }
 }
+
+$('#btnCancelUpload').onclick = () => { if (uploadXhr) uploadXhr.abort(); };
 
 refresh();
 </script>
