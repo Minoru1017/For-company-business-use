@@ -20,9 +20,10 @@ import threading
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import parse_qs, urlparse
+from urllib.parse import urlparse
 
 import demo_core
+import security
 
 ROOT = demo_core.ROOT
 STATIC = ROOT / "demo_app"
@@ -81,11 +82,14 @@ class JobState:
         return True, "正在取消轉錄…"
 
     def snapshot(self) -> dict:
+        import re
+
+        hf_re = re.compile(r"hf_[A-Za-z0-9]+")
         with self.lock:
             return {
                 "running": self.running,
                 "kind": self.kind,
-                "logs": list(self.logs),
+                "logs": [hf_re.sub("hf_***", line) for line in self.logs],
                 "exit_code": self.exit_code,
                 "cancel_requested": self.cancel_requested,
                 "cancel_uninstall": self.cancel_uninstall,
@@ -144,19 +148,61 @@ class Handler(BaseHTTPRequestHandler):
     def log_message(self, fmt: str, *args) -> None:
         return
 
+    def _origin(self) -> str:
+        return self.headers.get("Origin", "")
+
+    def _apply_cors(self) -> None:
+        origin = self._origin()
+        if security.is_allowed_origin(origin):
+            self.send_header("Access-Control-Allow-Origin", origin)
+            self.send_header("Vary", "Origin")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header(
+            "Access-Control-Allow-Headers",
+            f"Content-Type, {security.TOKEN_HEADER}",
+        )
+
     def _send_json(self, data: dict, status: int = 200) -> None:
         body = json.dumps(data, ensure_ascii=False).encode("utf-8")
         self.send_response(status)
         self.send_header("Content-Type", "application/json; charset=utf-8")
         self.send_header("Content-Length", str(len(body)))
-        self._cors()
+        self._apply_cors()
         self.end_headers()
         self.wfile.write(body)
 
-    def _cors(self) -> None:
-        self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
-        self.send_header("Access-Control-Allow-Headers", "Content-Type")
+    def _parse_json(self, body: bytes) -> dict | None:
+        if not body:
+            return {}
+        try:
+            return json.loads(body.decode("utf-8"))
+        except json.JSONDecodeError:
+            return None
+
+    def _reject(self, status: int, message: str) -> None:
+        self._send_json({"ok": False, "message": message}, status)
+
+    def _check_host(self) -> bool:
+        host = self.headers.get("Host", "")
+        if not security.is_allowed_host(host, PORT):
+            self._reject(403, "不允許的 Host")
+            return False
+        return True
+
+    def _check_api_access(self, path: str) -> bool:
+        if not self._check_host():
+            return False
+        if path in security.PUBLIC_API_PATHS:
+            origin = self._origin()
+            if origin and not security.is_allowed_origin(origin):
+                self._reject(403, "不允許的來源")
+                return False
+            return True
+        token = self.headers.get(security.TOKEN_HEADER, "")
+        if token != security.API_TOKEN:
+            self._reject(401, "未授權的本機 API 請求")
+            return False
+        return True
 
     def _send_file(self, path: Path) -> None:
         if not path.exists() or not path.is_file():
@@ -167,18 +213,29 @@ class Handler(BaseHTTPRequestHandler):
         self.send_response(200)
         self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(data)))
-        self._cors()
+        self._apply_cors()
         self.end_headers()
         self.wfile.write(data)
 
     def do_OPTIONS(self) -> None:
+        if not self._check_host():
+            return
         self.send_response(204)
-        self._cors()
+        self._apply_cors()
         self.end_headers()
 
     def do_GET(self) -> None:
         parsed = urlparse(self.path)
         path = parsed.path
+
+        if path == "/api/bootstrap":
+            if not self._check_api_access(path):
+                return
+            return self._send_json({"ok": True, "token": security.API_TOKEN})
+
+        if path.startswith("/api/"):
+            if not self._check_api_access(path):
+                return
 
         if path == "/api/status":
             return self._send_json(demo_core.get_status().to_dict())
@@ -208,8 +265,11 @@ class Handler(BaseHTTPRequestHandler):
             return self._send_file(STATIC / "index.html")
 
         rel = path.lstrip("/")
-        file_path = STATIC / rel
-        if file_path.exists() and file_path.is_file():
+        try:
+            file_path = security.resolve_under(STATIC / rel, STATIC)
+        except ValueError:
+            return self.send_error(403)
+        if file_path.is_file():
             return self._send_file(file_path)
 
         self.send_error(404)
@@ -217,6 +277,11 @@ class Handler(BaseHTTPRequestHandler):
     def do_POST(self) -> None:
         parsed = urlparse(self.path)
         path = parsed.path
+
+        if path.startswith("/api/"):
+            if not self._check_api_access(path):
+                return
+
         length = int(self.headers.get("Content-Length", 0))
         body = self.rfile.read(length) if length else b""
 
@@ -225,8 +290,15 @@ class Handler(BaseHTTPRequestHandler):
             return self._send_json({"ok": ok, "message": msg})
 
         if path == "/api/transcribe":
-            data = json.loads(body.decode("utf-8") or "{}")
+            data = self._parse_json(body)
+            if data is None:
+                return self._reject(400, "JSON 格式錯誤")
             mp4 = data.get("mp4")
+            if mp4:
+                try:
+                    mp4 = demo_core.safe_mp4_name(str(mp4))
+                except ValueError as e:
+                    return self._reject(400, str(e))
             hooks = JobHooks(JOB)
             ok, msg = run_job(
                 "transcribe",
@@ -235,7 +307,9 @@ class Handler(BaseHTTPRequestHandler):
             return self._send_json({"ok": ok, "message": msg})
 
         if path == "/api/cancel":
-            data = json.loads(body.decode("utf-8") or "{}")
+            data = self._parse_json(body)
+            if data is None:
+                return self._reject(400, "JSON 格式錯誤")
             uninstall = bool(data.get("uninstall"))
             remove_models = bool(data.get("remove_models"))
             ok, msg = JOB.request_cancel(uninstall=uninstall, remove_models=remove_models)
@@ -243,7 +317,9 @@ class Handler(BaseHTTPRequestHandler):
             return self._send_json({"ok": ok, "message": msg}, status)
 
         if path == "/api/token":
-            data = json.loads(body.decode("utf-8") or "{}")
+            data = self._parse_json(body)
+            if data is None:
+                return self._reject(400, "JSON 格式錯誤")
             token = str(data.get("token", "")).strip()
             try:
                 demo_core.save_hf_token(token)
@@ -252,7 +328,9 @@ class Handler(BaseHTTPRequestHandler):
             return self._send_json({"ok": True, "status": demo_core.get_status().to_dict()})
 
         if path == "/api/open-folder":
-            data = json.loads(body.decode("utf-8") or "{}")
+            data = self._parse_json(body)
+            if data is None:
+                return self._reject(400, "JSON 格式錯誤")
             folder = str(data.get("folder", "output"))
             if folder not in ("input", "output", "models"):
                 return self._send_json({"ok": False, "message": "不允許的資料夾"}, 400)
@@ -263,7 +341,9 @@ class Handler(BaseHTTPRequestHandler):
             return self._send_json({"ok": True})
 
         if path == "/api/open-url":
-            data = json.loads(body.decode("utf-8") or "{}")
+            data = self._parse_json(body)
+            if data is None:
+                return self._reject(400, "JSON 格式錯誤")
             url = str(data.get("url", "")).strip()
             if not url:
                 return self._send_json({"ok": False, "message": "缺少 url"}, 400)
@@ -281,7 +361,9 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/uninstall":
             if JOB.running:
                 return self._send_json({"ok": False, "message": "轉錄或安裝進行中，請稍後再解除安裝"}, 409)
-            data = json.loads(body.decode("utf-8") or "{}")
+            data = self._parse_json(body)
+            if data is None:
+                return self._reject(400, "JSON 格式錯誤")
             remove_models = bool(data.get("remove_models"))
             ok, msg = run_job(
                 "uninstall",
@@ -292,6 +374,13 @@ class Handler(BaseHTTPRequestHandler):
         self.send_error(404)
 
     def _handle_upload(self) -> None:
+        if JOB.running:
+            return self._send_json({"ok": False, "message": "轉錄或安裝進行中，請稍後再上傳"}, 409)
+
+        length = int(self.headers.get("Content-Length", 0))
+        if length > security.MAX_UPLOAD_BYTES:
+            return self._reject(413, f"檔案過大（上限 {security.MAX_UPLOAD_BYTES // (1024**3)} GB）")
+
         ctype = self.headers.get("Content-Type", "")
         if "multipart/form-data" not in ctype:
             return self._send_json({"ok": False, "message": "需要 multipart 上傳"}, 400)
@@ -309,19 +398,24 @@ class Handler(BaseHTTPRequestHandler):
         if item is None or not getattr(item, "filename", None):
             return self._send_json({"ok": False, "message": "未選擇檔案"}, 400)
 
-        filename = Path(item.filename).name
-        if not filename.lower().endswith(".mp4"):
-            return self._send_json({"ok": False, "message": "請上傳 MP4 錄影檔"}, 400)
+        try:
+            filename = demo_core.safe_mp4_name(item.filename)
+        except ValueError as e:
+            return self._reject(400, str(e))
 
         dest = ROOT / "input" / filename
         (ROOT / "input").mkdir(exist_ok=True)
         tmp = dest.with_suffix(dest.suffix + ".uploading")
+        written = 0
         try:
             with tmp.open("wb") as f:
                 while True:
                     chunk = item.file.read(1024 * 1024)
                     if not chunk:
                         break
+                    written += len(chunk)
+                    if written > security.MAX_UPLOAD_BYTES:
+                        raise OSError("超過上傳大小上限")
                     f.write(chunk)
             tmp.replace(dest)
         except OSError as e:

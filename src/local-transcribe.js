@@ -2,7 +2,10 @@
  * Bridge Call Coach (GitHub Pages) ↔ local demo_app.py (127.0.0.1:8765).
  * DEMO audio never leaves the machine; only finished SRT is loaded into Call Coach.
  */
+import { escapeHTML } from './utils.js';
+
 const LOCAL_API = 'http://127.0.0.1:8765';
+const API_TOKEN_HEADER = 'X-Call-Coach-Token';
 
 let pollTimer = null;
 let refreshTimer = null;
@@ -11,6 +14,7 @@ let uploadBusy = false;
 let transcribeBusy = false;
 let uploadXhr = null;
 let uploadStartAt = 0;
+let bridgeApiToken = null;
 
 const LARGE_FILE_MB = 80;
 const HF_TOKEN_URL = 'https://huggingface.co/settings/tokens';
@@ -49,8 +53,22 @@ function fmtElapsed(sec) {
   return `${Math.floor(sec / 60)} 分 ${sec % 60} 秒`;
 }
 
+async function ensureApiToken() {
+  if (bridgeApiToken) return bridgeApiToken;
+  const res = await fetch(`${LOCAL_API}/api/bootstrap`, { mode: 'cors' });
+  const data = await res.json();
+  if (!res.ok || !data?.token) throw new Error('無法取得本機 API 授權');
+  bridgeApiToken = data.token;
+  return bridgeApiToken;
+}
+
 async function api(path, opts = {}) {
-  const res = await fetch(`${LOCAL_API}${path}`, { ...opts, mode: 'cors' });
+  const token = await ensureApiToken();
+  const headers = {
+    ...(opts.headers || {}),
+    [API_TOKEN_HEADER]: token,
+  };
+  const res = await fetch(`${LOCAL_API}${path}`, { ...opts, headers, mode: 'cors' });
   return res.json();
 }
 
@@ -105,7 +123,7 @@ export function initLocalTranscribe({ onTranscriptReady, showToast, getMode }) {
           .map(
             (f) => `
         <label class="bridge-file ${f === selectedMp4 ? 'on' : ''}">
-          <input type="radio" name="bridgeMp4" value="${f}" ${f === selectedMp4 ? 'checked' : ''}> ${f}
+          <input type="radio" name="bridgeMp4" value="${escapeHTML(f)}" ${f === selectedMp4 ? 'checked' : ''}> ${escapeHTML(f)}
         </label>`
           )
           .join('')
@@ -118,7 +136,7 @@ export function initLocalTranscribe({ onTranscriptReady, showToast, getMode }) {
       <div class="bridge-manual">
         <strong>推薦：大檔 DEMO 請手動複製（比拖曳快）</strong>
         <p class="hint" style="margin:6px 0 8px">用檔案總管將 MP4 <strong>複製</strong>到下方資料夾，再按「重新掃描」：</p>
-        <code class="bridge-path">${st.input_folder || 'demo-workspace\\input'}</code>
+        <code class="bridge-path">${escapeHTML(st.input_folder || 'demo-workspace\\input')}</code>
         <div class="bridge-actions" style="margin-top:10px">
           <button type="button" class="btn primary" id="bridgeOpenInput">開啟 input 資料夾</button>
           <button type="button" class="btn" id="bridgeRescan">重新掃描檔案</button>
@@ -267,10 +285,18 @@ function setUploadUI({ state, message, pct = 0, showCancel = false }) {
 }
 
 function uploadMp4XHR(file, onProgress) {
-  return new Promise((resolve, reject) => {
+  return new Promise(async (resolve, reject) => {
+    let token;
+    try {
+      token = await ensureApiToken();
+    } catch (err) {
+      reject(err);
+      return;
+    }
     uploadXhr = new XMLHttpRequest();
     uploadStartAt = Date.now();
     uploadXhr.open('POST', `${LOCAL_API}/api/upload`);
+    uploadXhr.setRequestHeader(API_TOKEN_HEADER, token);
     uploadXhr.upload.onprogress = (e) => {
       const loaded = e.loaded;
       const total = e.lengthComputable ? e.total : file.size;
