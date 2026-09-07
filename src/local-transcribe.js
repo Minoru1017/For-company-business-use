@@ -19,6 +19,7 @@ let bridgeApiToken = null;
 const LARGE_FILE_MB = 80;
 const HF_TOKEN_URL = 'https://huggingface.co/settings/tokens';
 const TOKEN_PAGE_KEY = 'call_coach_hf_token_opened';
+const PRESET_STORAGE_KEY = 'call_coach_transcribe_preset';
 
 function fmtSize(bytes) {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -51,6 +52,39 @@ function maybeAutoOpenTokenPage(st, showToast) {
 function fmtElapsed(sec) {
   if (sec < 60) return `${sec} 秒`;
   return `${Math.floor(sec / 60)} 分 ${sec % 60} 秒`;
+}
+
+function getTranscribePreset(st) {
+  const saved = localStorage.getItem(PRESET_STORAGE_KEY);
+  if (saved && st?.transcribe_presets?.[saved]) return saved;
+  return st?.default_transcribe_preset || 'fast';
+}
+
+function renderPresetOptions(st, selected) {
+  const presets = st.transcribe_presets || {};
+  const device = st.transcribe_device || 'cpu';
+  const compute = st.transcribe_compute_type || 'int8';
+  const deviceLabel = device === 'cuda' ? 'NVIDIA GPU' : 'CPU';
+  const cards = Object.entries(presets)
+    .map(([key, cfg]) => {
+      const on = key === selected ? 'on' : '';
+      const title = key === 'fast' ? '快速（推薦）' : '標準';
+      const model = cfg.model || '';
+      const eta = cfg.eta_hint || '';
+      return `
+        <label class="bridge-preset ${on}">
+          <input type="radio" name="bridgePreset" value="${escapeHTML(key)}" ${key === selected ? 'checked' : ''}>
+          <span class="bridge-preset-title">${escapeHTML(title)}</span>
+          <span class="bridge-preset-meta">Whisper ${escapeHTML(model)} · ${escapeHTML(eta)}</span>
+        </label>`;
+    })
+    .join('');
+  return `
+    <div class="bridge-preset-wrap">
+      <strong>轉錄速度</strong>
+      <p class="hint" style="margin:6px 0 8px">快速模式用較小模型，目標是 2 小時 DEMO 約 1 小時內完成；仍保留顧問／客戶分軌。本機：${escapeHTML(deviceLabel)}（${escapeHTML(compute)}）。</p>
+      <div class="bridge-presets">${cards}</div>
+    </div>`;
 }
 
 async function ensureApiToken() {
@@ -127,6 +161,7 @@ export function initLocalTranscribe({ onTranscriptReady, showToast, getMode }) {
 
     const files = st.mp4_files || [];
     if (!selectedMp4 || !files.includes(selectedMp4)) selectedMp4 = files[0] || null;
+    const selectedPreset = getTranscribePreset(st);
 
     const fileHtml = files.length
       ? files
@@ -164,6 +199,7 @@ export function initLocalTranscribe({ onTranscriptReady, showToast, getMode }) {
       <div class="bridge-progress hidden" id="bridgeProgress"><div id="bridgeProgressBar"></div></div>
       <button type="button" class="btn bridge-cancel hidden" id="bridgeCancelUpload">取消複製</button>
       <input type="password" id="bridgeToken" placeholder="HF_TOKEN（hf_...，首次請貼上）" class="bridge-token" ${st.token_ok ? 'style="display:none"' : ''}>
+      ${renderPresetOptions(st, selectedPreset)}
       <div class="bridge-actions">
         ${!st.venv_ok || !st.whisperx_ok ? '<button type="button" class="btn primary" id="bridgeSetup">一鍵安裝</button>' : ''}
         ${st.can_uninstall ? '<button type="button" class="btn bridge-uninstall" id="bridgeUninstall">解除安裝轉錄環境</button>' : ''}
@@ -175,8 +211,15 @@ export function initLocalTranscribe({ onTranscriptReady, showToast, getMode }) {
       </div>
       <div class="bridge-transcribe-status hidden" id="bridgeTranscribeStatus"></div>
       <pre class="bridge-log hidden" id="bridgeLog"></pre>
-      <p class="hint">2 小時 DEMO 約 1.5～3 小時，請接電源。轉錄中請保持「啟動轉錄助手」視窗開啟。</p>
+      <p class="hint">快速模式：2 小時 DEMO 約 50～70 分鐘（Intel CPU）。若有 NVIDIA GPU 會自動加速。轉錄中請保持「啟動轉錄助手」視窗開啟。</p>
     `;
+
+    panel.querySelectorAll('input[name="bridgePreset"]').forEach((el) => {
+      el.onchange = () => {
+        localStorage.setItem(PRESET_STORAGE_KEY, el.value);
+        refreshStatus();
+      };
+    });
 
     panel.querySelectorAll('.bridge-file').forEach((el) => {
       el.onclick = () => {
@@ -541,7 +584,12 @@ async function saveToken(showToast, refreshStatus) {
 
 async function runTranscribe(onTranscriptReady, showToast, refreshStatus) {
   if (!selectedMp4) return showToast('請先選擇 MP4');
-  const r = await api('/api/transcribe', { method: 'POST', body: JSON.stringify({ mp4: selectedMp4 }) });
+  const st = await checkLocalBridge();
+  const preset = getTranscribePreset(st);
+  const r = await api('/api/transcribe', {
+    method: 'POST',
+    body: JSON.stringify({ mp4: selectedMp4, preset }),
+  });
   if (!r.ok) return showToast(r.message);
   transcribeBusy = true;
   setTranscribeUI({ active: true });
