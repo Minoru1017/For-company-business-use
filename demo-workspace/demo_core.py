@@ -14,10 +14,25 @@ ROOT = Path(__file__).resolve().parent
 VENV_PY = ROOT / ".venv" / "Scripts" / "python.exe"
 WHISPERX = ROOT / ".venv" / "Scripts" / "whisperx.exe"
 REQUIRED_PY = (3, 10)
-MODEL = "medium"
-THREADS = 8
-BATCH = 4
 CALL_COACH_URL = "https://minoru1017.github.io/For-company-business-use/"
+
+# fast: small + 較大 batch，目標 ≤ 原始時長 50%（Intel CPU / 16GB）
+# standard: medium，中文準確度較高但約等於實時長
+TRANSCRIBE_PRESETS: dict[str, dict[str, int | str]] = {
+    "fast": {
+        "model": "small",
+        "batch": 16,
+        "threads": min(os.cpu_count() or 8, 16),
+        "eta_hint": "約原始時長的 40%～55%（2 小時 DEMO 約 50～70 分鐘）",
+    },
+    "standard": {
+        "model": "medium",
+        "batch": 4,
+        "threads": 8,
+        "eta_hint": "約原始時長的 80%～120%（2 小時 DEMO 約 1.5～2.5 小時）",
+    },
+}
+DEFAULT_PRESET = "fast"
 
 HF_LINKS = {
     "join": "https://huggingface.co/join",
@@ -168,6 +183,38 @@ def find_mp4(arg: str | None = None) -> Path:
     raise FileNotFoundError("input 資料夾沒有 MP4。請先選擇或放入錄影檔。")
 
 
+def resolve_preset(name: str | None) -> tuple[str, dict[str, int | str]]:
+    key = (name or DEFAULT_PRESET).strip().lower()
+    if key not in TRANSCRIBE_PRESETS:
+        raise ValueError(f"未知轉錄模式: {name}（可選: {', '.join(TRANSCRIBE_PRESETS)}）")
+    return key, TRANSCRIBE_PRESETS[key]
+
+
+def detect_compute_backend() -> tuple[str, str]:
+    """Return (device, compute_type) for WhisperX."""
+    if not VENV_PY.exists():
+        return "cpu", "int8"
+    try:
+        proc = subprocess.run(
+            [
+                str(VENV_PY),
+                "-c",
+                "import torch; print('cuda' if torch.cuda.is_available() else 'cpu')",
+            ],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=45,
+            cwd=ROOT,
+        )
+        if proc.returncode == 0 and proc.stdout.strip() == "cuda":
+            return "cuda", "float16"
+    except (OSError, subprocess.TimeoutExpired):
+        pass
+    return "cpu", "int8"
+
+
 def cache_env() -> dict[str, str]:
     env = os.environ.copy()
     env["HF_HOME"] = str(ROOT / "models")
@@ -193,6 +240,10 @@ class EnvStatus:
     mp4_files: list[str] = field(default_factory=list)
     srt_files: list[str] = field(default_factory=list)
     ready_to_transcribe: bool = False
+    transcribe_device: str = "cpu"
+    transcribe_compute_type: str = "int8"
+    transcribe_presets: dict[str, dict[str, int | str]] = field(default_factory=dict)
+    default_transcribe_preset: str = DEFAULT_PRESET
 
     def to_dict(self) -> dict:
         return {
@@ -207,6 +258,10 @@ class EnvStatus:
             "mp4_files": self.mp4_files,
             "srt_files": self.srt_files,
             "ready_to_transcribe": self.ready_to_transcribe,
+            "transcribe_device": self.transcribe_device,
+            "transcribe_compute_type": self.transcribe_compute_type,
+            "transcribe_presets": self.transcribe_presets,
+            "default_transcribe_preset": self.default_transcribe_preset,
             "root": str(ROOT),
             "input_folder": str(ROOT / "input"),
             "can_uninstall": self.venv_ok,
@@ -230,6 +285,7 @@ def get_status() -> EnvStatus:
         srts = [p.name for p in sorted(output_dir.glob("*.srt"), key=lambda p: p.stat().st_mtime, reverse=True)]
 
     ready = python_ok and venv_ok and whisperx_ok and token_ok and ffmpeg_ok and bool(mp4s)
+    device, compute_type = detect_compute_backend() if venv_ok else ("cpu", "int8")
 
     return EnvStatus(
         python_ok=python_ok,
@@ -243,6 +299,10 @@ def get_status() -> EnvStatus:
         mp4_files=mp4s,
         srt_files=srts,
         ready_to_transcribe=ready,
+        transcribe_device=device,
+        transcribe_compute_type=compute_type,
+        transcribe_presets=TRANSCRIBE_PRESETS,
+        default_transcribe_preset=DEFAULT_PRESET,
     )
 
 
@@ -349,8 +409,28 @@ def run_uninstall(remove_models: bool = False, log: LogFn = default_log) -> int:
     return 0
 
 
-def run_transcribe(mp4_name: str | None = None, log: LogFn = default_log, hooks: JobHooks | None = None) -> int:
+def run_transcribe(
+    mp4_name: str | None = None,
+    preset: str | None = None,
+    log: LogFn = default_log,
+    hooks: JobHooks | None = None,
+) -> int:
+    try:
+        preset_key, preset_cfg = resolve_preset(preset)
+    except ValueError as e:
+        log(f"[錯誤] {e}")
+        return 1
+
+    model = str(preset_cfg["model"])
+    batch = int(preset_cfg["batch"])
+    threads = int(preset_cfg["threads"])
+    eta_hint = str(preset_cfg["eta_hint"])
+    device, compute_type = detect_compute_backend()
+
     log("=== 開始轉錄 DEMO ===")
+    log(
+        f"模式: {preset_key}（模型 {model} / batch {batch} / {device} {compute_type}）— {eta_hint}"
+    )
 
     if hooks and hooks.is_cancelled():
         log("[已取消] 轉錄已停止")
@@ -420,23 +500,23 @@ def run_transcribe(mp4_name: str | None = None, log: LogFn = default_log, hooks:
         log("[已取消] 轉錄已停止")
         return CANCEL_EXIT
 
-    log("[2/2] 開始轉錄（2 小時 DEMO 約 1.5～3 小時，請接電源）...")
+    log(f"[2/2] 開始轉錄（{eta_hint}，請接電源）...")
     code = run_command(
         whisperx_cmd()
         + [
             str(audio),
             "--model",
-            MODEL,
+            model,
             "--language",
             "zh",
             "--device",
-            "cpu",
+            device,
             "--compute_type",
-            "int8",
+            compute_type,
             "--threads",
-            str(THREADS),
+            str(threads),
             "--batch_size",
-            str(BATCH),
+            str(batch),
             "--diarize",
             "--min_speakers",
             "2",

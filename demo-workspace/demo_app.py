@@ -294,15 +294,21 @@ class Handler(BaseHTTPRequestHandler):
             if data is None:
                 return self._reject(400, "JSON 格式錯誤")
             mp4 = data.get("mp4")
+            preset = data.get("preset")
             if mp4:
                 try:
                     mp4 = demo_core.safe_mp4_name(str(mp4))
                 except ValueError as e:
                     return self._reject(400, str(e))
+            if preset is not None:
+                try:
+                    preset, _ = demo_core.resolve_preset(str(preset))
+                except ValueError as e:
+                    return self._reject(400, str(e))
             hooks = JobHooks(JOB)
             ok, msg = run_job(
                 "transcribe",
-                lambda log: demo_core.run_transcribe(mp4, log, hooks=hooks),
+                lambda log: demo_core.run_transcribe(mp4, preset=preset, log=log, hooks=hooks),
             )
             return self._send_json({"ok": ok, "message": msg})
 

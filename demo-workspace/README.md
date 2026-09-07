@@ -33,6 +33,15 @@ demo-workspace/
 
 電訪模式不需啟動本機助手；DEMO 模式需保持 `start_call_coach` 視窗開啟。
 
+## 轉錄速度
+
+| 模式 | 模型 | 預估時間（2 小時 DEMO） | 說明 |
+|------|------|-------------------------|------|
+| **快速（預設）** | Whisper `small` | 約 50～70 分鐘 | 目標 ≤ 原始時長 50%，仍保留顧問／客戶分軌 |
+| **標準** | Whisper `medium` | 約 1.5～2.5 小時 | 中文準確度較高，速度較慢 |
+
+在 Call Coach DEMO 模式可選「快速」或「標準」。若電腦有 **NVIDIA GPU**，會自動改用 GPU 加速。
+
 ## HF_TOKEN
 
 首次 DEMO 轉錄需 Hugging Face Read Token（用於辨識誰在說話）。在 Call Coach DEMO 模式按「前往取得 Token」，或至 https://huggingface.co/settings/tokens 建立。
