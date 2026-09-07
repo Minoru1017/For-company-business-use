@@ -62,14 +62,24 @@ async function ensureApiToken() {
   return bridgeApiToken;
 }
 
-async function api(path, opts = {}) {
+async function api(path, opts = {}, retried = false) {
   const token = await ensureApiToken();
   const headers = {
     ...(opts.headers || {}),
     [API_TOKEN_HEADER]: token,
   };
   const res = await fetch(`${LOCAL_API}${path}`, { ...opts, headers, mode: 'cors' });
-  return res.json();
+  const data = await res.json().catch(() => ({}));
+  if (res.status === 401 && !retried) {
+    bridgeApiToken = null;
+    return api(path, opts, true);
+  }
+  if (!res.ok) {
+    const err = new Error(data?.message || `HTTP ${res.status}`);
+    err.status = res.status;
+    throw err;
+  }
+  return data;
 }
 
 export async function checkLocalBridge() {
@@ -91,10 +101,10 @@ export function initLocalTranscribe({ onTranscriptReady, showToast, getMode }) {
     const inDemo = getMode?.() === 'demo';
     if (!st) {
       panel.hidden = true;
-      if (offline) offline.classList.toggle('hidden', !inDemo);
+      if (offline) offline.hidden = !inDemo;
       return null;
     }
-    if (offline) offline.classList.add('hidden');
+    if (offline) offline.hidden = true;
     panel.hidden = false;
     if (!uploadBusy && !transcribeBusy) renderPanel(st);
     return st;

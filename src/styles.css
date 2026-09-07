@@ -6,6 +6,7 @@
         --mono:"JetBrains Mono",monospace;
         --sans:"Noto Sans TC","PingFang TC","Microsoft JhengHei",sans-serif; }
 * { box-sizing:border-box; margin:0; padding:0; }
+.hidden { display: none !important; }
 body { font-family:var(--sans); background:var(--bg); color:var(--text);
        min-height:100vh; padding:0 16px 60px;
        background-image:radial-gradient(rgba(255,255,255,.05) 1px, transparent 1px);
