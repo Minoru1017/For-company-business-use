@@ -20,9 +20,21 @@ VENV_PY = ROOT / ".venv" / "Scripts" / "python.exe"
 WHISPERX = ROOT / ".venv" / "Scripts" / "whisperx.exe"
 REQUIRED_PY = (3, 10)
 RECOMMENDED_PY_MAX = (3, 12)
-MODEL = "medium"
-THREADS = 8
-BATCH = 4
+MODEL = os.environ.get("CALL_COACH_MODEL", "medium")
+
+
+def transcribe_threads() -> int:
+    try:
+        return int(os.environ.get("CALL_COACH_THREADS", str(max(4, min((os.cpu_count() or 8), 12)))))
+    except ValueError:
+        return max(4, min((os.cpu_count() or 8), 12))
+
+
+def transcribe_batch() -> int:
+    try:
+        return max(1, min(int(os.environ.get("CALL_COACH_BATCH", "8")), 16))
+    except ValueError:
+        return 8
 CALL_COACH_URL = "https://minoru1017.github.io/For-company-business-use/"
 
 HF_LINKS = {
@@ -542,10 +554,29 @@ def run_transcribe(mp4_name: str | None = None, log: LogFn = default_log, hooks:
 
     log(f"錄影檔: {mp4.name}")
     wav = mp4.with_suffix(".wav")
-    audio = mp4
-
     ffmpeg = ffmpeg_exe()
-    if ffmpeg:
+
+    from transcribe_parallel import (
+        chunk_count_for_duration,
+        estimate_transcribe_minutes,
+        max_parallel_workers,
+        probe_duration_seconds,
+        run_parallel_transcribe,
+    )
+
+    duration = probe_duration_seconds(mp4, ffmpeg, log) if ffmpeg else 0.0
+    chunk_count = chunk_count_for_duration(duration) if duration > 0 else 1
+    use_parallel = chunk_count > 1 and bool(ffmpeg)
+    code = 0
+
+    if use_parallel:
+        parallel = max_parallel_workers(chunk_count)
+        eta_low, eta_high = estimate_transcribe_minutes(duration, chunk_count, parallel)
+        log(
+            f"[1/2] 長影片分段模式：略過整段音軌抽出，直接從 MP4 切 {chunk_count} 段"
+            f"（預估總耗時約 {eta_low}～{eta_high} 分鐘）…"
+        )
+    elif ffmpeg:
         log("[1/2] 從 MP4 抽出音軌（長影片可能需 5～15 分鐘，請耐心等候）...")
         code = run_command(
             [
@@ -574,7 +605,7 @@ def run_transcribe(mp4_name: str | None = None, log: LogFn = default_log, hooks:
         if code != 0:
             log("[錯誤] 音軌抽取失敗")
             return code
-        audio = wav
+        duration = probe_duration_seconds(wav, ffmpeg, log) if duration <= 0 else duration
     else:
         log("[提醒] 未安裝 ffmpeg，直接對 MP4 轉錄")
 
@@ -582,12 +613,9 @@ def run_transcribe(mp4_name: str | None = None, log: LogFn = default_log, hooks:
         log("[已取消] 轉錄已停止")
         return CANCEL_EXIT
 
-    from transcribe_parallel import chunk_count_for_duration, probe_duration_seconds, run_parallel_transcribe
-
-    duration = probe_duration_seconds(audio, ffmpeg, log) if audio.suffix.lower() == ".wav" else 0.0
-    chunk_count = chunk_count_for_duration(duration) if duration > 0 else 1
-    use_parallel = chunk_count > 1 and bool(ffmpeg)
-    code = 0
+    audio = mp4 if use_parallel else (wav if ffmpeg else mp4)
+    threads = transcribe_threads()
+    batch = transcribe_batch()
 
     if use_parallel:
         stem = Path(mp4.name).stem
@@ -601,8 +629,8 @@ def run_transcribe(mp4_name: str | None = None, log: LogFn = default_log, hooks:
             final_srt=final_srt,
             whisperx_cmd=whisperx_cmd(),
             model=MODEL,
-            default_threads=THREADS,
-            batch=BATCH,
+            default_threads=threads,
+            batch=batch,
             env_vars=env_vars,
             run_command=run_command,
             log=log,
@@ -615,8 +643,42 @@ def run_transcribe(mp4_name: str | None = None, log: LogFn = default_log, hooks:
     if not use_parallel or code != 0:
         if use_parallel and code != 0:
             log("[提醒] 分段平行轉錄失敗，改為單檔完整轉錄（較慢但較穩定）…")
+            if ffmpeg and not wav.exists():
+                log("[1/2] 從 MP4 抽出音軌…")
+                code = run_command(
+                    [
+                        ffmpeg,
+                        "-y",
+                        "-hide_banner",
+                        "-loglevel",
+                        "error",
+                        "-i",
+                        str(mp4),
+                        "-vn",
+                        "-ac",
+                        "1",
+                        "-ar",
+                        "16000",
+                        "-c:a",
+                        "pcm_s16le",
+                        str(wav),
+                    ],
+                    log=log,
+                    env=env_vars,
+                    hooks=hooks,
+                )
+                if code == CANCEL_EXIT:
+                    return code
+                if code != 0:
+                    log("[錯誤] 音軌抽取失敗")
+                    return code
+            audio = wav if ffmpeg else mp4
         elif duration > 0 and chunk_count == 1:
-            log(f"[2/2] 音檔約 {int(duration // 60)} 分鐘，單段轉錄…")
+            eta_low, eta_high = estimate_transcribe_minutes(duration, 1, 1)
+            log(
+                f"[2/2] 音檔約 {int(duration // 60)} 分鐘，單段轉錄"
+                f"（預估約 {eta_low}～{eta_high} 分鐘）…"
+            )
         else:
             log("[2/2] 開始轉錄（2 小時 DEMO 約 1.5～3 小時，請接電源）…")
         code = run_command(
@@ -632,9 +694,9 @@ def run_transcribe(mp4_name: str | None = None, log: LogFn = default_log, hooks:
                 "--compute_type",
                 "int8",
                 "--threads",
-                str(THREADS),
+                str(threads),
                 "--batch_size",
-                str(BATCH),
+                str(batch),
                 "--diarize",
                 "--min_speakers",
                 "2",

@@ -2,7 +2,11 @@
 import unittest
 
 from srt_utils import merge_srt_parts, parse_srt, seconds_to_timestamp, timestamp_to_seconds
-from transcribe_parallel import chunk_count_for_duration, max_parallel_workers
+from transcribe_parallel import (
+    chunk_count_for_duration,
+    estimate_transcribe_minutes,
+    max_parallel_workers,
+)
 
 
 class SrtUtilsTest(unittest.TestCase):
@@ -22,10 +26,16 @@ class SrtUtilsTest(unittest.TestCase):
 class ChunkPlanTest(unittest.TestCase):
     def test_chunk_count(self):
         self.assertEqual(chunk_count_for_duration(10 * 60), 1)
-        self.assertEqual(chunk_count_for_duration(45 * 60), 2)
-        self.assertEqual(chunk_count_for_duration(75 * 60), 3)
-        self.assertEqual(chunk_count_for_duration(110 * 60), 4)
+        self.assertEqual(chunk_count_for_duration(25 * 60), 2)
+        self.assertEqual(chunk_count_for_duration(45 * 60), 3)
+        self.assertEqual(chunk_count_for_duration(75 * 60), 4)
+        self.assertEqual(chunk_count_for_duration(110 * 60), 5)
         self.assertEqual(chunk_count_for_duration(150 * 60), 5)
+
+    def test_estimate_eta(self):
+        low, high = estimate_transcribe_minutes(48 * 60, 3, 3)
+        self.assertGreaterEqual(low, 10)
+        self.assertGreater(high, low)
 
     def test_parallel_cap(self):
         self.assertEqual(max_parallel_workers(5), 3)
@@ -65,7 +75,7 @@ class ChunkPlanTest(unittest.TestCase):
                 return 0
 
             with patch(
-                "transcribe_parallel.split_wav_chunks",
+                "transcribe_parallel.split_audio_chunks",
                 return_value=[(part_a, 0.0), (part_b, 1440.0)],
             ):
                 code = run_parallel_transcribe(
