@@ -7,9 +7,9 @@
 ### 方式 A：Windows 應用程式（推薦，尤其公司電腦）
 
 1. 至 [Releases](https://github.com/Minoru1017/For-company-business-use/releases/latest) 下載 **`CallCoachAssistant-Windows.zip`**
-2. 解壓到任意資料夾（例如 `C:\CallCoachAssistant`）
-3. 雙擊 **`CallCoachAssistant.exe`** — 會開啟小視窗並自動連到 Call Coach
-4. 在 Call Coach 選 **DEMO · 錄影轉逐字稿** → **完整環境安裝** → 設定 Token → 轉錄
+2. 解壓到任意資料夾（路徑含中文時建議用 `C:\CallCoachAssistant`）
+3. 雙擊 **`CallCoachAssistant.cmd`**（建議；支援中文使用者名稱）或 `CallCoachAssistant.exe`
+4. 保持視窗開啟 → Call Coach **DEMO** → **完整環境安裝**
 
 不需安裝 Python、不需 winget、不需管理員。內含 Python 3.12 與轉錄助手。
 
@@ -29,7 +29,7 @@
 .\build_windows.ps1
 ```
 
-產出：`dist/CallCoachAssistant-Windows.zip`（含 `CallCoachAssistant.exe` + 內建 Python 3.12）。
+產出：`dist/CallCoachAssistant-Windows.zip`（含 `CallCoachAssistant.cmd` + 內建 Python 3.12；可選 `CallCoachAssistant.exe`）。
 
 GitHub Actions 亦會在 `main` 分支更新 `demo-workspace/` 時自動建置，可到 Actions 或 Releases 下載 artifact。
 
@@ -68,7 +68,7 @@ demo-workspace/
 
 ## 疑難排解
 
-- **setup_all.cmd 開不起來**（公司電腦常見）：改用 **`setup_portable.cmd`**。不需 winget、不需管理員；若公司封鎖下載，見 `setup_portable.cmd` 內手動方式
+- **CallCoachAssistant.exe 無法開啟 / python312.dll 錯誤**：請改雙擊 **`CallCoachAssistant.cmd`**，或將整個資料夾移到 **`C:\CallCoachAssistant`**（路徑不要有中文）後再試。不需 winget、不需管理員；若公司封鎖下載，見 `setup_portable.cmd` 內手動方式
 - **雙擊 start_call_coach 沒反應**：改用 `setup_portable.cmd` 或 `start_call_coach.cmd`（命令指令檔，不是 .pyw）
 - **Call Coach 顯示未連線**：確認助手黑窗仍開啟；若使用 **Python 3.13/3.14**，請執行 **`setup_portable.cmd`** 安裝內建 Python 3.12
 - **大檔 MP4 很慢**：建議手動複製到 `input\`，再按「重新掃描」

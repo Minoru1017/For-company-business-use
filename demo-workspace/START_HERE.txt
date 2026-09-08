@@ -1,17 +1,15 @@
 Call Coach 本機助手 — 從這裡開始
 ==============================
 
-【最簡單 — Windows 應用程式】
-  1. 下載 CallCoachAssistant-Windows.zip（GitHub Releases）
-  2. 解壓後雙擊 CallCoachAssistant.exe
-  3. 保持小視窗開啟 → Call Coach DEMO → 完整環境安裝
+【Windows 應用程式 — 請點這個】
+  1. 解壓 CallCoachAssistant-Windows.zip
+  2. 雙擊 CallCoachAssistant.cmd  ← 建議（支援中文路徑）
+  3. 保持黑窗開啟 → Call Coach DEMO → 完整環境安裝
 
-  不需安裝 Python、不需 winget、不需管理員
+  若 CallCoachAssistant.exe 出現 python312.dll 錯誤：
+  → 請改用 CallCoachAssistant.cmd，或將資料夾移到 C:\CallCoachAssistant
 
-【公司電腦 — 腳本方式】
+【公司電腦 — demo-workspace 腳本】
   雙擊 setup_portable.cmd
-
-【一般電腦 — 腳本方式】
-  雙擊 setup_all.cmd
 
 說明見 README.md
