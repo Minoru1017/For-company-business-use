@@ -360,15 +360,21 @@ def run_setup(log: LogFn = default_log) -> int:
         log(f"建立虛擬環境 .venv（使用 {py.name}）...")
         code = run_command([str(py), "-m", "venv", str(ROOT / ".venv")], log=log)
         if code != 0:
+            log(f"[錯誤] 建立 .venv 失敗（exit code {code}）")
             return code
 
     code = run_command([str(VENV_PY), "-m", "pip", "install", "-U", "pip", "wheel"], log=log)
     if code != 0:
+        log(f"[錯誤] pip 升級失敗（exit code {code}）")
+        log("[提示] 詳細日誌已儲存至 logs/ 資料夾，請複製給技術支援")
         return code
 
     log("安裝 whisperx（首次約 5～15 分鐘，請保持網路連線）...")
     code = run_command([str(VENV_PY), "-m", "pip", "install", "whisperx", "huggingface_hub"], log=log)
     if code != 0:
+        log(f"[錯誤] WhisperX 安裝失敗（exit code {code}）")
+        log("[常見原因] 公司網路封鎖 PyPI、Python 版本過新（請用 3.10～3.12）、磁碟空間不足")
+        log("[提示] 詳細日誌已儲存至 logs/ 資料夾，請按「複製日誌」傳給技術支援")
         return code
 
     env_file = ROOT / ".env"
@@ -411,7 +417,9 @@ def run_install_ffmpeg(log: LogFn = default_log) -> int:
         log=log,
     )
     if code != 0:
-        log("[錯誤] ffmpeg 安裝失敗")
+        log(f"[錯誤] ffmpeg 安裝失敗（exit code {code}）")
+        log("[常見原因] 公司電腦封鎖 winget 或需管理員權限")
+        log("[提示] 詳細日誌已儲存至 logs/ 資料夾")
         return code
 
     if shutil.which("ffmpeg"):
