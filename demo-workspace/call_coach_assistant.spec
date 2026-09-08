@@ -57,5 +57,5 @@ coll = COLLECT(
     strip=False,
     upx=False,
     upx_exclude=[],
-    name="CallCoachAssistant",
+    name="CallCoachAssistant-exe",
 )

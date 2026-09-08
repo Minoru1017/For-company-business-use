@@ -35,12 +35,16 @@ foreach ($file in $AppFiles) {
 }
 Copy-Item -Recurse "demo_app" "$Dist\demo_app"
 
-# Optional legacy .exe via PyInstaller (may fail on non-ASCII paths — keep .cmd as primary)
+# Optional legacy .exe via PyInstaller (separate folder — must not overwrite portable $Dist)
+$PyiDist = "dist\CallCoachAssistant-exe"
 try {
     python -m pip install -q -r requirements-build.txt
     if (Test-Path "build") { Remove-Item "build" -Recurse -Force }
+    if (Test-Path $PyiDist) { Remove-Item $PyiDist -Recurse -Force }
     python -m PyInstaller --noconfirm call_coach_assistant.spec
-    if (Test-Path "dist\CallCoachAssistant\CallCoachAssistant.exe") {
+    $BuiltExe = "$PyiDist\CallCoachAssistant.exe"
+    if (Test-Path $BuiltExe) {
+        Copy-Item $BuiltExe $Dist -Force
         Write-Host "[OK] Built optional CallCoachAssistant.exe (use .cmd if DLL error)"
     }
 } catch {
