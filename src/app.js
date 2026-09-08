@@ -19,6 +19,7 @@ import { bindLabelCollapseHandlers, createLabelController } from './labels.js';
 import { applyBuiltinSpeakerLabels, enrichSegments, parse, parseVibeJson } from './parser.js';
 import { bumpUsage, checkQuotaBefore, getLimit, getUsage, quotaPercent, saveUsage } from './quota.js';
 import { labeledRatio } from './speaker-labels.js';
+import { appendAIReportSection } from './report-format.js';
 import { autoGuess } from './speaker.js';
 import { animateStats, bindUI, renderAnalysisUI, showQuotaModal, showToast } from './ui.js';
 import { $, escapeHTML, fmt } from './utils.js';
@@ -341,7 +342,7 @@ async function runAIAnalysis() {
     renderAIResults(j);
     $('aiStatus').textContent = `AI 分析完成 — ${j.summary || ''}`;
     showToast(chunks.length > 1 ? `AI 深度分析完成（${chunks.length} 段合併）` : 'AI 深度分析完成');
-    reportText += `\n\n【AI 深度分析】\n總評：${j.summary || ''}\n[WELL DONE] ${(j.good || []).map((g) => g.point).join('；')}\n[IMPROVE] ${(j.bad || []).map((b) => b.point).join('；')}\n[SCRIPTS] ${(j.suggest || []).map((s) => s.say).join('；')}`;
+    reportText += appendAIReportSection('', j);
   } catch (e) {
     if (e.status === 429) {
       showQuotaModal(

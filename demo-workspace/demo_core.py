@@ -582,43 +582,77 @@ def run_transcribe(mp4_name: str | None = None, log: LogFn = default_log, hooks:
         log("[已取消] 轉錄已停止")
         return CANCEL_EXIT
 
-    log("[2/2] 開始轉錄（2 小時 DEMO 約 1.5～3 小時，請接電源）...")
-    code = run_command(
-        whisperx_cmd()
-        + [
-            str(audio),
-            "--model",
-            MODEL,
-            "--language",
-            "zh",
-            "--device",
-            "cpu",
-            "--compute_type",
-            "int8",
-            "--threads",
-            str(THREADS),
-            "--batch_size",
-            str(BATCH),
-            "--diarize",
-            "--min_speakers",
-            "2",
-            "--max_speakers",
-            "2",
-            "--output_format",
-            "srt",
-            "--output_dir",
-            str(ROOT / "output"),
-        ],
-        log=log,
-        env=env_vars,
-        hooks=hooks,
-    )
-    if code == CANCEL_EXIT:
-        log("[已取消] 轉錄已停止")
-        return code
-    if code != 0:
-        log("[錯誤] 轉錄失敗")
-        return code
+    from transcribe_parallel import chunk_count_for_duration, probe_duration_seconds, run_parallel_transcribe
+
+    duration = probe_duration_seconds(audio, ffmpeg, log) if audio.suffix.lower() == ".wav" else 0.0
+    chunk_count = chunk_count_for_duration(duration) if duration > 0 else 1
+
+    if chunk_count > 1 and ffmpeg:
+        stem = Path(mp4.name).stem
+        final_srt = ROOT / "output" / f"{stem}.srt"
+        code = run_parallel_transcribe(
+            audio=audio,
+            chunk_count=chunk_count,
+            ffmpeg=ffmpeg,
+            work_root=ROOT / "output",
+            output_dir=ROOT / "output",
+            final_srt=final_srt,
+            whisperx_cmd=whisperx_cmd(),
+            model=MODEL,
+            default_threads=THREADS,
+            batch=BATCH,
+            env_vars=env_vars,
+            run_command=run_command,
+            log=log,
+            hooks=hooks,
+            cancel_check=lambda: bool(hooks and hooks.is_cancelled()),
+        )
+        if code == CANCEL_EXIT:
+            return code
+        if code != 0:
+            log("[錯誤] 轉錄失敗")
+            return code
+    else:
+        if duration > 0 and chunk_count == 1:
+            log(f"[2/2] 音檔約 {int(duration // 60)} 分鐘，單段轉錄…")
+        else:
+            log("[2/2] 開始轉錄（2 小時 DEMO 約 1.5～3 小時，請接電源）…")
+        code = run_command(
+            whisperx_cmd()
+            + [
+                str(audio),
+                "--model",
+                MODEL,
+                "--language",
+                "zh",
+                "--device",
+                "cpu",
+                "--compute_type",
+                "int8",
+                "--threads",
+                str(THREADS),
+                "--batch_size",
+                str(BATCH),
+                "--diarize",
+                "--min_speakers",
+                "2",
+                "--max_speakers",
+                "2",
+                "--output_format",
+                "srt",
+                "--output_dir",
+                str(ROOT / "output"),
+            ],
+            log=log,
+            env=env_vars,
+            hooks=hooks,
+        )
+        if code == CANCEL_EXIT:
+            log("[已取消] 轉錄已停止")
+            return code
+        if code != 0:
+            log("[錯誤] 轉錄失敗")
+            return code
 
     srts = list((ROOT / "output").glob("*.srt"))
     log("=== 轉錄完成 ===")
