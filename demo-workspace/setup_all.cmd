@@ -44,12 +44,17 @@ call "%~dp0start_call_coach.cmd"
 exit /b %ERRORLEVEL%
 
 :no_winget
-echo [錯誤] 找不到 winget。請確認為 Windows 10/11 且已安裝「應用程式安裝程式」。
-echo 或手動安裝 Python 3.10+ 與 ffmpeg 後，雙擊 start_call_coach.cmd
+echo [錯誤] 找不到 winget（公司電腦常見）。
+echo.
+echo 請改用 setup_portable.cmd — 不需 winget、不需管理員。
+echo 會把 Python 3.12 下載到 demo-workspace\runtime\python\
 goto :pause
 
 :install_failed
-echo [錯誤] 自動安裝失敗。請以系統管理員身分執行，或手動安裝後改用 start_call_coach.cmd
+echo [錯誤] winget 安裝失敗（公司電腦常見，可能被 IT 封鎖）。
+echo.
+echo 請改用 setup_portable.cmd — 不需 winget、不需管理員。
+echo 若公司也封鎖下載，請見 setup_portable.cmd 內的手動方式。
 goto :pause
 
 :pause

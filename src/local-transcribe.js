@@ -111,10 +111,10 @@ function renderOfflineWizard(offlineEl) {
         </div>
       </li>
       <li>
-        <strong>② 一鍵安裝並啟動（Windows）</strong>
-        <p class="hint">在 <code>demo-workspace</code> 內雙擊 <code>setup_all.cmd</code> — 會自動安裝 Python、ffmpeg 並啟動助手。<strong>黑窗請保持開啟。</strong></p>
-        <p class="hint">若已裝 Python，可改雙擊 <code>start_call_coach.cmd</code>（命令指令檔，不是 Python 圖示的 .pyw）。</p>
-        <p class="hint"><strong>請使用 Python 3.10～3.12。</strong> Python 3.13/3.14 可能無法啟動助手或安裝 WhisperX，建議用 <code>setup_all.cmd</code> 安裝 3.12。</p>
+        <strong>② 安裝並啟動（Windows）</strong>
+        <p class="hint"><strong>公司電腦</strong>（setup_all 開不起來）：雙擊 <code>setup_portable.cmd</code> — 不需 winget、不需管理員，Python 會放在本資料夾 <code>runtime\python\</code>。</p>
+        <p class="hint"><strong>一般電腦</strong>：雙擊 <code>setup_all.cmd</code> — 自動安裝 Python 3.12 + ffmpeg。</p>
+        <p class="hint">若已裝 Python 3.10～3.12：雙擊 <code>start_call_coach.cmd</code>（命令指令檔，不是 .pyw）。<strong>黑窗請保持開啟。</strong></p>
       </li>
       <li>
         <strong>③ 等待連線</strong>

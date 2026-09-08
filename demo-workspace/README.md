@@ -4,10 +4,12 @@
 
 ## 快速開始
 
-**Windows 首次使用**：雙擊 **`setup_all.cmd`**，會自動安裝 Python 3.12 + ffmpeg（需 winget）並啟動助手。
+**公司電腦**（`setup_all.cmd` 開不起來）：雙擊 **`setup_portable.cmd`** — 不需 winget、不需管理員，Python 會下載到 `runtime\python\`。
+
+**一般電腦**：雙擊 **`setup_all.cmd`**，會自動安裝 Python 3.12 + ffmpeg（需 winget）並啟動助手。
 
 1. 下載整個 `demo-workspace` 資料夾到本機（例如 `C:\Users\經銷業務\demo-workspace`）
-2. 雙擊 **`setup_all.cmd`**（首次）或 **`start_call_coach.cmd`**（已裝 Python）
+2. 雙擊 **`setup_portable.cmd`**（公司電腦）或 **`setup_all.cmd`**（一般電腦）或 **`start_call_coach.cmd`**（已裝 Python 3.10～3.12）
 3. 瀏覽器開啟 Call Coach → 選擇 **DEMO · 錄影轉逐字稿**
 4. **完整環境安裝** → 設定 Token → 放入 MP4 → 開始轉錄 → 自動進入分析
 
@@ -15,8 +17,10 @@
 
 ```
 demo-workspace/
-├── setup_all.cmd          ← 一鍵安裝 Python/ffmpeg 並啟動（Windows 首次推薦）
-├── start_call_coach.cmd   ← 啟動（已裝 Python 時）
+├── setup_portable.cmd     ← 公司電腦用（不需 winget / 管理員）
+├── setup_all.cmd          ← 一般電腦用（winget 安裝 Python/ffmpeg）
+├── start_call_coach.cmd   ← 啟動（優先使用 runtime\python）
+├── runtime/python/        ← 可攜式 Python（setup_portable 後產生）
 ├── start_call_coach.pyw
 ├── demo_app.py            ← 本機 API（127.0.0.1:8765）
 ├── demo_core.py           ← 安裝 / 轉錄 / 解除安裝邏輯
@@ -44,8 +48,9 @@ demo-workspace/
 
 ## 疑難排解
 
-- **雙擊 start_call_coach 沒反應**：改用 `setup_all.cmd` 或 `start_call_coach.cmd`（命令指令檔，不是 Python 圖示的 .pyw）
-- **Call Coach 顯示未連線**：確認助手黑窗仍開啟；若使用 **Python 3.13/3.14**，請改用 **Python 3.12**（執行 `setup_all.cmd` 或從 python.org 安裝 3.12）
+- **setup_all.cmd 開不起來**（公司電腦常見）：改用 **`setup_portable.cmd`**。不需 winget、不需管理員；若公司封鎖下載，見 `setup_portable.cmd` 內手動方式
+- **雙擊 start_call_coach 沒反應**：改用 `setup_portable.cmd` 或 `start_call_coach.cmd`（命令指令檔，不是 .pyw）
+- **Call Coach 顯示未連線**：確認助手黑窗仍開啟；若使用 **Python 3.13/3.14**，請執行 **`setup_portable.cmd`** 安裝內建 Python 3.12
 - **大檔 MP4 很慢**：建議手動複製到 `input\`，再按「重新掃描」
 - **轉錄失敗**：查看 Call Coach 下方日誌；常見為 Token 未設定或 ffmpeg 未安裝（`winget install Gyan.FFmpeg`）
 - **解除安裝**：在 DEMO 模式按「解除安裝轉錄環境」
