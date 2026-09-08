@@ -1,0 +1,9 @@
+runtime/
+.venv/
+models/
+.env
+output/*.srt
+output/*.wav
+input/*.mp4
+input/*.wav
+*.uploading

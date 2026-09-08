@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Callable
 
 ROOT = Path(__file__).resolve().parent
+PORTABLE_PY = ROOT / "runtime" / "python" / "python.exe"
 VENV_PY = ROOT / ".venv" / "Scripts" / "python.exe"
 WHISPERX = ROOT / ".venv" / "Scripts" / "whisperx.exe"
 REQUIRED_PY = (3, 10)
@@ -201,6 +202,7 @@ class EnvStatus:
     python_ok: bool
     python_version: str
     python_warning: str | None
+    portable_python_ok: bool
     ffmpeg_ok: bool
     winget_ok: bool
     venv_ok: bool
@@ -217,6 +219,7 @@ class EnvStatus:
             "python_ok": self.python_ok,
             "python_version": self.python_version,
             "python_warning": self.python_warning,
+            "portable_python_ok": self.portable_python_ok,
             "ffmpeg_ok": self.ffmpeg_ok,
             "winget_ok": self.winget_ok,
             "venv_ok": self.venv_ok,
@@ -251,10 +254,18 @@ def get_status() -> EnvStatus:
 
     ready = python_ok and venv_ok and whisperx_ok and token_ok and bool(mp4s)
 
+    portable_ok = PORTABLE_PY.is_file()
+    if portable_ok and python_warning and "過新" in python_warning:
+        python_warning = (
+            f"目前使用系統 Python {ver}；已偵測到可攜式 Python。"
+            " 請用 start_call_coach.cmd 啟動（會優先使用 runtime\\python）。"
+        )
+
     return EnvStatus(
         python_ok=python_ok,
         python_version=ver,
         python_warning=python_warning,
+        portable_python_ok=portable_ok,
         ffmpeg_ok=ffmpeg_ok,
         winget_ok=winget_ok,
         venv_ok=venv_ok,
