@@ -52,10 +52,13 @@ $SitePackages = Join-Path $RuntimeDir "Lib\site-packages"
 New-Item -ItemType Directory -Force -Path $SitePackages | Out-Null
 
 $GetPip = Join-Path $RuntimeParent "get-pip.py"
-Write-Host "[3/3] Installing pip ..."
+Write-Host "[3/4] Installing pip ..."
 Invoke-WebRequest -Uri "https://bootstrap.pypa.io/get-pip.py" -OutFile $GetPip -UseBasicParsing
 & $PythonExe $GetPip --no-warn-script-location
 Remove-Item $GetPip -Force
+
+Write-Host "[4/4] Installing virtualenv (embed Python has no venv module) ..."
+& $PythonExe -m pip install --no-warn-script-location virtualenv
 
 Write-Host ""
 Write-Host "[Done] Portable Python ready:"

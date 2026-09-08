@@ -68,7 +68,8 @@ demo-workspace/
 
 ## 疑難排解
 
-- **CallCoachAssistant.exe 無法開啟 / python312.dll 錯誤**：請改雙擊 **`CallCoachAssistant.cmd`**，或將整個資料夾移到 **`C:\CallCoachAssistant`**（路徑不要有中文）後再試。不需 winget、不需管理員；若公司封鎖下載，見 `setup_portable.cmd` 內手動方式
+- **CallCoachAssistant.exe 無法開啟 / python312.dll 錯誤**：請改雙擊 **`CallCoachAssistant.cmd`**，或將整個資料夾移到 **`C:\CallCoachAssistant`**（路徑不要有中文）後再試
+- **完整環境安裝出現 Failed to fetch**：請確認 `CallCoachAssistant.cmd` 黑窗仍開啟，並下載 [最新版 Releases](https://github.com/Minoru1017/For-company-business-use/releases/latest)。若仍失敗，改按「僅安裝 WhisperX」
 - **雙擊 start_call_coach 沒反應**：改用 `setup_portable.cmd` 或 `start_call_coach.cmd`（命令指令檔，不是 .pyw）
 - **Call Coach 顯示未連線**：確認助手黑窗仍開啟；若使用 **Python 3.13/3.14**，請執行 **`setup_portable.cmd`** 安裝內建 Python 3.12
 - **大檔 MP4 很慢**：建議手動複製到 `input\`，再按「重新掃描」
