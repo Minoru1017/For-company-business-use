@@ -10,7 +10,6 @@ Call Coach 本機助手 — 整合 DEMO 轉錄與電訪分析
 """
 from __future__ import annotations
 
-import cgi
 import json
 import mimetypes
 import os
@@ -24,6 +23,7 @@ from urllib.parse import urlparse
 
 import demo_core
 import security
+import upload_parse
 
 ROOT = demo_core.ROOT
 STATIC = ROOT / "demo_app"
@@ -289,6 +289,14 @@ class Handler(BaseHTTPRequestHandler):
             ok, msg = run_job("setup", demo_core.run_setup)
             return self._send_json({"ok": ok, "message": msg})
 
+        if path == "/api/install-ffmpeg":
+            ok, msg = run_job("install-ffmpeg", demo_core.run_install_ffmpeg)
+            return self._send_json({"ok": ok, "message": msg})
+
+        if path == "/api/full-setup":
+            ok, msg = run_job("full-setup", demo_core.run_full_setup)
+            return self._send_json({"ok": ok, "message": msg})
+
         if path == "/api/transcribe":
             data = self._parse_json(body)
             if data is None:
@@ -385,39 +393,23 @@ class Handler(BaseHTTPRequestHandler):
         if "multipart/form-data" not in ctype:
             return self._send_json({"ok": False, "message": "需要 multipart 上傳"}, 400)
 
-        form = cgi.FieldStorage(
-            fp=self.rfile,
-            headers=self.headers,
-            environ={
-                "REQUEST_METHOD": "POST",
-                "CONTENT_TYPE": ctype,
-                "CONTENT_LENGTH": self.headers.get("Content-Length", "0"),
-            },
-        )
-        item = form["file"] if "file" in form else None
-        if item is None or not getattr(item, "filename", None):
-            return self._send_json({"ok": False, "message": "未選擇檔案"}, 400)
-
-        try:
-            filename = demo_core.safe_mp4_name(item.filename)
-        except ValueError as e:
-            return self._reject(400, str(e))
-
-        dest = ROOT / "input" / filename
-        (ROOT / "input").mkdir(exist_ok=True)
-        tmp = dest.with_suffix(dest.suffix + ".uploading")
-        written = 0
+        dest_dir = ROOT / "input"
+        dest_dir.mkdir(exist_ok=True)
+        tmp = dest_dir / "upload.uploading"
         try:
             with tmp.open("wb") as f:
-                while True:
-                    chunk = item.file.read(1024 * 1024)
-                    if not chunk:
-                        break
-                    written += len(chunk)
-                    if written > security.MAX_UPLOAD_BYTES:
-                        raise OSError("超過上傳大小上限")
-                    f.write(chunk)
+                raw_name = upload_parse.stream_multipart_file(
+                    self.rfile,
+                    ctype,
+                    f,
+                    max_bytes=security.MAX_UPLOAD_BYTES,
+                )
+            filename = demo_core.safe_mp4_name(raw_name)
+            dest = dest_dir / filename
             tmp.replace(dest)
+        except ValueError as e:
+            tmp.unlink(missing_ok=True)
+            return self._send_json({"ok": False, "message": str(e)}, 400)
         except OSError as e:
             tmp.unlink(missing_ok=True)
             return self._send_json({"ok": False, "message": f"寫入失敗: {e}"}, 500)
@@ -436,10 +428,15 @@ def main() -> int:
         print(f"[錯誤] 找不到介面檔案: {STATIC}")
         return 1
 
+    _, ver, warning = demo_core.python_version_info()
+    if warning:
+        print(f"[提醒] {warning}")
+
     host = "127.0.0.1"
     url = CALL_COACH_URL
     print("=== Call Coach 本機助手 ===")
     print(f"工作目錄: {ROOT}")
+    print(f"Python: {ver}")
     print(f"Call Coach: {url}")
     print(f"本機 API: http://{host}:{PORT}/api/status")
     print("（關閉此視窗即停止服務）\n")
