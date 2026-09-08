@@ -7,8 +7,12 @@ Call Coach 本機助手 — 從這裡開始
 
 請雙擊以下任一檔案啟動（在這個資料夾內）：
 
-  1. start_call_coach.cmd     ← 建議先用這個（有錯誤會顯示說明）
-  2. start_call_coach.pyw     ← 已裝好 Python 後可用（無黑窗）
+  1. start_call_coach.cmd     ← 請點這個！（類型：Windows 命令指令檔，會出現黑窗）
+  2. start_call_coach.pyw     ← 進階用（類型：Python 檔，無黑窗；失敗時可能完全沒反應）
+
+如何分辨：在檔案總管開啟「檢視 → 顯示 → 檔案名稱副檔名」，
+  .cmd = 命令指令檔（建議）
+  .pyw = Python 檔（不要先點這個）
 
 啟動成功後會自動開啟 Call Coach，請選擇：
   - 開發 · 電訪逐字稿（Vibe 匯出檔）

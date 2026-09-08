@@ -14,6 +14,8 @@ if not defined PY_CMD goto :no_python
 
 echo 使用: %PY_CMD%
 echo.
+echo [提示] 若成功，此黑窗會一直開著 — 請勿關閉，並回到 Call Coach 重新整理。
+echo.
 %PY_CMD% demo_app.py
 if errorlevel 1 goto :failed
 exit /b 0
