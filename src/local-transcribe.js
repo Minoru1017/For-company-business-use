@@ -283,7 +283,7 @@ export function initLocalTranscribe({ onTranscriptReady, showToast, getMode }) {
         <p class="bridge-log-hint hidden" id="bridgeLogHint">安裝失敗時，請複製或下載日誌傳給技術支援。</p>
         <pre class="bridge-log" id="bridgeLog"></pre>
       </div>
-      <p class="hint">長影片會依時長自動分段平行轉錄（2 小時約 4～5 段、最多 3 段同時跑，16GB 記憶體）。請接電源並保持助手視窗開啟。</p>
+      <p class="hint">本機 CPU 轉錄（含發言者辨識）約為影片長度的 1.5～2.5 倍：48 分鐘 DEMO 常需 50～90 分鐘。長影片會自動分段平行處理並顯示預估時間；請接電源並保持助手視窗開啟。若要加速可設定環境變數 <code>CALL_COACH_MODEL=small</code>（略降準確度）。</p>
     `;
 
     panel.querySelectorAll('.bridge-file').forEach((el) => {
