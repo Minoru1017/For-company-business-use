@@ -114,6 +114,7 @@ function renderOfflineWizard(offlineEl) {
         <strong>② 一鍵安裝並啟動（Windows）</strong>
         <p class="hint">在 <code>demo-workspace</code> 內雙擊 <code>setup_all.cmd</code> — 會自動安裝 Python、ffmpeg 並啟動助手。<strong>黑窗請保持開啟。</strong></p>
         <p class="hint">若已裝 Python，可改雙擊 <code>start_call_coach.cmd</code>（命令指令檔，不是 Python 圖示的 .pyw）。</p>
+        <p class="hint"><strong>請使用 Python 3.10～3.12。</strong> Python 3.13/3.14 可能無法啟動助手或安裝 WhisperX，建議用 <code>setup_all.cmd</code> 安裝 3.12。</p>
       </li>
       <li>
         <strong>③ 等待連線</strong>
@@ -170,7 +171,7 @@ export function initLocalTranscribe({ onTranscriptReady, showToast, getMode }) {
 
   function renderPanel(st) {
     const checks = [
-      ['python_ok', 'Python'],
+      ['python_ok', st.python_version ? `Python ${st.python_version}` : 'Python'],
       ['ffmpeg_ok', 'ffmpeg'],
       ['venv_ok', '轉錄環境'],
       ['whisperx_ok', 'WhisperX'],
@@ -179,9 +180,12 @@ export function initLocalTranscribe({ onTranscriptReady, showToast, getMode }) {
     const checkHtml = checks
       .map(([k, label]) => {
         const ok = st[k];
-        return `<li><span class="bridge-badge ${ok ? 'ok' : 'bad'}">${ok ? 'OK' : '—'}</span>${label}</li>`;
+        return `<li><span class="bridge-badge ${ok ? 'ok' : 'bad'}">${ok ? 'OK' : '—'}</span>${escapeHTML(label)}</li>`;
       })
       .join('');
+    const pythonWarn = st.python_warning
+      ? `<p class="bridge-python-warn">${escapeHTML(st.python_warning)}</p>`
+      : '';
 
     const files = st.mp4_files || [];
     if (!selectedMp4 || !files.includes(selectedMp4)) selectedMp4 = files[0] || null;
@@ -214,6 +218,7 @@ export function initLocalTranscribe({ onTranscriptReady, showToast, getMode }) {
       <p class="bridge-lead">錄影在本機轉成逐字稿後，會<strong>自動載入</strong>到上方分析區，不需手動上傳 SRT。</p>
       ${setupBanner}
       <ul class="bridge-checks">${checkHtml}</ul>
+      ${pythonWarn}
 
       <div class="bridge-manual">
         <strong>推薦：大檔 DEMO 請手動複製（比拖曳快）</strong>

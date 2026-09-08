@@ -14,6 +14,7 @@ ROOT = Path(__file__).resolve().parent
 VENV_PY = ROOT / ".venv" / "Scripts" / "python.exe"
 WHISPERX = ROOT / ".venv" / "Scripts" / "whisperx.exe"
 REQUIRED_PY = (3, 10)
+RECOMMENDED_PY_MAX = (3, 12)
 MODEL = "medium"
 THREADS = 8
 BATCH = 4
@@ -180,10 +181,26 @@ def cache_env() -> dict[str, str]:
     return env
 
 
+def python_version_info() -> tuple[bool, str, str | None]:
+    ver = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
+    ok = sys.version_info >= REQUIRED_PY
+    warning: str | None = None
+    if sys.version_info > RECOMMENDED_PY_MAX:
+        warning = (
+            f"Python {ver} 過新，WhisperX 建議使用 3.10～3.12。"
+            " 若安裝或轉錄失敗，請改用 Python 3.12。"
+        )
+    elif sys.version_info < REQUIRED_PY:
+        warning = f"需要 Python {REQUIRED_PY[0]}.{REQUIRED_PY[1]}+（目前 {ver}）"
+        ok = False
+    return ok, ver, warning
+
+
 @dataclass
 class EnvStatus:
     python_ok: bool
     python_version: str
+    python_warning: str | None
     ffmpeg_ok: bool
     winget_ok: bool
     venv_ok: bool
@@ -199,6 +216,7 @@ class EnvStatus:
         return {
             "python_ok": self.python_ok,
             "python_version": self.python_version,
+            "python_warning": self.python_warning,
             "ffmpeg_ok": self.ffmpeg_ok,
             "winget_ok": self.winget_ok,
             "venv_ok": self.venv_ok,
@@ -218,8 +236,7 @@ class EnvStatus:
 
 
 def get_status() -> EnvStatus:
-    ver = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
-    python_ok = sys.version_info >= REQUIRED_PY
+    python_ok, ver, python_warning = python_version_info()
     ffmpeg_ok = shutil.which("ffmpeg") is not None
     winget_ok = shutil.which("winget") is not None
     venv_ok = VENV_PY.exists()
@@ -237,6 +254,7 @@ def get_status() -> EnvStatus:
     return EnvStatus(
         python_ok=python_ok,
         python_version=ver,
+        python_warning=python_warning,
         ffmpeg_ok=ffmpeg_ok,
         winget_ok=winget_ok,
         venv_ok=venv_ok,

@@ -45,7 +45,7 @@ demo-workspace/
 ## 疑難排解
 
 - **雙擊 start_call_coach 沒反應**：改用 `setup_all.cmd` 或 `start_call_coach.cmd`（命令指令檔，不是 Python 圖示的 .pyw）
-- **Call Coach 顯示未連線**：確認助手黑窗仍開啟，或重新雙擊 `setup_all.cmd`
+- **Call Coach 顯示未連線**：確認助手黑窗仍開啟；若使用 **Python 3.13/3.14**，請改用 **Python 3.12**（執行 `setup_all.cmd` 或從 python.org 安裝 3.12）
 - **大檔 MP4 很慢**：建議手動複製到 `input\`，再按「重新掃描」
 - **轉錄失敗**：查看 Call Coach 下方日誌；常見為 Token 未設定或 ffmpeg 未安裝（`winget install Gyan.FFmpeg`）
 - **解除安裝**：在 DEMO 模式按「解除安裝轉錄環境」
