@@ -107,7 +107,7 @@ function renderOfflineWizard(offlineEl) {
     <ol class="setup-wizard-steps">
       <li>
         <strong>① 下載 Windows 應用程式（推薦）</strong>
-        <p class="hint">下載 <code>CallCoachAssistant-Windows.zip</code>，解壓後雙擊 <code>CallCoachAssistant.exe</code>。不需安裝 Python、不需 winget。</p>
+        <p class="hint">下載 <code>CallCoachAssistant-Windows.zip</code>，解壓後雙擊 <code>CallCoachAssistant.cmd</code>（支援中文使用者名稱路徑）。若 <code>.exe</code> 出現 python312.dll 錯誤，請改用 <code>.cmd</code>。不需安裝 Python、不需 winget。</p>
         <div class="bridge-actions">
           <a class="btn primary" href="${ASSISTANT_RELEASE_URL}" target="_blank" rel="noopener noreferrer">下載本機助手（Windows）</a>
         </div>
