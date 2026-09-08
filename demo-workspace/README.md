@@ -4,16 +4,22 @@
 
 ## 快速開始
 
-### 方式 A：Windows 應用程式（推薦，尤其公司電腦）
+### 方式 A：Windows 安裝精靈（推薦，公司電腦）
 
-1. 至 [Releases](https://github.com/Minoru1017/For-company-business-use/releases/latest) 下載 **`CallCoachAssistant-Windows.zip`**
-2. 解壓到任意資料夾（路徑含中文時建議用 `C:\CallCoachAssistant`）
-3. 雙擊 **`啟動 Call Coach.cmd`**（支援中文使用者名稱路徑；**不要用 .exe**）
-4. 保持視窗開啟 → Call Coach **DEMO** → **完整環境安裝**
+1. 至 [Releases](https://github.com/Minoru1017/For-company-business-use/releases/latest) 下載 **`CallCoachAssistant-Setup.exe`**
+2. 執行安裝精靈（建議使用預設位置 `C:\CallCoachAssistant`）
+3. 安裝過程會自動準備 **ffmpeg** 與 **WhisperX**（約 5～15 分鐘，需網路）
+4. 從開始選單啟動 **Call Coach 本機助手** → Call Coach **DEMO** → 貼上 HF_TOKEN
 
-不需安裝 Python、不需 winget、不需管理員。內含 Python 3.12 與轉錄助手。
+不需 `.cmd`、不需 winget、不需自行安裝 Python。適合公司電腦封鎖腳本的情況。
 
-### 方式 B：demo-workspace 腳本（開發者）
+### 方式 B：ZIP 免安裝版
+
+1. 下載 **`CallCoachAssistant-Windows.zip`**
+2. 解壓後雙擊 **`啟動 Call Coach.cmd`**（若公司封鎖 .cmd，請用方式 A）
+3. Call Coach **DEMO** → **完整環境安裝**
+
+### 方式 C：demo-workspace 腳本（開發者）
 
 **公司電腦**：雙擊 **`setup_portable.cmd`**。**一般電腦**：**`setup_all.cmd`**。
 

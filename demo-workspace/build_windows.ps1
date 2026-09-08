@@ -1,22 +1,37 @@
-# Build CallCoachAssistant-Windows.zip on Windows (PowerShell).
-# Portable package: runtime/python + sources + CallCoachAssistant.cmd
-# (Avoids PyInstaller python312.dll failures on Chinese user profile paths.)
+# Build CallCoachAssistant Windows installer + optional zip.
+# Installer: Inno Setup → dist/CallCoachAssistant-Setup.exe
+# Installs to C:\CallCoachAssistant (ASCII path) with bundled Python, ffmpeg, WhisperX setup.
+param(
+    [switch]$SkipInstaller
+)
+
 $ErrorActionPreference = "Stop"
 Set-Location $PSScriptRoot
 
 Write-Host "=== Build Call Coach Assistant (Windows) ==="
 
 & .\scripts\bootstrap_portable_python.ps1
+& .\scripts\bootstrap_portable_ffmpeg.ps1
 
-$Dist = "dist\CallCoachAssistant"
-if (Test-Path $Dist) { Remove-Item $Dist -Recurse -Force }
-New-Item -ItemType Directory -Force -Path $Dist, "$Dist\input", "$Dist\output", "$Dist\models", "$Dist\logs" | Out-Null
+$Version = (Get-Content "..\package.json" -Raw | ConvertFrom-Json).version
+$Payload = "dist\installer-payload"
+$PyiDist = "dist\CallCoachAssistant-exe"
+
+if (Test-Path $Payload) { Remove-Item $Payload -Recurse -Force }
+if (Test-Path $PyiDist) { Remove-Item $PyiDist -Recurse -Force }
+New-Item -ItemType Directory -Force -Path $Payload, "$Payload\input", "$Payload\output", "$Payload\models", "$Payload\logs", "$Payload\installer" | Out-Null
 
 if (-not (Test-Path "runtime\python\python.exe")) {
-    throw "Missing runtime\python\python.exe — bootstrap_portable_python failed"
+    throw "Missing runtime\python\python.exe"
 }
-New-Item -ItemType Directory -Force -Path "$Dist\runtime" | Out-Null
-Copy-Item -Recurse "runtime\python" "$Dist\runtime\python"
+if (-not (Test-Path "runtime\ffmpeg\ffmpeg.exe")) {
+    throw "Missing runtime\ffmpeg\ffmpeg.exe"
+}
+
+New-Item -ItemType Directory -Force -Path "$Payload\runtime" | Out-Null
+Copy-Item -Recurse "runtime\python" "$Payload\runtime\python"
+New-Item -ItemType Directory -Force -Path "$Payload\runtime\ffmpeg" | Out-Null
+Copy-Item "runtime\ffmpeg\*" "$Payload\runtime\ffmpeg" -Force
 
 $AppFiles = @(
     "demo_app.py",
@@ -25,30 +40,56 @@ $AppFiles = @(
     "upload_parse.py",
     "job_log.py",
     "app_paths.py",
-    "啟動 Call Coach.cmd",
-    "CallCoachAssistant.cmd",
     ".env.example",
     "START_HERE.txt",
     "README.md"
 )
 foreach ($file in $AppFiles) {
-    Copy-Item $file $Dist -Force
+    Copy-Item $file $Payload -Force
 }
-Copy-Item -Recurse "demo_app" "$Dist\demo_app"
+Copy-Item -Recurse "demo_app" "$Payload\demo_app"
+Copy-Item "installer\setup_env.py" "$Payload\installer\setup_env.py" -Force
 
-$Version = (Get-Content "..\package.json" -Raw | ConvertFrom-Json).version
-Set-Content -Path "$Dist\VERSION.txt" -Value "Call Coach Assistant Windows v$Version" -Encoding UTF8
+Set-Content -Path "$Payload\VERSION.txt" -Value "Call Coach Assistant Windows v$Version (installer)" -Encoding UTF8
 
-# Do not ship CallCoachAssistant.exe — PyInstaller fails on Chinese user profile paths.
+Write-Host "[Build] PyInstaller application (.exe) ..."
+python -m pip install -q -r requirements-build.txt
+if (Test-Path "build") { Remove-Item "build" -Recurse -Force }
+python -m PyInstaller --noconfirm call_coach_assistant.spec
 
-if (-not (Test-Path "$Dist\啟動 Call Coach.cmd")) {
-    throw "Build failed: 啟動 Call Coach.cmd not found"
+if (-not (Test-Path "$PyiDist\CallCoachAssistant.exe")) {
+    throw "PyInstaller build failed"
 }
+Copy-Item "$PyiDist\CallCoachAssistant.exe" $Payload -Force
+Copy-Item "$PyiDist\_internal" "$Payload\_internal" -Recurse -Force
+Write-Host "[OK] CallCoachAssistant.exe (install to C:\CallCoachAssistant)"
+
+# Portable zip (dev / fallback — includes .cmd)
+$ZipDist = "dist\CallCoachAssistant"
+if (Test-Path $ZipDist) { Remove-Item $ZipDist -Recurse -Force }
+Copy-Item $Payload $ZipDist -Recurse -Force
+Copy-Item "啟動 Call Coach.cmd" $ZipDist -Force
+Copy-Item "CallCoachAssistant.cmd" $ZipDist -Force
 
 $Zip = "dist\CallCoachAssistant-Windows.zip"
 if (Test-Path $Zip) { Remove-Item $Zip -Force }
-Compress-Archive -Path $Dist -DestinationPath $Zip -Force
+Compress-Archive -Path $ZipDist -DestinationPath $Zip -Force
+Write-Host "[Done] $Zip"
+
+if (-not $SkipInstaller) {
+    $Iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
+    if (-not (Test-Path $Iscc)) {
+        Write-Host "[提醒] Inno Setup 未安裝，略過 Setup.exe（請在 CI 或安裝 Inno Setup 6 後重試）"
+    } else {
+        Write-Host "[Build] Inno Setup installer ..."
+        & $Iscc "installer\CallCoachAssistant.iss" "/DAppVersion=$Version"
+        $Setup = "dist\CallCoachAssistant-Setup.exe"
+        if (-not (Test-Path $Setup)) {
+            throw "Installer build failed: $Setup not found"
+        }
+        Write-Host "[Done] $Setup"
+    }
+}
 
 Write-Host ""
-Write-Host "[Done] $Zip"
-Write-Host "請雙擊「啟動 Call Coach.cmd」啟動（支援中文路徑，勿用 .exe）"
+Write-Host "公司電腦請使用 CallCoachAssistant-Setup.exe 安裝精靈"
