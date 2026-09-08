@@ -154,7 +154,14 @@ h2 { font-family:var(--disp); font-size:.98rem; margin-bottom:12px; color:var(--
 .bridge-uninstall { border-color: #5d2f28; color: var(--muted); }
 .bridge-uninstall:hover { border-color: var(--bad); color: var(--bad); }
 .bridge-actions { display: flex; flex-wrap: wrap; gap: 8px; margin-bottom: 8px; }
-.bridge-log { background: #0e0e0e; border: 1px solid var(--border); border-radius: 8px; padding: 10px; max-height: 180px; overflow-y: auto; font-family: var(--mono); font-size: .7rem; line-height: 1.5; color: #b0b0b0; white-space: pre-wrap; }
+.bridge-log { background: #0e0e0e; border: 1px solid var(--border); border-radius: 8px; padding: 10px; max-height: 220px; overflow-y: auto; font-family: var(--mono); font-size: .7rem; line-height: 1.5; color: #b0b0b0; white-space: pre-wrap; }
+.bridge-log-panel { margin-bottom: 10px; border: 1px solid var(--border); border-radius: 10px; padding: 10px 12px; background: #101010; }
+.bridge-log-panel.err { border-color: #5d2f28; background: #1a1210; }
+.bridge-log-head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; margin-bottom: 8px; }
+.bridge-log-head strong { color: var(--text); font-size: .88rem; }
+.bridge-log-panel.err .bridge-log-head strong { color: var(--bad); }
+.bridge-log-actions { margin: 0; }
+.bridge-log-hint { margin: 0 0 8px; font-size: .78rem; color: var(--warn); }
 
 button { background:transparent; color:var(--text); border:1px solid var(--border);
          border-radius:99px; padding:10px 20px; font-size:.85rem; cursor:pointer;

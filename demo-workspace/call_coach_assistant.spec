@@ -16,6 +16,7 @@ a = Analysis(
         "demo_core",
         "security",
         "upload_parse",
+        "job_log",
         "tkinter",
     ],
     hookspath=[],

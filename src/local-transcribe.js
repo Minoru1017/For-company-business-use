@@ -253,7 +253,18 @@ export function initLocalTranscribe({ onTranscriptReady, showToast, getMode }) {
         <button type="button" class="btn" id="bridgeImport" ${st.srt_files?.length ? '' : 'disabled'}>載入最新 SRT</button>
       </div>
       <div class="bridge-transcribe-status hidden" id="bridgeTranscribeStatus"></div>
-      <pre class="bridge-log hidden" id="bridgeLog"></pre>
+      <div class="bridge-log-panel hidden" id="bridgeLogPanel">
+        <div class="bridge-log-head">
+          <strong id="bridgeLogTitle">安裝記錄</strong>
+          <div class="bridge-actions bridge-log-actions">
+            <button type="button" class="btn" id="bridgeCopyLog">複製日誌</button>
+            <button type="button" class="btn" id="bridgeDownloadLog">下載日誌</button>
+            <button type="button" class="btn" id="bridgeOpenLogs">開啟 logs 資料夾</button>
+          </div>
+        </div>
+        <p class="bridge-log-hint hidden" id="bridgeLogHint">安裝失敗時，請複製或下載日誌傳給技術支援。</p>
+        <pre class="bridge-log" id="bridgeLog"></pre>
+      </div>
       <p class="hint">2 小時以上 DEMO：音軌抽出可能需 5～15 分鐘，轉錄約 1.5～3 小時，請接電源。轉錄中請保持「啟動轉錄助手」視窗開啟。</p>
     `;
 
@@ -319,6 +330,7 @@ export function initLocalTranscribe({ onTranscriptReady, showToast, getMode }) {
       cancelTranscribe(showToast, refreshStatus)
     );
     panel.querySelector('#bridgeImport')?.addEventListener('click', () => importLatest(onTranscriptReady, showToast));
+    bindLogActions(showToast);
     if (transcribeBusy) setTranscribeUI({ active: true });
     maybeAutoOpenTokenPage(st, showToast);
   }
@@ -511,12 +523,63 @@ function setTranscribeUI({ active, message = '本機轉錄進行中…請保持�
   }
 }
 
-function showLog(lines) {
+function showLog(lines, { failed = false, title = '執行記錄' } = {}) {
+  const panel = document.getElementById('bridgeLogPanel');
   const el = document.getElementById('bridgeLog');
-  if (!el) return;
-  el.classList.remove('hidden');
+  const hint = document.getElementById('bridgeLogHint');
+  const titleEl = document.getElementById('bridgeLogTitle');
+  if (!el || !panel) return;
+  panel.classList.remove('hidden');
+  if (failed) panel.classList.add('err');
+  else panel.classList.remove('err');
+  if (titleEl) titleEl.textContent = title;
+  if (hint) hint.classList.toggle('hidden', !failed);
   el.textContent = (lines || []).join('\n');
   el.scrollTop = el.scrollHeight;
+}
+
+async function fetchLatestLog() {
+  return api('/api/job/log/latest');
+}
+
+async function copyLatestLog(showToast) {
+  try {
+    const r = await fetchLatestLog();
+    await navigator.clipboard.writeText(r.content);
+    showToast?.(`已複製日誌：${r.filename}`);
+  } catch {
+    const el = document.getElementById('bridgeLog');
+    if (el?.textContent) {
+      await navigator.clipboard.writeText(el.textContent);
+      showToast?.('已複製畫面上的記錄');
+    } else {
+      showToast?.('尚無日誌可複製');
+    }
+  }
+}
+
+async function downloadLatestLog(showToast) {
+  try {
+    const r = await fetchLatestLog();
+    const blob = new Blob([r.content], { type: 'text/plain;charset=utf-8' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = r.filename || 'call-coach-install.log';
+    a.click();
+    URL.revokeObjectURL(a.href);
+    showToast?.(`已下載 ${a.download}`);
+  } catch {
+    showToast?.('尚無日誌可下載');
+  }
+}
+
+function bindLogActions(showToast) {
+  document.getElementById('bridgeCopyLog')?.addEventListener('click', () => copyLatestLog(showToast));
+  document.getElementById('bridgeDownloadLog')?.addEventListener('click', () => downloadLatestLog(showToast));
+  document.getElementById('bridgeOpenLogs')?.addEventListener('click', async () => {
+    await api('/api/open-folder', { method: 'POST', body: JSON.stringify({ folder: 'logs' }) });
+    showToast('已開啟 logs 資料夾');
+  });
 }
 
 function transcribeBlockReason(st) {
@@ -527,12 +590,21 @@ function transcribeBlockReason(st) {
   return '';
 }
 
-async function pollJob(onDone, { trackTranscribe = false } = {}) {
+async function pollJob(onDone, { trackTranscribe = false, trackSetup = false } = {}) {
   clearInterval(pollTimer);
   const tick = async () => {
     try {
       const j = await api('/api/job');
-      showLog(j.logs);
+      const setupKinds = new Set(['setup', 'full-setup', 'install-ffmpeg', 'uninstall']);
+      const isSetup = setupKinds.has(j.kind);
+      if (isSetup || trackSetup) {
+        showLog(j.logs, {
+          failed: !j.running && j.exit_code !== null && j.exit_code !== 0,
+          title: j.running ? '安裝進行中…' : j.exit_code === 0 ? '安裝完成' : '安裝失敗',
+        });
+      } else {
+        showLog(j.logs);
+      }
       if (trackTranscribe && j.running && j.kind === 'transcribe') {
         setTranscribeUI({ active: true, message: j.cancel_requested ? '正在取消轉錄…' : '本機轉錄進行中…' });
       }
@@ -562,13 +634,22 @@ async function runSetupJob(endpoint, startMsg, doneMsg, showToast, refreshStatus
     const r = await api(endpoint, { method: 'POST' });
     if (!r.ok) return showToast(r.message || '無法開始安裝');
     showToast(startMsg);
-    showLog(['安裝進行中…']);
-    pollJob((ok) => {
-      showToast(ok ? doneMsg : '安裝失敗，請查看記錄');
-      refreshStatus().then((st) => {
-        if (ok && st && !st.token_ok) openTokenPage(showToast);
-      });
-    });
+    showLog(['安裝啟動中…'], { title: '安裝進行中…' });
+    pollJob(
+      (ok, job) => {
+        showLog(job.logs || [], {
+          failed: !ok,
+          title: ok ? '安裝完成' : '安裝失敗 — 請複製日誌',
+        });
+        showToast(
+          ok ? doneMsg : '安裝失敗 — 請查看下方記錄，按「複製日誌」傳給技術支援'
+        );
+        refreshStatus().then((st) => {
+          if (ok && st && !st.token_ok) openTokenPage(showToast);
+        });
+      },
+      { trackSetup: true }
+    );
   } catch (err) {
     showToast(err?.message || '無法連線本機轉錄助手');
   }
@@ -641,9 +722,9 @@ async function runUninstall(showToast, refreshStatus) {
   if (!r.ok) return showToast(r.message);
   showToast('開始解除安裝…');
   pollJob((ok) => {
-    showToast(ok ? '已解除安裝' : '解除安裝失敗');
+    showToast(ok ? '已解除安裝' : '解除安裝失敗 — 請查看日誌');
     refreshStatus();
-  });
+  }, { trackSetup: true });
 }
 
 async function saveToken(showToast, refreshStatus) {

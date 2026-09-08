@@ -73,4 +73,5 @@ demo-workspace/
 - **Call Coach 顯示未連線**：確認助手黑窗仍開啟；若使用 **Python 3.13/3.14**，請執行 **`setup_portable.cmd`** 安裝內建 Python 3.12
 - **大檔 MP4 很慢**：建議手動複製到 `input\`，再按「重新掃描」
 - **轉錄失敗**：查看 Call Coach 下方日誌；常見為 Token 未設定或 ffmpeg 未安裝（`winget install Gyan.FFmpeg`）
+- **一鍵安裝失敗**：在 Call Coach 按「複製日誌」或「下載日誌」，或開啟 `logs\` 資料夾將 `.log` 檔傳給技術支援
 - **解除安裝**：在 DEMO 模式按「解除安裝轉錄環境」

@@ -22,6 +22,7 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 import demo_core
+import job_log
 import security
 import upload_parse
 
@@ -42,6 +43,7 @@ class JobState:
         self.cancel_uninstall = False
         self.cancel_remove_models = False
         self.current_proc: subprocess.Popen | None = None
+        self.log_file: str | None = None
 
     def reset(self, kind: str) -> bool:
         with self.lock:
@@ -55,6 +57,7 @@ class JobState:
             self.cancel_uninstall = False
             self.cancel_remove_models = False
             self.current_proc = None
+            self.log_file = None
             return True
 
     def append(self, msg: str) -> None:
@@ -62,10 +65,18 @@ class JobState:
             self.logs.append(msg)
 
     def finish(self, code: int) -> None:
+        import job_log
+
         with self.lock:
+            logs_copy = list(self.logs)
+            kind = self.kind
             self.exit_code = code
             self.running = False
             self.current_proc = None
+        if kind:
+            path = job_log.save_job_log(kind, logs_copy, code)
+            with self.lock:
+                self.log_file = str(path)
 
     def request_cancel(self, uninstall: bool = False, remove_models: bool = False) -> tuple[bool, str]:
         with self.lock:
@@ -93,6 +104,8 @@ class JobState:
                 "exit_code": self.exit_code,
                 "cancel_requested": self.cancel_requested,
                 "cancel_uninstall": self.cancel_uninstall,
+                "log_file": self.log_file,
+                "logs_folder": str(job_log.LOGS_DIR),
             }
 
 
@@ -245,6 +258,20 @@ class Handler(BaseHTTPRequestHandler):
             snap["status"] = demo_core.get_status().to_dict()
             return self._send_json(snap)
 
+        if path == "/api/job/log/latest":
+            try:
+                name, content, folder = job_log.read_latest_log()
+            except FileNotFoundError:
+                return self._send_json({"ok": False, "message": "尚無安裝日誌"}, 404)
+            return self._send_json(
+                {
+                    "ok": True,
+                    "filename": name,
+                    "content": content,
+                    "folder": folder,
+                }
+            )
+
         if path == "/api/srt/latest":
             try:
                 name, content = demo_core.read_srt()
@@ -340,7 +367,7 @@ class Handler(BaseHTTPRequestHandler):
             if data is None:
                 return self._reject(400, "JSON 格式錯誤")
             folder = str(data.get("folder", "output"))
-            if folder not in ("input", "output", "models"):
+            if folder not in ("input", "output", "models", "logs"):
                 return self._send_json({"ok": False, "message": "不允許的資料夾"}, 400)
             try:
                 demo_core.open_folder(folder)
