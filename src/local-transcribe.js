@@ -65,6 +65,7 @@ async function ensureApiToken() {
 async function api(path, opts = {}, retried = false) {
   const token = await ensureApiToken();
   const headers = {
+    ...(opts.body ? { 'Content-Type': 'application/json' } : {}),
     ...(opts.headers || {}),
     [API_TOKEN_HEADER]: token,
   };
@@ -169,13 +170,13 @@ export function initLocalTranscribe({ onTranscriptReady, showToast, getMode }) {
         ${st.can_uninstall ? '<button type="button" class="btn bridge-uninstall" id="bridgeUninstall">解除安裝轉錄環境</button>' : ''}
         ${!st.token_ok ? '<button type="button" class="btn" id="bridgeOpenToken">前往取得 Token</button>' : ''}
         ${!st.token_ok ? '<button type="button" class="btn" id="bridgeSaveToken">儲存 Token</button>' : ''}
-        <button type="button" class="btn primary" id="bridgeTranscribe" ${st.ready_to_transcribe && selectedMp4 && !transcribeBusy ? '' : 'disabled'}>開始本機轉錄</button>
+        <button type="button" class="btn primary" id="bridgeTranscribe" ${selectedMp4 && !transcribeBusy ? '' : 'disabled'}>開始本機轉錄</button>
         <button type="button" class="btn bridge-cancel hidden" id="bridgeCancelTranscribe">取消轉錄</button>
         <button type="button" class="btn" id="bridgeImport" ${st.srt_files?.length ? '' : 'disabled'}>載入最新 SRT</button>
       </div>
       <div class="bridge-transcribe-status hidden" id="bridgeTranscribeStatus"></div>
       <pre class="bridge-log hidden" id="bridgeLog"></pre>
-      <p class="hint">2 小時 DEMO 約 1.5～3 小時，請接電源。轉錄中請保持「啟動轉錄助手」視窗開啟。</p>
+      <p class="hint">2 小時以上 DEMO：音軌抽出可能需 5～15 分鐘，轉錄約 1.5～3 小時，請接電源。轉錄中請保持「啟動轉錄助手」視窗開啟。</p>
     `;
 
     panel.querySelectorAll('.bridge-file').forEach((el) => {
@@ -225,9 +226,11 @@ export function initLocalTranscribe({ onTranscriptReady, showToast, getMode }) {
 
     panel.querySelector('#bridgeOpenToken')?.addEventListener('click', () => openTokenPage(showToast));
     panel.querySelector('#bridgeSaveToken')?.addEventListener('click', () => saveToken(showToast, refreshStatus));
-    panel.querySelector('#bridgeTranscribe')?.addEventListener('click', () =>
-      runTranscribe(onTranscriptReady, showToast, refreshStatus)
-    );
+    panel.querySelector('#bridgeTranscribe')?.addEventListener('click', () => {
+      const reason = transcribeBlockReason(st);
+      if (reason) return showToast(reason);
+      runTranscribe(onTranscriptReady, showToast, refreshStatus);
+    });
     panel.querySelector('#bridgeCancelTranscribe')?.addEventListener('click', () =>
       cancelTranscribe(showToast, refreshStatus)
     );
@@ -392,8 +395,7 @@ async function uploadMp4(file, showToast, refreshStatus) {
     });
     selectedMp4 = r.filename;
     setUploadUI({ state: 'ok', message: `✓ 已放入本機 input：${r.filename}（${fmtSize(file.size)}）` });
-    showToast(`已放入本機 input：${r.filename}`);
-    await refreshStatus();
+    showToast(`已放入本機 input：${r.filename} — 可按「開始本機轉錄」`);
     setTimeout(() => setUploadUI({ state: 'idle' }), 5000);
   } catch (err) {
     const msg = err?.message || '上傳失敗';
@@ -402,6 +404,7 @@ async function uploadMp4(file, showToast, refreshStatus) {
   } finally {
     uploadBusy = false;
     uploadXhr = null;
+    await refreshStatus();
   }
 }
 
@@ -432,9 +435,17 @@ function showLog(lines) {
   el.scrollTop = el.scrollHeight;
 }
 
+function transcribeBlockReason(st) {
+  if (!selectedMp4) return '請先選擇或放入 MP4';
+  if (!st?.python_ok) return '需要 Python 3.10+（請確認轉錄助手視窗已啟動）';
+  if (!st?.venv_ok || !st?.whisperx_ok) return '請先按「一鍵安裝」完成轉錄環境';
+  if (!st?.token_ok) return '請先設定 HF_TOKEN';
+  return '';
+}
+
 async function pollJob(onDone, { trackTranscribe = false } = {}) {
   clearInterval(pollTimer);
-  pollTimer = setInterval(async () => {
+  const tick = async () => {
     try {
       const j = await api('/api/job');
       showLog(j.logs);
@@ -457,7 +468,9 @@ async function pollJob(onDone, { trackTranscribe = false } = {}) {
       }
       onDone(false, { logs: ['[錯誤] 無法連線本機轉錄助手'] });
     }
-  }, 800);
+  };
+  await tick();
+  pollTimer = setInterval(tick, 800);
 }
 
 async function runSetup(showToast, refreshStatus) {
@@ -541,20 +554,27 @@ async function saveToken(showToast, refreshStatus) {
 
 async function runTranscribe(onTranscriptReady, showToast, refreshStatus) {
   if (!selectedMp4) return showToast('請先選擇 MP4');
-  const r = await api('/api/transcribe', { method: 'POST', body: JSON.stringify({ mp4: selectedMp4 }) });
-  if (!r.ok) return showToast(r.message);
-  transcribeBusy = true;
-  setTranscribeUI({ active: true });
-  showToast('本機轉錄中…');
-  pollJob(async (ok, j) => {
-    await refreshStatus();
-    if (j.exit_code === 130) {
-      showToast(j.cancel_uninstall ? '已取消轉錄並解除安裝' : '已取消轉錄');
-      return;
-    }
-    if (ok) await importLatest(onTranscriptReady, showToast);
-    else showToast('轉錄失敗，請查看記錄');
-  }, { trackTranscribe: true });
+  try {
+    const r = await api('/api/transcribe', { method: 'POST', body: JSON.stringify({ mp4: selectedMp4 }) });
+    if (!r.ok) return showToast(r.message || '無法開始轉錄');
+    transcribeBusy = true;
+    setTranscribeUI({ active: true, message: '正在啟動轉錄…' });
+    showLog(['正在啟動本機轉錄，請稍候…']);
+    showToast('本機轉錄中…（長影片音軌抽出可能需數分鐘才會出現進度）');
+    pollJob(async (ok, j) => {
+      await refreshStatus();
+      if (j.exit_code === 130) {
+        showToast(j.cancel_uninstall ? '已取消轉錄並解除安裝' : '已取消轉錄');
+        return;
+      }
+      if (ok) await importLatest(onTranscriptReady, showToast);
+      else showToast('轉錄失敗，請查看記錄');
+    }, { trackTranscribe: true });
+  } catch (err) {
+    transcribeBusy = false;
+    setTranscribeUI({ active: false });
+    showToast(err?.message || '無法連線本機轉錄助手');
+  }
 }
 
 async function importLatest(onTranscriptReady, showToast) {
