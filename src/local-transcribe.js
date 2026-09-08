@@ -136,7 +136,8 @@ function renderOfflineWizard(offlineEl) {
         </div>
       </li>
       <li>
-        <strong>③ 等待連線</strong>
+        <strong>③ 啟動助手並等待連線</strong>
+        <p class="hint">從開始選單開啟 <strong>「Call Coach 本機助手」</strong>，保持視窗開啟。若顯示「轉錄環境：未安裝」，請在該視窗按 <strong>「安裝／修復轉錄環境」</strong>（約 5～15 分鐘）。</p>
         <p class="hint"><span id="bridgeConnectStatus">正在偵測本機助手…</span></p>
       </li>
     </ol>

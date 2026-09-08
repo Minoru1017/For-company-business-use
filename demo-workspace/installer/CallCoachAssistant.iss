@@ -35,12 +35,15 @@ Name: "{group}\Call Coach 本機助手"; Filename: "{app}\CallCoachAssistant.exe
 Name: "{autodesktop}\Call Coach 本機助手"; Filename: "{app}\CallCoachAssistant.exe"; Tasks: desktopicon
 
 [Run]
-Filename: "{app}\runtime\python\python.exe"; Parameters: """{app}\installer\setup_env.py"""; StatusMsg: "正在安裝 WhisperX 轉錄環境（約 5～15 分鐘，請保持網路連線）..."; Flags: waituntilterminated; Description: "準備轉錄環境（WhisperX）"
 Filename: "{app}\CallCoachAssistant.exe"; Description: "啟動 Call Coach 本機助手"; Flags: nowait postinstall skipifsilent
 
 [Code]
+var
+  SetupEnvOk: Boolean;
+
 procedure InitializeWizard();
 begin
+  SetupEnvOk := False;
   WizardForm.WelcomeLabel1.Caption := '歡迎使用 Call Coach 本機助手安裝精靈';
   WizardForm.WelcomeLabel2.Caption :=
     '此精靈將安裝 Call Coach 本機轉錄助手到您的電腦。' + #13#10 + #13#10 +
@@ -52,4 +55,39 @@ end;
 function InitializeSetup(): Boolean;
 begin
   Result := True;
+end;
+
+procedure CurStepChanged(CurStep: TSetupStep);
+var
+  ResultCode: Integer;
+begin
+  if CurStep <> ssPostInstall then
+    Exit;
+
+  WizardForm.StatusLabel.Caption := '正在安裝 WhisperX 轉錄環境（約 5～15 分鐘，請保持網路連線）...';
+  WizardForm.ProgressGauge.Style := npbstMarquee;
+
+  if Exec(
+    ExpandConstant('{app}\runtime\python\python.exe'),
+    ExpandConstant('"{app}\installer\setup_env.py"'),
+    ExpandConstant('{app}'),
+    SW_SHOW,
+    ewWaitUntilTerminated,
+    ResultCode) then
+  begin
+    SetupEnvOk := (ResultCode = 0);
+    if not SetupEnvOk then
+      MsgBox(
+        '轉錄環境安裝未成功（常見原因：公司網路封鎖下載）。' + #13#10 + #13#10 +
+        '請安裝完成後從開始選單啟動「Call Coach 本機助手」，' + #13#10 +
+        '按「安裝／修復轉錄環境」重試。' + #13#10 + #13#10 +
+        '日誌：' + ExpandConstant('{app}\logs\install-setup.log'),
+        mbError, MB_OK);
+  end else
+  begin
+    SetupEnvOk := False;
+    MsgBox('無法啟動轉錄環境安裝程序。', mbError, MB_OK);
+  end;
+
+  WizardForm.ProgressGauge.Style := npbstNormal;
 end;
