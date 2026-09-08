@@ -127,6 +127,83 @@ def has_valid_token() -> bool:
     return bool(token) and token.startswith("hf_") and "在這裡" not in token
 
 
+def azure_config() -> tuple[str, str]:
+    env = load_env()
+    return env.get("AZURE_SPEECH_KEY", "").strip(), env.get("AZURE_SPEECH_REGION", "").strip()
+
+
+def has_azure_config() -> bool:
+    key, region = azure_config()
+    return bool(key) and bool(region) and "在這裡" not in key
+
+
+def save_azure_config(key: str, region: str) -> None:
+    key = key.strip()
+    region = region.strip()
+    if not key:
+        raise ValueError("請填入 Azure Speech 金鑰")
+    if not region:
+        raise ValueError("請填入 Azure 區域（例如 eastasia）")
+    env_file = ROOT / ".env"
+    if not env_file.exists():
+        shutil.copy(ROOT / ".env.example", env_file)
+    updates = {
+        "AZURE_SPEECH_KEY": key,
+        "AZURE_SPEECH_REGION": region,
+    }
+    lines: list[str] = []
+    seen: set[str] = set()
+    if env_file.exists():
+        for line in env_file.read_text(encoding="utf-8").splitlines():
+            key_name = line.partition("=")[0].strip()
+            if key_name in updates:
+                lines.append(f"{key_name}={updates[key_name]}")
+                seen.add(key_name)
+            else:
+                lines.append(line)
+    for name, value in updates.items():
+        if name not in seen:
+            lines.append(f"{name}={value}")
+    env_file.write_text("\n".join(lines) + "\n", encoding="utf-8")
+    try:
+        os.chmod(env_file, 0o600)
+    except OSError:
+        pass
+
+
+def extract_wav_from_mp4(
+    mp4: Path,
+    wav: Path,
+    ffmpeg: str,
+    log: LogFn,
+    env_vars: dict[str, str],
+    hooks: JobHooks | None,
+) -> int:
+    log("[1/2] 從 MP4 抽出音軌（長影片可能需 5～15 分鐘，請耐心等候）...")
+    return run_command(
+        [
+            ffmpeg,
+            "-y",
+            "-hide_banner",
+            "-loglevel",
+            "error",
+            "-i",
+            str(mp4),
+            "-vn",
+            "-ac",
+            "1",
+            "-ar",
+            "16000",
+            "-c:a",
+            "pcm_s16le",
+            str(wav),
+        ],
+        log=log,
+        env=env_vars,
+        hooks=hooks,
+    )
+
+
 def whisperx_cmd() -> list[str]:
     if WHISPERX.exists():
         return [str(WHISPERX)]
@@ -258,7 +335,10 @@ class EnvStatus:
     winget_ok: bool
     venv_ok: bool
     whisperx_ok: bool
+    faster_whisper_ok: bool
     token_ok: bool
+    azure_ok: bool
+    azure_region: str | None
     input_dir_ok: bool
     output_dir_ok: bool
     mp4_files: list[str] = field(default_factory=list)
@@ -275,7 +355,10 @@ class EnvStatus:
             "winget_ok": self.winget_ok,
             "venv_ok": self.venv_ok,
             "whisperx_ok": self.whisperx_ok,
+            "faster_whisper_ok": self.faster_whisper_ok,
             "token_ok": self.token_ok,
+            "azure_ok": self.azure_ok,
+            "azure_region": self.azure_region,
             "input_dir_ok": self.input_dir_ok,
             "output_dir_ok": self.output_dir_ok,
             "mp4_files": self.mp4_files,
@@ -290,7 +373,19 @@ class EnvStatus:
             "api_capabilities": ["setup", "full-setup", "install-ffmpeg"],
             "call_coach_url": CALL_COACH_URL,
             "hf_links": HF_LINKS,
+            "transcribe_modes": ["fast", "standard", "azure"],
         }
+
+
+def faster_whisper_installed() -> bool:
+    if not VENV_PY.exists():
+        return False
+    proc = subprocess.run(
+        [str(VENV_PY), "-c", "import faster_whisper"],
+        capture_output=True,
+        check=False,
+    )
+    return proc.returncode == 0
 
 
 def get_status() -> EnvStatus:
@@ -299,7 +394,10 @@ def get_status() -> EnvStatus:
     winget_ok = shutil.which("winget") is not None
     venv_ok = VENV_PY.exists()
     whisperx_ok = WHISPERX.exists() or (ROOT / ".venv" / "Scripts" / "whisperx.cmd").exists()
+    faster_whisper_ok = faster_whisper_installed()
     token_ok = has_valid_token()
+    azure_key, azure_region = azure_config()
+    azure_ok = has_azure_config()
     input_dir = ROOT / "input"
     output_dir = ROOT / "output"
     mp4s = [p.name for p in list_mp4_files()]
@@ -325,7 +423,10 @@ def get_status() -> EnvStatus:
         winget_ok=winget_ok,
         venv_ok=venv_ok,
         whisperx_ok=whisperx_ok,
+        faster_whisper_ok=faster_whisper_ok,
         token_ok=token_ok,
+        azure_ok=azure_ok,
+        azure_region=azure_region or None,
         input_dir_ok=input_dir.exists(),
         output_dir_ok=output_dir.exists(),
         mp4_files=mp4s,
@@ -424,8 +525,20 @@ def run_setup(log: LogFn = default_log) -> int:
         log("[提示] 詳細日誌已儲存至 logs/ 資料夾，請複製給技術支援")
         return code
 
-    log("安裝 whisperx（首次約 5～15 分鐘，請保持網路連線）...")
-    code = run_command([str(VENV_PY), "-m", "pip", "install", "whisperx", "huggingface_hub"], log=log)
+    log("安裝 whisperx、faster-whisper、azure 語音 SDK（首次約 5～15 分鐘，請保持網路連線）...")
+    code = run_command(
+        [
+            str(VENV_PY),
+            "-m",
+            "pip",
+            "install",
+            "whisperx",
+            "huggingface_hub",
+            "faster-whisper",
+            "azure-cognitiveservices-speech",
+        ],
+        log=log,
+    )
     if code != 0:
         log(f"[錯誤] WhisperX 安裝失敗（exit code {code}）")
         log("[常見原因] 公司網路封鎖 PyPI、Python 版本過新（請用 3.10～3.12）、磁碟空間不足")
@@ -523,8 +636,26 @@ def run_uninstall(remove_models: bool = False, log: LogFn = default_log) -> int:
     return 0
 
 
-def run_transcribe(mp4_name: str | None = None, log: LogFn = default_log, hooks: JobHooks | None = None) -> int:
+def run_transcribe(
+    mp4_name: str | None = None,
+    log: LogFn = default_log,
+    hooks: JobHooks | None = None,
+    mode: str = "standard",
+    cloud_consent: bool = False,
+) -> int:
+    from azure_transcribe import run_azure_transcribe
+    from transcribe_modes import MODE_AZURE, MODE_LABELS, model_for_mode, normalize_mode, validate_transcribe_request
+    from transcribe_parallel import (
+        chunk_count_for_duration,
+        estimate_transcribe_minutes,
+        max_parallel_workers,
+        probe_duration_seconds,
+        run_parallel_transcribe,
+    )
+
+    mode = normalize_mode(mode)
     log("=== 開始轉錄 DEMO ===")
+    log(f"模式：{MODE_LABELS[mode]}")
 
     if hooks and hooks.is_cancelled():
         log("[已取消] 轉錄已停止")
@@ -534,8 +665,13 @@ def run_transcribe(mp4_name: str | None = None, log: LogFn = default_log, hooks:
         log("[錯誤] 尚未安裝，請先按「一鍵安裝」")
         return 1
 
-    if not has_valid_token():
-        log("[錯誤] 請先設定 HF_TOKEN")
+    err = validate_transcribe_request(mode, cloud_consent, has_azure_config())
+    if err:
+        log(f"[錯誤] {err}")
+        return 1
+
+    if mode != MODE_AZURE and not has_valid_token():
+        log("[錯誤] 本機轉錄請先設定 HF_TOKEN")
         return 1
 
     env_vars = shell_env(cache_env())
@@ -555,14 +691,36 @@ def run_transcribe(mp4_name: str | None = None, log: LogFn = default_log, hooks:
     log(f"錄影檔: {mp4.name}")
     wav = mp4.with_suffix(".wav")
     ffmpeg = ffmpeg_exe()
+    whisper_model = model_for_mode(mode)
+    threads = transcribe_threads()
+    batch = transcribe_batch()
+    stem = Path(mp4.name).stem
+    final_srt = ROOT / "output" / f"{stem}.srt"
 
-    from transcribe_parallel import (
-        chunk_count_for_duration,
-        estimate_transcribe_minutes,
-        max_parallel_workers,
-        probe_duration_seconds,
-        run_parallel_transcribe,
-    )
+    if mode == MODE_AZURE:
+        if not ffmpeg:
+            log("[錯誤] Azure 轉錄需要 ffmpeg 抽出音軌")
+            return 1
+        code = extract_wav_from_mp4(mp4, wav, ffmpeg, log, env_vars, hooks)
+        if code == CANCEL_EXIT:
+            return code
+        if code != 0:
+            log("[錯誤] 音軌抽取失敗")
+            return code
+        azure_key, azure_region = azure_config()
+        code = run_azure_transcribe(
+            wav,
+            final_srt,
+            speech_key=azure_key,
+            speech_region=azure_region,
+            log=log,
+            cancel_check=lambda: bool(hooks and hooks.is_cancelled()),
+        )
+        if code == 0:
+            log("=== 轉錄完成 ===")
+            log(f"逐字稿: {final_srt.name}")
+            log(f"請上傳至 Call Coach: {CALL_COACH_URL}")
+        return code
 
     duration = probe_duration_seconds(mp4, ffmpeg, log) if ffmpeg else 0.0
     chunk_count = chunk_count_for_duration(duration) if duration > 0 else 1
@@ -573,33 +731,11 @@ def run_transcribe(mp4_name: str | None = None, log: LogFn = default_log, hooks:
         parallel = max_parallel_workers(chunk_count)
         eta_low, eta_high = estimate_transcribe_minutes(duration, chunk_count, parallel)
         log(
-            f"[1/2] 長影片分段模式：略過整段音軌抽出，直接從 MP4 切 {chunk_count} 段"
+            f"[1/2] Faster-Whisper 分段模式（{whisper_model}）：直接從 MP4 切 {chunk_count} 段"
             f"（預估總耗時約 {eta_low}～{eta_high} 分鐘）…"
         )
     elif ffmpeg:
-        log("[1/2] 從 MP4 抽出音軌（長影片可能需 5～15 分鐘，請耐心等候）...")
-        code = run_command(
-            [
-                ffmpeg,
-                "-y",
-                "-hide_banner",
-                "-loglevel",
-                "error",
-                "-i",
-                str(mp4),
-                "-vn",
-                "-ac",
-                "1",
-                "-ar",
-                "16000",
-                "-c:a",
-                "pcm_s16le",
-                str(wav),
-            ],
-            log=log,
-            env=env_vars,
-            hooks=hooks,
-        )
+        code = extract_wav_from_mp4(mp4, wav, ffmpeg, log, env_vars, hooks)
         if code == CANCEL_EXIT:
             return code
         if code != 0:
@@ -614,12 +750,8 @@ def run_transcribe(mp4_name: str | None = None, log: LogFn = default_log, hooks:
         return CANCEL_EXIT
 
     audio = mp4 if use_parallel else (wav if ffmpeg else mp4)
-    threads = transcribe_threads()
-    batch = transcribe_batch()
 
     if use_parallel:
-        stem = Path(mp4.name).stem
-        final_srt = ROOT / "output" / f"{stem}.srt"
         code = run_parallel_transcribe(
             audio=audio,
             chunk_count=chunk_count,
@@ -628,7 +760,7 @@ def run_transcribe(mp4_name: str | None = None, log: LogFn = default_log, hooks:
             output_dir=ROOT / "output",
             final_srt=final_srt,
             whisperx_cmd=whisperx_cmd(),
-            model=MODEL,
+            model=whisper_model,
             default_threads=threads,
             batch=batch,
             env_vars=env_vars,
@@ -644,29 +776,7 @@ def run_transcribe(mp4_name: str | None = None, log: LogFn = default_log, hooks:
         if use_parallel and code != 0:
             log("[提醒] 分段平行轉錄失敗，改為單檔完整轉錄（較慢但較穩定）…")
             if ffmpeg and not wav.exists():
-                log("[1/2] 從 MP4 抽出音軌…")
-                code = run_command(
-                    [
-                        ffmpeg,
-                        "-y",
-                        "-hide_banner",
-                        "-loglevel",
-                        "error",
-                        "-i",
-                        str(mp4),
-                        "-vn",
-                        "-ac",
-                        "1",
-                        "-ar",
-                        "16000",
-                        "-c:a",
-                        "pcm_s16le",
-                        str(wav),
-                    ],
-                    log=log,
-                    env=env_vars,
-                    hooks=hooks,
-                )
+                code = extract_wav_from_mp4(mp4, wav, ffmpeg, log, env_vars, hooks)
                 if code == CANCEL_EXIT:
                     return code
                 if code != 0:
@@ -676,17 +786,17 @@ def run_transcribe(mp4_name: str | None = None, log: LogFn = default_log, hooks:
         elif duration > 0 and chunk_count == 1:
             eta_low, eta_high = estimate_transcribe_minutes(duration, 1, 1)
             log(
-                f"[2/2] 音檔約 {int(duration // 60)} 分鐘，單段轉錄"
+                f"[2/2] Faster-Whisper {whisper_model}，音檔約 {int(duration // 60)} 分鐘"
                 f"（預估約 {eta_low}～{eta_high} 分鐘）…"
             )
         else:
-            log("[2/2] 開始轉錄（2 小時 DEMO 約 1.5～3 小時，請接電源）…")
+            log(f"[2/2] Faster-Whisper {whisper_model} 轉錄（2 小時 DEMO 約 1.5～3 小時，請接電源）…")
         code = run_command(
             whisperx_cmd()
             + [
                 str(audio),
                 "--model",
-                MODEL,
+                whisper_model,
                 "--language",
                 "zh",
                 "--device",

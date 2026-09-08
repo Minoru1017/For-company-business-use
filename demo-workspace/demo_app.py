@@ -334,12 +334,32 @@ class Handler(BaseHTTPRequestHandler):
                     mp4 = demo_core.safe_mp4_name(str(mp4))
                 except ValueError as e:
                     return self._reject(400, str(e))
+            mode = str(data.get("mode", "standard"))
+            cloud_consent = bool(data.get("cloud_consent"))
             hooks = JobHooks(JOB)
             ok, msg = run_job(
                 "transcribe",
-                lambda log: demo_core.run_transcribe(mp4, log, hooks=hooks),
+                lambda log: demo_core.run_transcribe(
+                    mp4,
+                    log,
+                    hooks=hooks,
+                    mode=mode,
+                    cloud_consent=cloud_consent,
+                ),
             )
             return self._send_json({"ok": ok, "message": msg})
+
+        if path == "/api/azure-config":
+            data = self._parse_json(body)
+            if data is None:
+                return self._reject(400, "JSON 格式錯誤")
+            key = str(data.get("key", "")).strip()
+            region = str(data.get("region", "")).strip()
+            try:
+                demo_core.save_azure_config(key, region)
+            except ValueError as e:
+                return self._send_json({"ok": False, "message": str(e)}, 400)
+            return self._send_json({"ok": True, "status": demo_core.get_status().to_dict()})
 
         if path == "/api/cancel":
             data = self._parse_json(body)
