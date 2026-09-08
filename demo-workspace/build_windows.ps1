@@ -38,6 +38,8 @@ $AppFiles = @(
     "demo_core.py",
     "srt_utils.py",
     "transcribe_parallel.py",
+    "transcribe_modes.py",
+    "azure_transcribe.py",
     "security.py",
     "upload_parse.py",
     "job_log.py",
