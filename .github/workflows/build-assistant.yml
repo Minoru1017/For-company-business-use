@@ -59,11 +59,12 @@ jobs:
 
             1. 下載 **`CallCoachAssistant-Windows.zip`**
             2. 解壓到任意資料夾
-            3. 雙擊 **`CallCoachAssistant.exe`**，保持視窗開啟
+            3. 雙擊 **`CallCoachAssistant.cmd`**（建議；支援中文路徑），保持視窗開啟
             4. 開啟 [Call Coach](https://minoru1017.github.io/For-company-business-use/) → **DEMO · 轉錄** → **完整環境安裝**
 
             ### 說明
 
+            - 若 `CallCoachAssistant.exe` 出現 python312.dll 錯誤，請改用 **`CallCoachAssistant.cmd`**
             - 首次「完整環境安裝」會下載 WhisperX 與模型（約 1～3 GB）
             - 建議另行安裝 ffmpeg（`winget install Gyan.FFmpeg`）以加速長影片轉錄
 
