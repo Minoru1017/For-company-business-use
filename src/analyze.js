@@ -3,6 +3,7 @@ import { DEEP_REASONING_META } from './purpose-reasoning.js';
 import { detectKeyMoments } from './key-moments.js';
 import { buildLayerHits, evaluateManualRules } from './manual-check.js';
 import { RULES } from './rules.js';
+import { formatReportText } from './report-format.js';
 import { isQuestion } from './speaker.js';
 import { escapeHTML, fmt } from './utils.js';
 
@@ -224,8 +225,25 @@ export function runAnalysis(segs) {
   const manualChecks = evaluateManualRules(segs, { layerHits, convergeSeg, sQuestions, purposeProfile });
   const keyMoments = detectKeyMoments(segs);
 
-  const strip = (h) => h.replace(/<[^>]+>/g, '');
-  const reportText = `【電訪分析報告】\n通話長度 ${fmt(totalDur)}｜客戶說話比例 ${Math.round(custRatio * 100)}%｜業務提問 ${sQuestions.length} 句\n六步驟：${RULES.steps.map((st) => `${st.name}${stepHit[st.key] ? '[●]' : '[○]'}`).join(' ')}\n五層挖掘：最深到 L${deepest}｜收斂驗證${convergeSeg ? '[●]' : '[○]'}\n目的類型：${purposeProfile.dominant ? purposeProfile.dominant.label : '未判斷'}｜手冊檢核：挖掘[${manualChecks.discovery.statusLabel}]｜強化[${manualChecks.amplification.statusLabel}]\n\n[WELL DONE] 做得好\n${good.map((g) => `・${strip(g)}`).join('\n')}\n\n[IMPROVE] 待加強\n${bad.map((b) => `・${strip(b)}`).join('\n')}\n\n[SCRIPTS] 建議怎麼聊\n${sug.map((s) => `・${strip(s)}`).join('\n')}`;
+  const reportText = formatReportText({
+    stats: {
+      totalDur,
+      custRatio,
+      sQuestions: sQuestions.length,
+      sCount: S.length,
+      cCount: C.length,
+    },
+    stepHit,
+    deepest,
+    convergeSeg,
+    purposeProfile,
+    manualChecks,
+    good,
+    bad,
+    sug,
+    fmt,
+    RULES,
+  });
 
   return {
     stats: { totalDur, custRatio, sQuestions: sQuestions.length, sCount: S.length, cCount: C.length, avgCustChars: C.length ? cChars / C.length : 0 },

@@ -36,6 +36,8 @@ Copy-Item "runtime\ffmpeg\*" "$Payload\runtime\ffmpeg" -Force
 $AppFiles = @(
     "demo_app.py",
     "demo_core.py",
+    "srt_utils.py",
+    "transcribe_parallel.py",
     "security.py",
     "upload_parse.py",
     "job_log.py",
