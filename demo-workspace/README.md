@@ -4,8 +4,10 @@
 
 ## 快速開始
 
+**必要條件：本機需安裝 [Python 3.10+](https://www.python.org/downloads/)**（Windows 安裝時請勾選 **Add python.exe to PATH**）。
+
 1. 下載整個 `demo-workspace` 資料夾到本機（例如 `C:\Users\經銷業務\demo-workspace`）
-2. 雙擊 **`start_call_coach.pyw`**（或 `start_call_coach.cmd`）
+2. 雙擊 **`start_call_coach.cmd`**（首次建議用這個；若缺 Python 會顯示安裝指引）或 `start_call_coach.pyw`
 3. 瀏覽器開啟 Call Coach → 選擇 **DEMO · 錄影轉逐字稿**
 4. 一鍵安裝 → 設定 Token → 放入 MP4 → 開始轉錄 → 自動進入分析
 
@@ -41,7 +43,8 @@ demo-workspace/
 
 ## 疑難排解
 
-- **Call Coach 顯示未連線**：確認 `start_call_coach.pyw` 視窗仍開啟，重新整理頁面
+- **雙擊 start_call_coach 沒反應**：多半未安裝 Python，或安裝時未勾選 PATH。請改雙擊 `start_call_coach.cmd` 查看錯誤；或安裝 [Python 3.10+](https://www.python.org/downloads/) 後重試
+- **Call Coach 顯示未連線**：確認 `start_call_coach` 視窗仍開啟，重新整理頁面
 - **大檔 MP4 很慢**：建議手動複製到 `input\`，再按「重新掃描」
 - **轉錄失敗**：查看 Call Coach 下方日誌；常見為 Token 未設定或 ffmpeg 未安裝（`winget install Gyan.FFmpeg`）
 - **解除安裝**：在 DEMO 模式按「解除安裝轉錄環境」
