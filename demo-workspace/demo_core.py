@@ -229,7 +229,7 @@ def get_status() -> EnvStatus:
     if output_dir.exists():
         srts = [p.name for p in sorted(output_dir.glob("*.srt"), key=lambda p: p.stat().st_mtime, reverse=True)]
 
-    ready = python_ok and venv_ok and whisperx_ok and token_ok and ffmpeg_ok and bool(mp4s)
+    ready = python_ok and venv_ok and whisperx_ok and token_ok and bool(mp4s)
 
     return EnvStatus(
         python_ok=python_ok,
@@ -384,7 +384,7 @@ def run_transcribe(mp4_name: str | None = None, log: LogFn = default_log, hooks:
 
     ffmpeg = shutil.which("ffmpeg")
     if ffmpeg:
-        log("[1/2] 從 MP4 抽出音軌（約 1～3 分鐘）...")
+        log("[1/2] 從 MP4 抽出音軌（長影片可能需 5～15 分鐘，請耐心等候）...")
         code = run_command(
             [
                 ffmpeg,
