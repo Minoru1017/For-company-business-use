@@ -47,8 +47,6 @@ begin
     '建議使用預設安裝位置 C:\CallCoachAssistant（避免中文使用者名稱路徑問題）。' + #13#10 + #13#10 +
     '安裝過程會自動準備 ffmpeg 與 WhisperX（需下載約 1～3 GB），請保持網路連線。' + #13#10 + #13#10 +
     '安裝完成後，請在 Call Coach 網頁的 DEMO 模式貼上 Hugging Face Token 即可開始轉錄。';
-  WizardForm.FinishedLabel.Caption := 'Call Coach 本機助手已安裝完成。';
-  WizardForm.FinishedLabel2.Caption := '請從開始選單啟動「Call Coach 本機助手」，並在 Call Coach DEMO 模式貼上 HF_TOKEN。';
 end;
 
 function InitializeSetup(): Boolean;
