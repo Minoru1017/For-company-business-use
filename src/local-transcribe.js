@@ -16,10 +16,14 @@ let transcribeBusy = false;
 let uploadXhr = null;
 let uploadStartAt = 0;
 let bridgeApiToken = null;
+let transcribeMode = localStorage.getItem(TRANSCRIBE_MODE_KEY) || 'standard';
+let cloudConsent = localStorage.getItem(CLOUD_CONSENT_KEY) === '1';
 
 const LARGE_FILE_MB = 80;
 const HF_TOKEN_URL = 'https://huggingface.co/settings/tokens';
 const TOKEN_PAGE_KEY = 'call_coach_hf_token_opened';
+const TRANSCRIBE_MODE_KEY = 'callCoachTranscribeMode';
+const CLOUD_CONSENT_KEY = 'callCoachCloudConsent';
 const REPO_ZIP_URL = 'https://github.com/Minoru1017/For-company-business-use/archive/refs/heads/main.zip';
 const ASSISTANT_SETUP_URL =
   'https://github.com/Minoru1017/For-company-business-use/releases/latest/download/CallCoachAssistant-Setup.exe';
@@ -261,12 +265,37 @@ export function initLocalTranscribe({ onTranscriptReady, showToast, getMode }) {
       <div class="bridge-upload-status hidden" id="bridgeUploadStatus"></div>
       <div class="bridge-progress hidden" id="bridgeProgress"><div id="bridgeProgressBar"></div></div>
       <button type="button" class="btn bridge-cancel hidden" id="bridgeCancelUpload">取消複製</button>
-      <input type="password" id="bridgeToken" placeholder="HF_TOKEN（hf_...，首次請貼上）" class="bridge-token" ${st.token_ok ? 'style="display:none"' : ''}>
+      <input type="password" id="bridgeToken" placeholder="HF_TOKEN（hf_...，本機轉錄用）" class="bridge-token" ${st.token_ok || transcribeMode === 'azure' ? 'style="display:none"' : ''}>
+      <div class="bridge-mode-panel">
+        <strong>轉錄模式</strong>
+        <label class="bridge-mode-option">
+          <input type="radio" name="bridgeMode" value="fast" ${transcribeMode === 'fast' ? 'checked' : ''}>
+          快速模式（Faster-Whisper small，本機）
+        </label>
+        <label class="bridge-mode-option">
+          <input type="radio" name="bridgeMode" value="standard" ${transcribeMode === 'standard' ? 'checked' : ''}>
+          標準模式（Faster-Whisper medium，本機）
+        </label>
+        <label class="bridge-mode-option">
+          <input type="radio" name="bridgeMode" value="azure" ${transcribeMode === 'azure' ? 'checked' : ''}>
+          Azure 雲端轉錄（zh-TW，較快）
+        </label>
+        <label class="bridge-consent ${transcribeMode === 'azure' ? '' : 'hidden'}" id="bridgeCloudConsentWrap">
+          <input type="checkbox" id="bridgeCloudConsent" ${cloudConsent ? 'checked' : ''}>
+          我了解 DEMO 音訊將上傳至 <strong>Microsoft Azure Speech</strong> 進行轉錄（僅用於產生逐字稿，不會存入 Call Coach 網站）
+        </label>
+        <div class="bridge-azure-config ${transcribeMode === 'azure' && !st.azure_ok ? '' : 'hidden'}" id="bridgeAzureConfig">
+          <input type="password" id="bridgeAzureKey" placeholder="Azure Speech 金鑰" class="bridge-token">
+          <input type="text" id="bridgeAzureRegion" placeholder="Azure 區域（例如 eastasia）" class="bridge-token" value="${escapeHTML(st.azure_region || 'eastasia')}">
+          <button type="button" class="btn" id="bridgeSaveAzure">儲存 Azure 設定</button>
+        </div>
+        <p class="hint" id="bridgeModeHint">${escapeHTML(modeHintText())}</p>
+      </div>
       <div class="bridge-actions">
         ${st.can_uninstall ? '<button type="button" class="btn bridge-uninstall" id="bridgeUninstall">解除安裝轉錄環境</button>' : ''}
         ${!st.token_ok ? '<button type="button" class="btn" id="bridgeOpenToken">前往取得 Token</button>' : ''}
         ${!st.token_ok ? '<button type="button" class="btn" id="bridgeSaveToken">儲存 Token</button>' : ''}
-        <button type="button" class="btn primary" id="bridgeTranscribe" ${selectedMp4 && !transcribeBusy ? '' : 'disabled'}>開始本機轉錄</button>
+        <button type="button" class="btn primary" id="bridgeTranscribe" ${selectedMp4 && !transcribeBusy ? '' : 'disabled'}>${escapeHTML(transcribeButtonLabel())}</button>
         <button type="button" class="btn bridge-cancel hidden" id="bridgeCancelTranscribe">取消轉錄</button>
         <button type="button" class="btn" id="bridgeImport" ${st.srt_files?.length ? '' : 'disabled'}>載入最新 SRT</button>
       </div>
@@ -283,7 +312,7 @@ export function initLocalTranscribe({ onTranscriptReady, showToast, getMode }) {
         <p class="bridge-log-hint hidden" id="bridgeLogHint">安裝失敗時，請複製或下載日誌傳給技術支援。</p>
         <pre class="bridge-log" id="bridgeLog"></pre>
       </div>
-      <p class="hint">本機 CPU 轉錄（含發言者辨識）約為影片長度的 1.5～2.5 倍：48 分鐘 DEMO 常需 50～90 分鐘。長影片會自動分段平行處理並顯示預估時間；請接電源並保持助手視窗開啟。若要加速可設定環境變數 <code>CALL_COACH_MODEL=small</code>（略降準確度）。</p>
+      <p class="hint">本機模式使用 Faster-Whisper（WhisperX），音訊不上雲。若仍覺太慢，可選 Azure 雲端並勾選同意。請接電源並保持助手視窗開啟。</p>
     `;
 
     panel.querySelectorAll('.bridge-file').forEach((el) => {
@@ -339,6 +368,21 @@ export function initLocalTranscribe({ onTranscriptReady, showToast, getMode }) {
 
     panel.querySelector('#bridgeOpenToken')?.addEventListener('click', () => openTokenPage(showToast));
     panel.querySelector('#bridgeSaveToken')?.addEventListener('click', () => saveToken(showToast, refreshStatus));
+    panel.querySelectorAll('input[name="bridgeMode"]').forEach((el) => {
+      el.addEventListener('change', () => {
+        transcribeMode = el.value;
+        localStorage.setItem(TRANSCRIBE_MODE_KEY, transcribeMode);
+        refreshStatus();
+      });
+    });
+    panel.querySelector('#bridgeCloudConsent')?.addEventListener('change', (e) => {
+      cloudConsent = e.target.checked;
+      localStorage.setItem(CLOUD_CONSENT_KEY, cloudConsent ? '1' : '0');
+      refreshStatus();
+    });
+    panel.querySelector('#bridgeSaveAzure')?.addEventListener('click', () =>
+      saveAzureConfig(showToast, refreshStatus)
+    );
     panel.querySelector('#bridgeTranscribe')?.addEventListener('click', () => {
       const reason = transcribeBlockReason(st);
       if (reason) return showToast(reason);
@@ -604,8 +648,29 @@ function transcribeBlockReason(st) {
   if (!selectedMp4) return '請先選擇或放入 MP4';
   if (!st?.python_ok) return '需要 Python 3.10+（請確認轉錄助手視窗已啟動）';
   if (!st?.venv_ok || !st?.whisperx_ok) return '請先按「一鍵安裝」完成轉錄環境';
+  if (transcribeMode === 'azure') {
+    if (!cloudConsent) return '使用 Azure 雲端轉錄前，請勾選知情同意';
+    if (!st?.azure_ok) return '請先設定 Azure Speech 金鑰與區域';
+    return '';
+  }
   if (!st?.token_ok) return '請先設定 HF_TOKEN';
   return '';
+}
+
+function transcribeButtonLabel() {
+  if (transcribeMode === 'azure') return '開始 Azure 雲端轉錄';
+  if (transcribeMode === 'fast') return '開始本機轉錄（快速）';
+  return '開始本機轉錄（標準）';
+}
+
+function modeHintText() {
+  if (transcribeMode === 'azure') {
+    return 'Azure 雲端模式：音訊將上傳至 Microsoft Azure Speech（zh-TW）轉錄，通常比本機 CPU 快。請確認已勾選知情同意。';
+  }
+  if (transcribeMode === 'fast') {
+    return '快速模式：Faster-Whisper small，本機 CPU 轉錄，速度較快、準確度略降。48 分鐘 DEMO 常需 35～60 分鐘。';
+  }
+  return '標準模式：Faster-Whisper medium，本機 CPU 轉錄，準確度較佳。48 分鐘 DEMO 常需 50～90 分鐘。長影片會自動分段平行處理。';
 }
 
 function lastErrorLine(logs) {
@@ -805,15 +870,41 @@ async function saveToken(showToast, refreshStatus) {
   refreshStatus();
 }
 
+async function saveAzureConfig(showToast, refreshStatus) {
+  const key = document.getElementById('bridgeAzureKey')?.value?.trim();
+  const region = document.getElementById('bridgeAzureRegion')?.value?.trim();
+  if (!key || !region) return showToast('請填入 Azure 金鑰與區域');
+  const r = await api('/api/azure-config', {
+    method: 'POST',
+    body: JSON.stringify({ key, region }),
+  });
+  if (!r.ok) return showToast(r.message || '儲存失敗');
+  showToast('Azure 設定已儲存');
+  refreshStatus();
+}
+
 async function runTranscribe(onTranscriptReady, showToast, refreshStatus) {
   if (!selectedMp4) return showToast('請先選擇 MP4');
+  const reason = transcribeBlockReason(await checkLocalBridge());
+  if (reason) return showToast(reason);
   try {
-    const r = await api('/api/transcribe', { method: 'POST', body: JSON.stringify({ mp4: selectedMp4 }) });
+    const r = await api('/api/transcribe', {
+      method: 'POST',
+      body: JSON.stringify({
+        mp4: selectedMp4,
+        mode: transcribeMode,
+        cloud_consent: cloudConsent,
+      }),
+    });
     if (!r.ok) return showToast(r.message || '無法開始轉錄');
     transcribeBusy = true;
     setTranscribeUI({ active: true, message: '正在啟動轉錄…' });
     showLog(['正在啟動本機轉錄，請稍候…']);
-    showToast('本機轉錄中…（長影片音軌抽出可能需數分鐘才會出現進度）');
+    showToast(
+      transcribeMode === 'azure'
+        ? 'Azure 雲端轉錄中…（音訊上傳至 Microsoft Azure）'
+        : '本機轉錄中…（長影片音軌抽出可能需數分鐘才會出現進度）'
+    );
     pollJob(async (ok, j) => {
       await refreshStatus();
       if (j.exit_code === 130) {

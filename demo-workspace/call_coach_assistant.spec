@@ -17,6 +17,8 @@ a = Analysis(
         "security",
         "upload_parse",
         "transcribe_parallel",
+        "transcribe_modes",
+        "azure_transcribe",
         "srt_utils",
         "tkinter",
     ],

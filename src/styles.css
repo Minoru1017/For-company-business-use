@@ -150,6 +150,13 @@ h2 { font-family:var(--disp); font-size:.98rem; margin-bottom:12px; color:var(--
 .bridge-transcribe-status { font-size: .82rem; padding: 10px 12px; border-radius: 8px; margin-bottom: 8px; line-height: 1.5; }
 .bridge-transcribe-status.busy { background: #1f1a10; border: 1px solid #5d4d1e; color: var(--warn); }
 .bridge-cancel { margin-bottom: 10px; border-color: #5d2f28; color: var(--bad); }
+.bridge-mode-panel { background: #141414; border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; margin-bottom: 12px; }
+.bridge-mode-panel strong { display: block; margin-bottom: 8px; font-size: .88rem; }
+.bridge-mode-option { display: block; margin: 6px 0; font-size: .82rem; color: var(--text); cursor: pointer; }
+.bridge-mode-option input { margin-right: 8px; }
+.bridge-consent { display: block; margin-top: 10px; padding: 10px 12px; background: #1f1a10; border: 1px solid #5d4d1e; border-radius: 8px; font-size: .78rem; line-height: 1.5; color: var(--warn); cursor: pointer; }
+.bridge-consent input { margin-right: 8px; vertical-align: top; margin-top: 2px; }
+.bridge-azure-config { margin-top: 10px; }
 .bridge-cancel:hover { border-color: var(--bad); }
 .bridge-uninstall { border-color: #5d2f28; color: var(--muted); }
 .bridge-uninstall:hover { border-color: var(--bad); color: var(--bad); }
