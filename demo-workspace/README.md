@@ -4,17 +4,20 @@
 
 ## 快速開始
 
+**Windows 首次使用**：雙擊 **`setup_all.cmd`**，會自動安裝 Python 3.12 + ffmpeg（需 winget）並啟動助手。
+
 1. 下載整個 `demo-workspace` 資料夾到本機（例如 `C:\Users\經銷業務\demo-workspace`）
-2. 雙擊 **`start_call_coach.pyw`**（或 `start_call_coach.cmd`）
+2. 雙擊 **`setup_all.cmd`**（首次）或 **`start_call_coach.cmd`**（已裝 Python）
 3. 瀏覽器開啟 Call Coach → 選擇 **DEMO · 錄影轉逐字稿**
-4. 一鍵安裝 → 設定 Token → 放入 MP4 → 開始轉錄 → 自動進入分析
+4. **完整環境安裝** → 設定 Token → 放入 MP4 → 開始轉錄 → 自動進入分析
 
 ## 資料夾結構
 
 ```
 demo-workspace/
-├── start_call_coach.pyw   ← 啟動（推薦）
-├── start_call_coach.cmd
+├── setup_all.cmd          ← 一鍵安裝 Python/ffmpeg 並啟動（Windows 首次推薦）
+├── start_call_coach.cmd   ← 啟動（已裝 Python 時）
+├── start_call_coach.pyw
 ├── demo_app.py            ← 本機 API（127.0.0.1:8765）
 ├── demo_core.py           ← 安裝 / 轉錄 / 解除安裝邏輯
 ├── input/                 ← 放入 MP4
@@ -41,7 +44,8 @@ demo-workspace/
 
 ## 疑難排解
 
-- **Call Coach 顯示未連線**：確認 `start_call_coach.pyw` 視窗仍開啟，重新整理頁面
+- **雙擊 start_call_coach 沒反應**：改用 `setup_all.cmd` 或 `start_call_coach.cmd`（命令指令檔，不是 Python 圖示的 .pyw）
+- **Call Coach 顯示未連線**：確認助手黑窗仍開啟，或重新雙擊 `setup_all.cmd`
 - **大檔 MP4 很慢**：建議手動複製到 `input\`，再按「重新掃描」
 - **轉錄失敗**：查看 Call Coach 下方日誌；常見為 Token 未設定或 ffmpeg 未安裝（`winget install Gyan.FFmpeg`）
 - **解除安裝**：在 DEMO 模式按「解除安裝轉錄環境」

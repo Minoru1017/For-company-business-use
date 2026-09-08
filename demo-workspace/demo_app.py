@@ -289,6 +289,14 @@ class Handler(BaseHTTPRequestHandler):
             ok, msg = run_job("setup", demo_core.run_setup)
             return self._send_json({"ok": ok, "message": msg})
 
+        if path == "/api/install-ffmpeg":
+            ok, msg = run_job("install-ffmpeg", demo_core.run_install_ffmpeg)
+            return self._send_json({"ok": ok, "message": msg})
+
+        if path == "/api/full-setup":
+            ok, msg = run_job("full-setup", demo_core.run_full_setup)
+            return self._send_json({"ok": ok, "message": msg})
+
         if path == "/api/transcribe":
             data = self._parse_json(body)
             if data is None:

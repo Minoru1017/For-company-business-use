@@ -9,6 +9,7 @@ const API_TOKEN_HEADER = 'X-Call-Coach-Token';
 
 let pollTimer = null;
 let refreshTimer = null;
+let offlinePollTimer = null;
 let selectedMp4 = null;
 let uploadBusy = false;
 let transcribeBusy = false;
@@ -19,6 +20,7 @@ let bridgeApiToken = null;
 const LARGE_FILE_MB = 80;
 const HF_TOKEN_URL = 'https://huggingface.co/settings/tokens';
 const TOKEN_PAGE_KEY = 'call_coach_hf_token_opened';
+const REPO_ZIP_URL = 'https://github.com/Minoru1017/For-company-business-use/archive/refs/heads/main.zip';
 
 function fmtSize(bytes) {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -92,6 +94,51 @@ export async function checkLocalBridge() {
   }
 }
 
+function needsFullSetup(st) {
+  return !st.ffmpeg_ok || !st.venv_ok || !st.whisperx_ok;
+}
+
+function renderOfflineWizard(offlineEl) {
+  offlineEl.innerHTML = `
+    <p><strong>尚未連線本機轉錄助手</strong></p>
+    <p class="hint">首次使用請依下列步驟；助手啟動後此區會自動消失。</p>
+    <ol class="setup-wizard-steps">
+      <li>
+        <strong>① 下載 demo-workspace</strong>
+        <p class="hint">下載專案 ZIP，解壓後找到 <code>demo-workspace</code> 資料夾放到本機（例如桌面）。</p>
+        <div class="bridge-actions">
+          <a class="btn" href="${REPO_ZIP_URL}" target="_blank" rel="noopener noreferrer">下載專案 ZIP</a>
+        </div>
+      </li>
+      <li>
+        <strong>② 一鍵安裝並啟動（Windows）</strong>
+        <p class="hint">在 <code>demo-workspace</code> 內雙擊 <code>setup_all.cmd</code> — 會自動安裝 Python、ffmpeg 並啟動助手。<strong>黑窗請保持開啟。</strong></p>
+        <p class="hint">若已裝 Python，可改雙擊 <code>start_call_coach.cmd</code>（命令指令檔，不是 Python 圖示的 .pyw）。</p>
+      </li>
+      <li>
+        <strong>③ 等待連線</strong>
+        <p class="hint"><span id="bridgeConnectStatus">正在偵測本機助手…</span></p>
+      </li>
+    </ol>
+    <p class="hint">連線成功後，在下方按「完整環境安裝」即可一鍵安裝 ffmpeg 與 WhisperX。</p>
+  `;
+}
+
+function scheduleOfflinePoll(refreshStatus) {
+  if (offlinePollTimer) clearInterval(offlinePollTimer);
+  offlinePollTimer = setInterval(async () => {
+    const st = await checkLocalBridge();
+    if (st) {
+      clearInterval(offlinePollTimer);
+      offlinePollTimer = null;
+      await refreshStatus();
+      return;
+    }
+    const el = document.getElementById('bridgeConnectStatus');
+    if (el) el.textContent = `正在偵測本機助手…（${new Date().toLocaleTimeString()}）`;
+  }, 2500);
+}
+
 export function initLocalTranscribe({ onTranscriptReady, showToast, getMode }) {
   const panel = document.getElementById('localBridgePanel');
   const offline = document.getElementById('demoOfflineHint');
@@ -102,8 +149,18 @@ export function initLocalTranscribe({ onTranscriptReady, showToast, getMode }) {
     const inDemo = getMode?.() === 'demo';
     if (!st) {
       panel.hidden = true;
-      if (offline) offline.hidden = !inDemo;
+      if (offline) {
+        offline.hidden = !inDemo;
+        if (inDemo) {
+          renderOfflineWizard(offline);
+          scheduleOfflinePoll(refreshStatus);
+        }
+      }
       return null;
+    }
+    if (offlinePollTimer) {
+      clearInterval(offlinePollTimer);
+      offlinePollTimer = null;
     }
     if (offline) offline.hidden = true;
     panel.hidden = false;
@@ -140,8 +197,22 @@ export function initLocalTranscribe({ onTranscriptReady, showToast, getMode }) {
           .join('')
       : '<p class="hint">請拖曳 MP4 到下方，或放到 demo-workspace\\input\\</p>';
 
+    const setupBanner = needsFullSetup(st)
+      ? `
+      <div class="bridge-setup-banner">
+        <strong>首次設定 — 一鍵安裝轉錄環境</strong>
+        <p class="hint">會自動安裝 ffmpeg（若缺少）與 WhisperX 轉錄環境，首次約 5～15 分鐘。完成後再貼上 HF_TOKEN。</p>
+        <div class="bridge-actions">
+          <button type="button" class="btn primary" id="bridgeFullSetup">完整環境安裝</button>
+          ${!st.ffmpeg_ok && st.winget_ok ? '<button type="button" class="btn" id="bridgeInstallFfmpeg">僅安裝 ffmpeg</button>' : ''}
+          ${!st.venv_ok || !st.whisperx_ok ? '<button type="button" class="btn" id="bridgeSetup">僅安裝 WhisperX</button>' : ''}
+        </div>
+      </div>`
+      : '';
+
     panel.innerHTML = `
       <p class="bridge-lead">錄影在本機轉成逐字稿後，會<strong>自動載入</strong>到上方分析區，不需手動上傳 SRT。</p>
+      ${setupBanner}
       <ul class="bridge-checks">${checkHtml}</ul>
 
       <div class="bridge-manual">
@@ -166,7 +237,6 @@ export function initLocalTranscribe({ onTranscriptReady, showToast, getMode }) {
       <button type="button" class="btn bridge-cancel hidden" id="bridgeCancelUpload">取消複製</button>
       <input type="password" id="bridgeToken" placeholder="HF_TOKEN（hf_...，首次請貼上）" class="bridge-token" ${st.token_ok ? 'style="display:none"' : ''}>
       <div class="bridge-actions">
-        ${!st.venv_ok || !st.whisperx_ok ? '<button type="button" class="btn primary" id="bridgeSetup">一鍵安裝</button>' : ''}
         ${st.can_uninstall ? '<button type="button" class="btn bridge-uninstall" id="bridgeUninstall">解除安裝轉錄環境</button>' : ''}
         ${!st.token_ok ? '<button type="button" class="btn" id="bridgeOpenToken">前往取得 Token</button>' : ''}
         ${!st.token_ok ? '<button type="button" class="btn" id="bridgeSaveToken">儲存 Token</button>' : ''}
@@ -218,6 +288,12 @@ export function initLocalTranscribe({ onTranscriptReady, showToast, getMode }) {
       await refreshStatus();
       showToast(selectedMp4 ? `已找到：${selectedMp4}` : '尚未找到 MP4，請確認已複製到 input');
     });
+    panel.querySelector('#bridgeFullSetup')?.addEventListener('click', () =>
+      runFullSetup(showToast, refreshStatus)
+    );
+    panel.querySelector('#bridgeInstallFfmpeg')?.addEventListener('click', () =>
+      runInstallFfmpeg(showToast, refreshStatus)
+    );
     panel.querySelector('#bridgeSetup')?.addEventListener('click', () => runSetup(showToast, refreshStatus));
     panel.querySelector('#bridgeUninstall')?.addEventListener('click', () => runUninstall(showToast, refreshStatus));
     panel.querySelector('#bridgeCancelUpload')?.addEventListener('click', () => {
@@ -473,16 +549,39 @@ async function pollJob(onDone, { trackTranscribe = false } = {}) {
   pollTimer = setInterval(tick, 800);
 }
 
-async function runSetup(showToast, refreshStatus) {
-  const r = await api('/api/setup', { method: 'POST' });
-  if (!r.ok) return showToast(r.message);
-  showToast('開始安裝…');
-  pollJob((ok) => {
-    showToast(ok ? '安裝完成' : '安裝失敗');
-    refreshStatus().then((st) => {
-      if (ok && st && !st.token_ok) openTokenPage(showToast);
+async function runSetupJob(endpoint, startMsg, doneMsg, showToast, refreshStatus) {
+  try {
+    const r = await api(endpoint, { method: 'POST' });
+    if (!r.ok) return showToast(r.message || '無法開始安裝');
+    showToast(startMsg);
+    showLog(['安裝進行中…']);
+    pollJob((ok) => {
+      showToast(ok ? doneMsg : '安裝失敗，請查看記錄');
+      refreshStatus().then((st) => {
+        if (ok && st && !st.token_ok) openTokenPage(showToast);
+      });
     });
-  });
+  } catch (err) {
+    showToast(err?.message || '無法連線本機轉錄助手');
+  }
+}
+
+async function runSetup(showToast, refreshStatus) {
+  return runSetupJob('/api/setup', '開始安裝 WhisperX…', 'WhisperX 安裝完成', showToast, refreshStatus);
+}
+
+async function runInstallFfmpeg(showToast, refreshStatus) {
+  return runSetupJob('/api/install-ffmpeg', '開始安裝 ffmpeg…', 'ffmpeg 安裝完成', showToast, refreshStatus);
+}
+
+async function runFullSetup(showToast, refreshStatus) {
+  return runSetupJob(
+    '/api/full-setup',
+    '開始完整環境安裝（ffmpeg + WhisperX）…',
+    '完整環境安裝完成',
+    showToast,
+    refreshStatus
+  );
 }
 
 async function cancelTranscribe(showToast, refreshStatus) {

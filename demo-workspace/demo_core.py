@@ -185,6 +185,7 @@ class EnvStatus:
     python_ok: bool
     python_version: str
     ffmpeg_ok: bool
+    winget_ok: bool
     venv_ok: bool
     whisperx_ok: bool
     token_ok: bool
@@ -199,6 +200,7 @@ class EnvStatus:
             "python_ok": self.python_ok,
             "python_version": self.python_version,
             "ffmpeg_ok": self.ffmpeg_ok,
+            "winget_ok": self.winget_ok,
             "venv_ok": self.venv_ok,
             "whisperx_ok": self.whisperx_ok,
             "token_ok": self.token_ok,
@@ -219,6 +221,7 @@ def get_status() -> EnvStatus:
     ver = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
     python_ok = sys.version_info >= REQUIRED_PY
     ffmpeg_ok = shutil.which("ffmpeg") is not None
+    winget_ok = shutil.which("winget") is not None
     venv_ok = VENV_PY.exists()
     whisperx_ok = WHISPERX.exists() or (ROOT / ".venv" / "Scripts" / "whisperx.cmd").exists()
     token_ok = has_valid_token()
@@ -235,6 +238,7 @@ def get_status() -> EnvStatus:
         python_ok=python_ok,
         python_version=ver,
         ffmpeg_ok=ffmpeg_ok,
+        winget_ok=winget_ok,
         venv_ok=venv_ok,
         whisperx_ok=whisperx_ok,
         token_ok=token_ok,
@@ -322,6 +326,53 @@ def run_setup(log: LogFn = default_log) -> int:
 
     log("=== 安裝完成 ===")
     return 0
+
+
+def run_install_ffmpeg(log: LogFn = default_log) -> int:
+    if shutil.which("ffmpeg"):
+        log("ffmpeg 已安裝")
+        return 0
+
+    winget = shutil.which("winget")
+    if not winget:
+        log("[錯誤] 找不到 winget，請手動安裝 ffmpeg：")
+        log("  winget install Gyan.FFmpeg")
+        log("或至 https://ffmpeg.org/download.html 下載")
+        return 1
+
+    log("=== 開始安裝 ffmpeg（透過 winget）===")
+    code = run_command(
+        [
+            winget,
+            "install",
+            "-e",
+            "--id",
+            "Gyan.FFmpeg",
+            "--accept-package-agreements",
+            "--accept-source-agreements",
+        ],
+        log=log,
+    )
+    if code != 0:
+        log("[錯誤] ffmpeg 安裝失敗")
+        return code
+
+    if shutil.which("ffmpeg"):
+        log("=== ffmpeg 安裝完成 ===")
+        return 0
+
+    log("[提醒] winget 已執行，但目前仍找不到 ffmpeg。")
+    log("請關閉並重新開啟轉錄助手視窗，或重新開機後再試。")
+    return 0
+
+
+def run_full_setup(log: LogFn = default_log) -> int:
+    log("=== 完整環境安裝（ffmpeg + 轉錄工具）===")
+    if not shutil.which("ffmpeg"):
+        code = run_install_ffmpeg(log=log)
+        if code != 0:
+            return code
+    return run_setup(log=log)
 
 
 def run_uninstall(remove_models: bool = False, log: LogFn = default_log) -> int:
