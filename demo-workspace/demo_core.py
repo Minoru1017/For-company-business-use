@@ -255,6 +255,7 @@ class EnvStatus:
             "input_folder": str(ROOT / "input"),
             "packaged": is_frozen(),
             "can_uninstall": self.venv_ok,
+            "api_capabilities": ["setup", "full-setup", "install-ffmpeg"],
             "call_coach_url": CALL_COACH_URL,
             "hf_links": HF_LINKS,
         }
@@ -342,9 +343,34 @@ def run_command(
             hooks.register_proc(None)
 
 
+def create_venv(log: LogFn = default_log) -> int:
+    """Create .venv using venv or virtualenv (embed Python lacks venv)."""
+    py = base_python_exe()
+    venv_path = ROOT / ".venv"
+    if VENV_PY.exists():
+        return 0
+
+    log(f"建立虛擬環境 .venv（使用 {py.name}）...")
+    code = run_command([str(py), "-m", "venv", str(venv_path)], log=log)
+    if code == 0 and VENV_PY.exists():
+        return 0
+
+    log("[提醒] 內建 Python 不含 venv 模組，改用 virtualenv…")
+    code = run_command([str(py), "-m", "pip", "install", "virtualenv"], log=log)
+    if code != 0:
+        log(f"[錯誤] 無法安裝 virtualenv（exit code {code}）")
+        return code
+
+    if venv_path.exists():
+        shutil.rmtree(venv_path, ignore_errors=True)
+    code = run_command([str(py), "-m", "virtualenv", str(venv_path)], log=log)
+    if code != 0:
+        log(f"[錯誤] 建立 .venv 失敗（exit code {code}）")
+    return code
+
+
 def run_setup(log: LogFn = default_log) -> int:
     log("=== 開始安裝轉錄工具 ===")
-    py = base_python_exe()
     if is_frozen() and not PORTABLE_PY.is_file():
         log("[錯誤] 找不到內建 Python（runtime\\python\\python.exe）")
         log("請重新下載完整 CallCoachAssistant-Windows.zip 並解壓。")
@@ -356,12 +382,9 @@ def run_setup(log: LogFn = default_log) -> int:
 
     ensure_workspace_files(log)
 
-    if not VENV_PY.exists():
-        log(f"建立虛擬環境 .venv（使用 {py.name}）...")
-        code = run_command([str(py), "-m", "venv", str(ROOT / ".venv")], log=log)
-        if code != 0:
-            log(f"[錯誤] 建立 .venv 失敗（exit code {code}）")
-            return code
+    code = create_venv(log=log)
+    if code != 0:
+        return code
 
     code = run_command([str(VENV_PY), "-m", "pip", "install", "-U", "pip", "wheel"], log=log)
     if code != 0:

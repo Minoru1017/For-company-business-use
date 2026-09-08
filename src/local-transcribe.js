@@ -66,6 +66,17 @@ async function ensureApiToken() {
   return bridgeApiToken;
 }
 
+function bridgeFetchError(err) {
+  const msg = String(err?.message || '');
+  if (/failed to fetch|networkerror|network error|load failed/i.test(msg)) {
+    return (
+      '無法連線本機轉錄助手。請確認：① CallCoachAssistant.cmd 黑窗仍開啟 ' +
+      '② 網頁在 DEMO 模式 ③ 已下載最新版助手（Releases）'
+    );
+  }
+  return msg || '無法連線本機轉錄助手';
+}
+
 async function api(path, opts = {}, retried = false) {
   const token = await ensureApiToken();
   const headers = {
@@ -651,7 +662,7 @@ async function runSetupJob(endpoint, startMsg, doneMsg, showToast, refreshStatus
       { trackSetup: true }
     );
   } catch (err) {
-    showToast(err?.message || '無法連線本機轉錄助手');
+    showToast(bridgeFetchError(err));
   }
 }
 
@@ -664,13 +675,33 @@ async function runInstallFfmpeg(showToast, refreshStatus) {
 }
 
 async function runFullSetup(showToast, refreshStatus) {
-  return runSetupJob(
-    '/api/full-setup',
-    '開始完整環境安裝（ffmpeg + WhisperX）…',
-    '完整環境安裝完成',
-    showToast,
-    refreshStatus
-  );
+  try {
+    const r = await api('/api/full-setup', { method: 'POST' });
+    if (!r.ok) return showToast(r.message || '無法開始安裝');
+    showToast('開始完整環境安裝（ffmpeg + WhisperX）…');
+    showLog(['安裝啟動中…'], { title: '安裝進行中…' });
+    pollJob(
+      (ok, job) => {
+        showLog(job.logs || [], {
+          failed: !ok,
+          title: ok ? '安裝完成' : '安裝失敗 — 請複製日誌',
+        });
+        showToast(
+          ok ? '完整環境安裝完成' : '安裝失敗 — 請查看下方記錄，按「複製日誌」傳給技術支援'
+        );
+        refreshStatus().then((st) => {
+          if (ok && st && !st.token_ok) openTokenPage(showToast);
+        });
+      },
+      { trackSetup: true }
+    );
+  } catch (err) {
+    if (err?.status === 404) {
+      showToast('助手版本較舊，改為分步安裝 WhisperX…');
+      return runSetup(showToast, refreshStatus);
+    }
+    showToast(bridgeFetchError(err));
+  }
 }
 
 async function cancelTranscribe(showToast, refreshStatus) {

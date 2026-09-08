@@ -406,7 +406,7 @@ class Handler(BaseHTTPRequestHandler):
             )
             return self._send_json({"ok": ok, "message": msg})
 
-        self.send_error(404)
+        return self._reject(404, "未知的 API")
 
     def _handle_upload(self) -> None:
         if JOB.running:
