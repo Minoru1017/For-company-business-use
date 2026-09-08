@@ -151,6 +151,7 @@ def run_parallel_transcribe(
     if chunk_dir.exists():
         shutil.rmtree(chunk_dir, ignore_errors=True)
 
+    parallel = max_parallel_workers(chunk_count)
     log(
         f"[2/2] 分段平行轉錄：{chunk_count} 段、最多 {parallel} 段同時跑"
         f"（16GB 記憶體建議上限 {DEFAULT_MAX_PARALLEL}）…"
@@ -223,6 +224,7 @@ def run_parallel_transcribe(
 
     results.sort(key=lambda x: x[0])
     merge_inputs = [(r[2].read_text(encoding="utf-8"), r[1]) for r in results]
+    final_srt.parent.mkdir(parents=True, exist_ok=True)
     final_srt.write_text(merge_srt_parts(merge_inputs), encoding="utf-8")
     log(f"已合併 {len(results)} 段 → {final_srt.name}")
     log("[提醒] 各段獨立辨識發言者；若接縫處業務／客戶標籤對調，請在 Call Coach 按「全部互換」")

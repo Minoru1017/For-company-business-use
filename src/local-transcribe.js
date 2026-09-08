@@ -371,7 +371,7 @@ export function initLocalTranscribe({ onTranscriptReady, showToast, getMode }) {
           return;
         }
         if (ok) await importLatest(onTranscriptReady, showToast);
-        else showToast('轉錄失敗，請查看記錄');
+        else showToast(transcribeFailToast(job.logs));
       }, { trackTranscribe: true });
     })
     .catch(() => {});
@@ -608,6 +608,20 @@ function transcribeBlockReason(st) {
   return '';
 }
 
+function lastErrorLine(logs) {
+  const lines = logs || [];
+  for (let i = lines.length - 1; i >= 0; i--) {
+    if (String(lines[i]).includes('[錯誤]')) return String(lines[i]);
+  }
+  return null;
+}
+
+function transcribeFailToast(logs) {
+  const err = lastErrorLine(logs);
+  if (!err) return '轉錄失敗，請查看下方記錄';
+  return `轉錄失敗：${err.replace(/^\[錯誤\]\s*/, '')}`;
+}
+
 async function pollJob(onDone, { trackTranscribe = false, trackSetup = false } = {}) {
   clearInterval(pollTimer);
   const tick = async () => {
@@ -619,6 +633,19 @@ async function pollJob(onDone, { trackTranscribe = false, trackSetup = false } =
         showLog(j.logs, {
           failed: !j.running && j.exit_code !== null && j.exit_code !== 0,
           title: j.running ? '安裝進行中…' : j.exit_code === 0 ? '安裝完成' : '安裝失敗',
+        });
+      } else if (trackTranscribe) {
+        showLog(j.logs, {
+          failed: !j.running && j.exit_code !== null && j.exit_code !== 0 && j.exit_code !== 130,
+          title: j.running
+            ? j.cancel_requested
+              ? '正在取消轉錄…'
+              : '轉錄進行中…'
+            : j.exit_code === 0
+              ? '轉錄完成'
+              : j.exit_code === 130
+                ? '轉錄已取消'
+                : '轉錄失敗 — 請查看記錄',
         });
       } else {
         showLog(j.logs);
@@ -794,7 +821,7 @@ async function runTranscribe(onTranscriptReady, showToast, refreshStatus) {
         return;
       }
       if (ok) await importLatest(onTranscriptReady, showToast);
-      else showToast('轉錄失敗，請查看記錄');
+      else showToast(transcribeFailToast(j.logs));
     }, { trackTranscribe: true });
   } catch (err) {
     transcribeBusy = false;
