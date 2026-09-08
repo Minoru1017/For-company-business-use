@@ -21,8 +21,12 @@ const LARGE_FILE_MB = 80;
 const HF_TOKEN_URL = 'https://huggingface.co/settings/tokens';
 const TOKEN_PAGE_KEY = 'call_coach_hf_token_opened';
 const REPO_ZIP_URL = 'https://github.com/Minoru1017/For-company-business-use/archive/refs/heads/main.zip';
-const ASSISTANT_RELEASE_URL =
+const ASSISTANT_SETUP_URL =
+  'https://github.com/Minoru1017/For-company-business-use/releases/latest/download/CallCoachAssistant-Setup.exe';
+const ASSISTANT_ZIP_URL =
   'https://github.com/Minoru1017/For-company-business-use/releases/latest/download/CallCoachAssistant-Windows.zip';
+const ASSISTANT_RELEASE_PAGE =
+  'https://github.com/Minoru1017/For-company-business-use/releases/latest';
 
 function fmtSize(bytes) {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -70,8 +74,8 @@ function bridgeFetchError(err) {
   const msg = String(err?.message || '');
   if (/failed to fetch|networkerror|network error|load failed/i.test(msg)) {
     return (
-      '無法連線本機轉錄助手。請確認：①「啟動 Call Coach.cmd」黑窗仍開啟 ' +
-      '② 網頁在 DEMO 模式 ③ 已下載最新版助手（Releases）'
+      '無法連線本機轉錄助手。請確認：① 已從開始選單啟動「Call Coach 本機助手」或安裝精靈已完成 ' +
+      '② 網頁在 DEMO 模式 ③ 已安裝最新版（Releases）'
     );
   }
   return msg || '無法連線本機轉錄助手';
@@ -117,17 +121,18 @@ function renderOfflineWizard(offlineEl) {
     <p class="hint">首次使用請依下列步驟；助手啟動後此區會自動消失。</p>
     <ol class="setup-wizard-steps">
       <li>
-        <strong>① 下載 Windows 應用程式（推薦）</strong>
-        <p class="hint">下載 <code>CallCoachAssistant-Windows.zip</code>（v11.0.2+），解壓後<strong>只</strong>雙擊 <code>啟動 Call Coach.cmd</code>。若出現 python312.dll 或資料夾有 <code>_internal</code>，代表舊版或點錯 .exe — 請刪除重下。不需安裝 Python、不需 winget。</p>
+        <strong>① 公司電腦 — 安裝精靈（推薦）</strong>
+        <p class="hint">下載 <code>CallCoachAssistant-Setup.exe</code>，執行安裝精靈（建議安裝到 <code>C:\\CallCoachAssistant</code>）。安裝過程會自動準備 ffmpeg 與 WhisperX，<strong>不需 .cmd</strong>。完成後從開始選單啟動「Call Coach 本機助手」。</p>
         <div class="bridge-actions">
-          <a class="btn primary" href="${ASSISTANT_RELEASE_URL}" target="_blank" rel="noopener noreferrer">下載本機助手（Windows）</a>
+          <a class="btn primary" href="${ASSISTANT_SETUP_URL}" target="_blank" rel="noopener noreferrer">下載安裝精靈（Setup.exe）</a>
+          <a class="btn" href="${ASSISTANT_RELEASE_PAGE}" target="_blank" rel="noopener noreferrer">Releases 頁面</a>
         </div>
       </li>
       <li>
-        <strong>② 或下載 demo-workspace 原始檔</strong>
-        <p class="hint">公司電腦：雙擊 <code>setup_portable.cmd</code>。一般電腦：<code>setup_all.cmd</code>。已裝 Python 3.10～3.12：<code>start_call_coach.cmd</code>。</p>
+        <strong>② 或 ZIP 免安裝版</strong>
+        <p class="hint">下載 <code>CallCoachAssistant-Windows.zip</code>，解壓後雙擊 <code>啟動 Call Coach.cmd</code>（部分公司電腦會封鎖 .cmd）。</p>
         <div class="bridge-actions">
-          <a class="btn" href="${REPO_ZIP_URL}" target="_blank" rel="noopener noreferrer">下載專案 ZIP</a>
+          <a class="btn" href="${ASSISTANT_ZIP_URL}" target="_blank" rel="noopener noreferrer">下載 ZIP 版</a>
         </div>
       </li>
       <li>
@@ -135,7 +140,7 @@ function renderOfflineWizard(offlineEl) {
         <p class="hint"><span id="bridgeConnectStatus">正在偵測本機助手…</span></p>
       </li>
     </ol>
-    <p class="hint">連線成功後，在下方按「完整環境安裝」即可一鍵安裝 ffmpeg 與 WhisperX。</p>
+    <p class="hint">安裝精靈完成後，在 DEMO 模式貼上 HF_TOKEN 即可開始轉錄（通常不需再按「完整環境安裝」）。</p>
   `;
 }
 
@@ -219,14 +224,16 @@ export function initLocalTranscribe({ onTranscriptReady, showToast, getMode }) {
       ? `
       <div class="bridge-setup-banner">
         <strong>首次設定 — 一鍵安裝轉錄環境</strong>
-        <p class="hint">會自動安裝 ffmpeg（若缺少）與 WhisperX 轉錄環境，首次約 5～15 分鐘。完成後再貼上 HF_TOKEN。</p>
+        <p class="hint">${st.installer_setup ? '安裝精靈可能未完成環境準備，可再按下方按鈕重試。' : '會自動安裝 ffmpeg（若缺少）與 WhisperX，首次約 5～15 分鐘。'}完成後再貼上 HF_TOKEN。</p>
         <div class="bridge-actions">
           <button type="button" class="btn primary" id="bridgeFullSetup">完整環境安裝</button>
-          ${!st.ffmpeg_ok && st.winget_ok ? '<button type="button" class="btn" id="bridgeInstallFfmpeg">僅安裝 ffmpeg</button>' : ''}
+          ${!st.ffmpeg_ok && st.winget_ok && !st.bundled_ffmpeg ? '<button type="button" class="btn" id="bridgeInstallFfmpeg">僅安裝 ffmpeg</button>' : ''}
           ${!st.venv_ok || !st.whisperx_ok ? '<button type="button" class="btn" id="bridgeSetup">僅安裝 WhisperX</button>' : ''}
         </div>
       </div>`
-      : '';
+      : st.installer_setup && !st.token_ok
+        ? `<p class="hint bridge-installer-ok">✓ 安裝精靈已完成轉錄環境準備。請在下方貼上 HF_TOKEN 後即可開始轉錄。</p>`
+        : '';
 
     panel.innerHTML = `
       <p class="bridge-lead">錄影在本機轉成逐字稿後，會<strong>自動載入</strong>到上方分析區，不需手動上傳 SRT。</p>

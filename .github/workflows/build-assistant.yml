@@ -35,14 +35,19 @@ jobs:
         with:
           python-version: "3.12"
 
-      - name: Build Windows app package
+      - name: Install Inno Setup
+        run: choco install innosetup -y
+
+      - name: Build Windows installer and package
         shell: pwsh
         run: ./build_windows.ps1
 
       - uses: actions/upload-artifact@v4
         with:
           name: CallCoachAssistant-Windows
-          path: demo-workspace/dist/CallCoachAssistant-Windows.zip
+          path: |
+            demo-workspace/dist/CallCoachAssistant-Setup.exe
+            demo-workspace/dist/CallCoachAssistant-Windows.zip
           if-no-files-found: error
 
       - name: Publish GitHub Release
@@ -53,22 +58,23 @@ jobs:
           body: |
             ## Call Coach 本機轉錄助手（Windows）
 
-            免安裝 Python、不需 winget，適合公司電腦。
+            ### 公司電腦（推薦）— 安裝精靈
 
-            ### 使用方式
+            1. 下載 **`CallCoachAssistant-Setup.exe`**
+            2. 執行安裝精靈（建議使用預設位置 `C:\CallCoachAssistant`）
+            3. 安裝過程會自動準備 ffmpeg 與 WhisperX（約 5～15 分鐘，需網路）
+            4. 從開始選單啟動 **Call Coach 本機助手**
+            5. 開啟 [Call Coach](https://minoru1017.github.io/For-company-business-use/) → **DEMO · 轉錄** → 貼上 HF_TOKEN
 
-            1. 下載 **`CallCoachAssistant-Windows.zip`**
-            2. 解壓到任意資料夾
-            3. 雙擊 **`啟動 Call Coach.cmd`**，保持視窗開啟（**勿用 .exe**）
-            4. 開啟 [Call Coach](https://minoru1017.github.io/For-company-business-use/) → **DEMO · 轉錄** → **完整環境安裝**
+            不需 `.cmd`、不需 winget、不需自行安裝 Python。
 
-            ### 說明
+            ### 進階 — ZIP 免安裝版
 
-            - 若資料夾內有 `_internal` 或出現 python312.dll 錯誤，代表是**舊版** — 請刪除後重新下載本 zip
-            - 首次「完整環境安裝」會下載 WhisperX 與模型（約 1～3 GB）
-            - 建議另行安裝 ffmpeg（`winget install Gyan.FFmpeg`）以加速長影片轉錄
+            下載 `CallCoachAssistant-Windows.zip`，解壓後雙擊 `啟動 Call Coach.cmd`（部分公司電腦可能封鎖 .cmd）。
 
             **Commit:** ${{ github.sha }}
-          files: demo-workspace/dist/CallCoachAssistant-Windows.zip
+          files: |
+            demo-workspace/dist/CallCoachAssistant-Setup.exe
+            demo-workspace/dist/CallCoachAssistant-Windows.zip
           make_latest: true
           draft: false

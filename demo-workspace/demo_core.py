@@ -15,6 +15,7 @@ from app_paths import is_frozen, resolve_paths
 ROOT, BUNDLE = resolve_paths()
 STATIC = BUNDLE / "demo_app"
 PORTABLE_PY = ROOT / "runtime" / "python" / "python.exe"
+BUNDLED_FFMPEG = ROOT / "runtime" / "ffmpeg" / "ffmpeg.exe"
 VENV_PY = ROOT / ".venv" / "Scripts" / "python.exe"
 WHISPERX = ROOT / ".venv" / "Scripts" / "whisperx.exe"
 REQUIRED_PY = (3, 10)
@@ -185,6 +186,23 @@ def cache_env() -> dict[str, str]:
     return env
 
 
+def ffmpeg_exe() -> str | None:
+    if BUNDLED_FFMPEG.is_file():
+        return str(BUNDLED_FFMPEG)
+    return shutil.which("ffmpeg")
+
+
+def shell_env(extra: dict[str, str] | None = None) -> dict[str, str]:
+    env = os.environ.copy()
+    if extra:
+        env.update(extra)
+    ff = ffmpeg_exe()
+    if ff:
+        ff_dir = str(Path(ff).parent)
+        env["PATH"] = ff_dir + os.pathsep + env.get("PATH", "")
+    return env
+
+
 def base_python_exe() -> Path:
     """Interpreter used to create .venv (must be a real python.exe when packaged)."""
     if PORTABLE_PY.is_file():
@@ -254,6 +272,8 @@ class EnvStatus:
             "root": str(ROOT),
             "input_folder": str(ROOT / "input"),
             "packaged": is_frozen(),
+            "installer_setup": (ROOT / ".setup_complete").is_file(),
+            "bundled_ffmpeg": BUNDLED_FFMPEG.is_file(),
             "can_uninstall": self.venv_ok,
             "api_capabilities": ["setup", "full-setup", "install-ffmpeg"],
             "call_coach_url": CALL_COACH_URL,
@@ -263,7 +283,7 @@ class EnvStatus:
 
 def get_status() -> EnvStatus:
     python_ok, ver, python_warning = python_version_info()
-    ffmpeg_ok = shutil.which("ffmpeg") is not None
+    ffmpeg_ok = ffmpeg_exe() is not None
     winget_ok = shutil.which("winget") is not None
     venv_ok = VENV_PY.exists()
     whisperx_ok = WHISPERX.exists() or (ROOT / ".venv" / "Scripts" / "whisperx.cmd").exists()
@@ -316,7 +336,7 @@ def run_command(
     proc = subprocess.Popen(
         cmd,
         cwd=ROOT,
-        env=env or os.environ.copy(),
+        env=shell_env(env),
         stdout=subprocess.PIPE,
         stderr=subprocess.STDOUT,
         text=True,
@@ -407,7 +427,7 @@ def run_setup(log: LogFn = default_log) -> int:
             shutil.copy(example, env_file)
             log("已建立 .env — 請在下一步填入 HF_TOKEN")
 
-    if not shutil.which("ffmpeg"):
+    if not ffmpeg_exe():
         log("[提醒] 找不到 ffmpeg，請安裝: winget install Gyan.FFmpeg")
 
     log("=== 安裝完成 ===")
@@ -415,8 +435,11 @@ def run_setup(log: LogFn = default_log) -> int:
 
 
 def run_install_ffmpeg(log: LogFn = default_log) -> int:
-    if shutil.which("ffmpeg"):
-        log("ffmpeg 已安裝")
+    if ffmpeg_exe():
+        if BUNDLED_FFMPEG.is_file():
+            log("ffmpeg 已就緒（內建）")
+        else:
+            log("ffmpeg 已安裝")
         return 0
 
     winget = shutil.which("winget")
@@ -456,7 +479,7 @@ def run_install_ffmpeg(log: LogFn = default_log) -> int:
 
 def run_full_setup(log: LogFn = default_log) -> int:
     log("=== 完整環境安裝（ffmpeg + 轉錄工具）===")
-    if not shutil.which("ffmpeg"):
+    if not ffmpeg_exe():
         code = run_install_ffmpeg(log=log)
         if code != 0:
             return code
@@ -503,7 +526,7 @@ def run_transcribe(mp4_name: str | None = None, log: LogFn = default_log, hooks:
         log("[錯誤] 請先設定 HF_TOKEN")
         return 1
 
-    env_vars = cache_env()
+    env_vars = shell_env(cache_env())
     (ROOT / "models").mkdir(exist_ok=True)
     (ROOT / "output").mkdir(exist_ok=True)
     (ROOT / "input").mkdir(exist_ok=True)
@@ -521,7 +544,7 @@ def run_transcribe(mp4_name: str | None = None, log: LogFn = default_log, hooks:
     wav = mp4.with_suffix(".wav")
     audio = mp4
 
-    ffmpeg = shutil.which("ffmpeg")
+    ffmpeg = ffmpeg_exe()
     if ffmpeg:
         log("[1/2] 從 MP4 抽出音軌（長影片可能需 5～15 分鐘，請耐心等候）...")
         code = run_command(
