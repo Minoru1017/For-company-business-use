@@ -454,6 +454,8 @@ def _run_with_window(server: ThreadingHTTPServer, host: str, url: str) -> int:
     import tkinter as tk
     from tkinter import messagebox
 
+    status_var = tk.StringVar(value="正在檢查轉錄環境…")
+
     def open_browser() -> None:
         webbrowser.open(url)
 
@@ -461,6 +463,50 @@ def _run_with_window(server: ThreadingHTTPServer, host: str, url: str) -> int:
         if messagebox.askokcancel("結束", "確定要停止本機轉錄助手嗎？"):
             server.shutdown()
             root.destroy()
+
+    def refresh_status_label() -> demo_core.EnvStatus:
+        st = demo_core.get_status()
+        ff = "OK" if st.ffmpeg_ok else "—"
+        wx = "OK" if st.venv_ok and st.whisperx_ok else "未安裝"
+        status_var.set(f"ffmpeg: {ff}  |  轉錄環境 (WhisperX): {wx}")
+        return st
+
+    def poll_setup() -> None:
+        snap = JOB.snapshot()
+        if snap["running"] and snap["kind"] in ("setup", "full-setup", "install-ffmpeg"):
+            setup_btn.config(state=tk.DISABLED, text="安裝進行中…")
+            root.after(1000, poll_setup)
+            return
+        setup_btn.config(state=tk.NORMAL, text="安裝／修復轉錄環境")
+        refresh_status_label()
+        if snap["exit_code"] == 0:
+            messagebox.showinfo(
+                "完成",
+                "轉錄環境已就緒。\n請在 Call Coach DEMO 模式貼上 HF_TOKEN 後開始轉錄。",
+            )
+        elif snap["exit_code"] is not None:
+            log_dir = demo_core.ROOT / "logs"
+            messagebox.showerror(
+                "安裝失敗",
+                f"轉錄環境安裝未成功。\n\n請查看日誌資料夾：\n{log_dir}\n\n"
+                "常見原因：公司網路封鎖 PyPI 下載。",
+            )
+
+    def run_setup_gui() -> None:
+        if JOB.running:
+            messagebox.showinfo("請稍候", "已有安裝工作進行中。")
+            return
+        if not messagebox.askokcancel(
+            "安裝轉錄環境",
+            "將安裝 WhisperX 轉錄環境（約 5～15 分鐘，需網路）。\n\n確定要開始嗎？",
+        ):
+            return
+        ok, msg = run_job("full-setup", demo_core.run_full_setup)
+        if not ok:
+            messagebox.showerror("無法開始", msg)
+            return
+        setup_btn.config(state=tk.DISABLED, text="安裝進行中…")
+        poll_setup()
 
     def serve() -> None:
         server.serve_forever()
@@ -470,14 +516,36 @@ def _run_with_window(server: ThreadingHTTPServer, host: str, url: str) -> int:
 
     root = tk.Tk()
     root.title("Call Coach 本機助手")
-    root.geometry("380x210")
+    root.geometry("420x280")
     root.resizable(False, False)
-    tk.Label(root, text="Call Coach 本機助手", font=("", 13, "bold")).pack(pady=(18, 6))
-    tk.Label(root, text=f"本機 API：http://{host}:{PORT}/").pack()
-    tk.Label(root, text="請保持此視窗開啟，關閉即停止服務", fg="#555").pack(pady=(8, 12))
-    tk.Button(root, text="開啟 Call Coach", command=open_browser, width=28).pack(pady=4)
-    tk.Button(root, text="結束助手", command=on_quit, width=28).pack(pady=4)
+    tk.Label(root, text="Call Coach 本機助手", font=("", 13, "bold")).pack(pady=(14, 4))
+    tk.Label(root, text=f"本機 API：http://{host}:{PORT}/", fg="#333").pack()
+    tk.Label(root, textvariable=status_var, fg="#555").pack(pady=(6, 4))
+    tk.Label(
+        root,
+        text="① 保持此視窗開啟  ② DEMO 模式連線  ③ 貼上 HF_TOKEN",
+        fg="#666",
+        wraplength=380,
+    ).pack(pady=(0, 8))
+    setup_btn = tk.Button(root, text="安裝／修復轉錄環境", command=run_setup_gui, width=30)
+    setup_btn.pack(pady=4)
+    tk.Button(root, text="開啟 Call Coach 網頁", command=open_browser, width=30).pack(pady=4)
+    tk.Button(root, text="結束助手", command=on_quit, width=30).pack(pady=4)
     root.protocol("WM_DELETE_WINDOW", on_quit)
+
+    def after_start() -> None:
+        st = refresh_status_label()
+        if JOB.running:
+            poll_setup()
+            return
+        if not (st.venv_ok and st.whisperx_ok):
+            messagebox.showwarning(
+                "轉錄環境尚未就緒",
+                "請先按「安裝／修復轉錄環境」（約 5～15 分鐘，需網路）。\n\n"
+                "完成後，Call Coach DEMO 才會顯示已連線並可轉錄。",
+            )
+
+    root.after(1200, after_start)
     root.mainloop()
     server.server_close()
     return 0
