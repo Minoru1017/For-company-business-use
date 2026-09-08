@@ -6,12 +6,12 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' https://fonts.googleapis.com 'unsafe-inline'; font-src https://fonts.gstatic.com; connect-src 'self' http://127.0.0.1:8765 https://generativelanguage.googleapis.com; img-src 'self' data:; base-uri 'self'; object-src 'none'; frame-ancestors 'none';">
   <title>CALL COACH｜顧問式銷售電訪分析</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=JetBrains+Mono:wght@400;600&family=Noto+Sans+TC:wght@400;500;700;900&family=Noto+Serif+TC:wght@600;700&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=JetBrains+Mono:wght@400;600&family=Noto+Sans+TC:wght@400;500;700;900&family=Noto+Serif+TC:wght@600;700&family=Archivo+Black&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/src/styles.css">
 </head>
 <body>
-<div class="side-label l">SALES CALL ANALYSIS — CONSULTATIVE SELLING</div>
-<div class="side-label r">FOCUS MODE / LOCAL PROCESSING</div>
+<div class="side-label l">ARCHIVE LOG ● 私/人/稿/件 ● CONSULTATIVE SELLING</div>
+<div class="side-label r">FILE_01 // LOCAL PROCESSING ● 禁止上雲</div>
 
 <section class="mode-chooser" id="modeChooser">
   <div class="mode-chooser-inner">
@@ -19,14 +19,14 @@
     <h2 class="mode-chooser-title">選擇工作流程</h2>
     <p class="mode-chooser-lead">同一套工具，依情境選擇電訪分析或 DEMO 錄影轉錄。</p>
     <div class="mode-cards">
-      <button type="button" class="mode-card" data-mode="dev">
-        <span class="mode-card-tag">開發</span>
+      <button type="button" class="mode-card" data-mode="dev" data-code="CODE_001 // DRIFT">
+        <span class="mode-card-tag">開發 · 電訪</span>
         <h3>電訪逐字稿</h3>
         <p>從 Vibe 匯出 <code>.vibe.json</code> 或 SRT，上傳後分析通話品質。</p>
         <span class="mode-card-cta">上傳分析 →</span>
       </button>
-      <button type="button" class="mode-card accent" data-mode="demo">
-        <span class="mode-card-tag">DEMO</span>
+      <button type="button" class="mode-card accent" data-mode="demo" data-code="CODE_002 // SIGNAL">
+        <span class="mode-card-tag">DEMO · 錄影</span>
         <h3>錄影轉逐字稿</h3>
         <p>1～2 小時 MP4 在本機轉錄（不上雲），完成後自動進入分析。</p>
         <span class="mode-card-cta">本機轉錄 →</span>
@@ -47,7 +47,7 @@
       <button type="button" class="mode-pill" data-mode="dev">開發 · 電訪</button>
       <button type="button" class="mode-pill" data-mode="demo">DEMO · 轉錄</button>
     </nav>
-    <h1 class="display">CALL<br><span class="ghost">COACH</span></h1>
+    <h1 class="display" data-text="CALL&#10;COACH">CALL<br><span class="ghost">COACH</span></h1>
     <p class="tagline" id="heroTagline">電訪逐字稿分析工具——把每一通電話變成可複盤的專業判斷。<br>
     <span>VIBE SRT / VTT / TXT ・ 規則分析全程本地 ・ 僅 AI 功能會傳送至 Google</span></p>
   </header>
@@ -204,7 +204,7 @@
     <div class="footer">
       <span class="mono">CALL COACH — CONSULTATIVE SALES ANALYZER</span>
       <div class="barcode"></div>
-      <span class="mono">VITE BUILD / VER 11</span>
+      <span class="mono">VITE BUILD / VER 11 ・ FILE_01 //</span>
     </div>
   </div>
 </div>

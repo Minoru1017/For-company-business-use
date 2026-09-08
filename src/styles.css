@@ -490,3 +490,203 @@ ul.report .q { font-family:"Noto Serif TC",serif; font-weight:700; color:#ece7da
 .mk { font-family:var(--mono); margin-right:7px; font-size:.72rem; }
 .mk.on { color:var(--ok); } .mk.off { color:var(--bad); }
 .ai-progress #aiProgressBar { height:100%; width:0%; background:var(--accent); border-radius:6px; transition:.3s; }
+
+/* =====================================================================
+   v12 — 酸性鉻面 × 實體檔案夾頁籤 × 日系霧藍
+   參考：GRID DAILY 頁籤 / LIQUID GLASS 海報 / 法蘭 HEALTH HAZARD 標籤
+   ===================================================================== */
+:root {
+  --bg:#1a212b; --panel:#212a36; --panel2:#27313f; --border:#35404f;
+  --text:#e8e4dc; --muted:#8e98a6; --ink:#171b21;
+  --accent:#e2573f; --ok:#8dc39b; --warn:#d8bb73; --bad:#e2573f;
+  --cust:#e2573f; --sales:#e8e4dc;
+  /* 頁籤紙色（第一張圖：米紙 / 牛皮 / 霧藍 / 橄欖 / 灰卡） */
+  --tab-paper:#dcd5c4; --tab-kraft:#b8ab8f; --tab-slate:#8493a8;
+  --tab-olive:#7d836b; --tab-card:#c9c4b8;
+  --tab:var(--tab-paper);
+  --acid:"Archivo Black",var(--disp);
+}
+
+/* hidden 屬性必須贏過 .mode-chooser 的 display:flex（否則進入主畫面後選擇頁仍佇在上方） */
+.mode-chooser[hidden] { display:none; }
+
+/* ---- 底圖：點陣 + 日系菱格細線 ---- */
+body {
+  background-color:var(--bg);
+  background-image:
+    radial-gradient(rgba(232,228,220,.07) 1px, transparent 1px),
+    repeating-linear-gradient(45deg, rgba(232,228,220,.028) 0 1px, transparent 1px 34px),
+    repeating-linear-gradient(-45deg, rgba(232,228,220,.028) 0 1px, transparent 1px 34px);
+  background-size:22px 22px, auto, auto;
+}
+body::before { background:radial-gradient(circle at 35% 35%, rgba(220,213,196,.16), rgba(132,147,168,.06) 60%, transparent 75%); }
+body::after  { background:radial-gradient(circle at 40% 40%, rgba(132,147,168,.14), rgba(40,48,60,.04) 60%, transparent 75%); }
+
+.side-label { color:#5b6573; letter-spacing:.42em; }
+
+/* ---- 玻璃面板改霧藍 ---- */
+.card, .report-shell, #drop, #labelList, .quota-box, .stats {
+  background:rgba(33,42,54,.6);
+  border:1px solid rgba(232,228,220,.09);
+}
+.stat { background:rgba(37,47,61,.75); }
+.step, .layer, .rule-card, .purpose-card, .purpose-playbook, .bridge-mode-panel,
+.bridge-log-panel, .demo-offline, .mode-pill, .field, .bridge-token, .bridge-file {
+  background:rgba(37,47,61,.62); border-color:var(--border);
+}
+.bridge-log, .bridge-path, .demo-guide-tree { background:#141a22; }
+
+/* ---- 日系警示標籤 chips：方角、細線、等寬 ---- */
+.pill { border-radius:3px; border-color:#4a5564; color:#9aa4b2; padding:5px 12px; }
+.pill.red { background:transparent; border:1px solid var(--tab-paper); color:var(--tab-paper); font-weight:600; }
+.pill.red::before { content:"▲ "; font-size:.6rem; }
+.hero { position:relative; border-bottom:1px solid #3a4553; padding-top:64px; }
+.hero::after { content:"HEALTH OF CALL ・ 通話健康度 ・ AVOID GUESSING, ASK";
+  position:absolute; right:0; bottom:-1px; transform:translateY(100%);
+  font-family:var(--mono); font-size:.58rem; letter-spacing:.3em; color:#4e5967; padding-top:6px; }
+
+/* ---- 酸性液態鉻面標題（第二張圖）---- */
+.hero .display {
+  font-family:var(--acid); font-weight:400; letter-spacing:-.01em; line-height:.9;
+  position:relative; isolation:isolate;
+  background:linear-gradient(178deg,#fbfaf6 0%,#dcd8cf 28%,#6a7079 46%,#f2f0ea 55%,#a4aab3 72%,#e9e6df 100%);
+  -webkit-background-clip:text; background-clip:text; color:transparent;
+  filter:drop-shadow(0 22px 34px rgba(0,0,0,.5)) drop-shadow(0 1px 0 rgba(255,255,255,.35));
+}
+.hero .display .ghost { color:transparent; -webkit-text-stroke:0; opacity:.78;
+  background:linear-gradient(178deg,#d9d6ce 0%,#9ea4ad 40%,#4c525b 52%,#c9c6bf 62%,#7c828b 100%);
+  -webkit-background-clip:text; background-clip:text; }
+/* 液態光帶：在字後面流動的白色黏稠曲線 */
+.hero .display::before { content:""; position:absolute; inset:-30% -8% -20% -6%; z-index:-1; pointer-events:none;
+  background:
+    radial-gradient(ellipse 34% 18% at 18% 30%, rgba(255,255,255,.28), transparent 70%),
+    radial-gradient(ellipse 46% 14% at 62% 58%, rgba(255,255,255,.22), transparent 70%),
+    radial-gradient(ellipse 28% 22% at 84% 22%, rgba(196,206,220,.2), transparent 70%);
+  filter:blur(22px); mix-blend-mode:screen; }
+/* 玻璃折射：字面上一條斜向高光 */
+.hero .display::after { content:attr(data-text); position:absolute; inset:0; z-index:1; pointer-events:none;
+  color:transparent; -webkit-text-stroke:1px rgba(255,255,255,.14);
+  background:linear-gradient(115deg, transparent 38%, rgba(255,255,255,.55) 46%, rgba(255,255,255,.1) 50%, transparent 58%);
+  -webkit-background-clip:text; background-clip:text; mix-blend-mode:screen; opacity:.8;
+  white-space:pre-line; }
+.tagline span { color:#8e98a6; }
+
+/* ---- 實體檔案夾頁籤：區塊標題（第一張圖）---- */
+.sec-head { position:relative; display:flex; align-items:stretch; gap:0; flex-wrap:nowrap;
+            padding:0; margin-bottom:20px; border-bottom:1.5px solid var(--tab); }
+.sec-head .num { display:flex; align-items:center; gap:0; background:var(--tab); color:var(--ink);
+  font-family:var(--mono); font-size:.66rem; font-weight:600; letter-spacing:.16em;
+  padding:11px 10px 9px 16px; border-radius:11px 0 0 0; text-transform:uppercase;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.45); }
+.sec-head .num::before { content:"CODE_0"; letter-spacing:.16em; }
+.sec-head .num::after  { content:"//"; opacity:.55; margin-left:8px; }
+.sec-head h2 { display:flex; align-items:center; background:var(--tab); color:var(--ink);
+  font-family:var(--disp); font-size:.98rem; font-weight:700; letter-spacing:.02em;
+  padding:11px 40px 9px 8px; margin:0;
+  clip-path:polygon(0 0, calc(100% - 26px) 0, 100% 100%, 0 100%);
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.45); }
+.sec-head .tag { margin-left:auto; align-self:flex-end; padding:0 4px 8px 0;
+  color:#6c7684; letter-spacing:.26em; font-size:.6rem; }
+.sec-head .tag::before { content:"FILE_"; }
+/* 頁籤紙紋：極淡橫紋 */
+.sec-head .num, .sec-head h2 {
+  background-image:repeating-linear-gradient(0deg, rgba(0,0,0,.035) 0 1px, transparent 1px 3px);
+  background-blend-mode:multiply; }
+/* 頁籤依序換紙色 */
+.sec:nth-of-type(5n+1) .sec-head { --tab:var(--tab-paper); }
+.sec:nth-of-type(5n+2) .sec-head { --tab:var(--tab-kraft); }
+.sec:nth-of-type(5n+3) .sec-head { --tab:var(--tab-slate); }
+.sec:nth-of-type(5n+4) .sec-head { --tab:var(--tab-olive); }
+.sec:nth-of-type(5n+5) .sec-head { --tab:var(--tab-card); }
+.sec:nth-of-type(5n+3) .sec-head .num, .sec:nth-of-type(5n+3) .sec-head h2,
+.sec:nth-of-type(5n+4) .sec-head .num, .sec:nth-of-type(5n+4) .sec-head h2 { color:#f3f1ea; }
+#result > .sec-head { --tab:var(--tab-kraft); }
+
+/* ---- 模式選擇：疊放的實體頁籤卡 ---- */
+.mode-chooser-kicker { color:var(--tab-paper); }
+.mode-chooser-title { font-family:var(--acid); font-weight:400; letter-spacing:-.01em;
+  background:linear-gradient(178deg,#fbfaf6,#c9c6bd 45%,#7a808a 52%,#eceae4);
+  -webkit-background-clip:text; background-clip:text; color:transparent; }
+.mode-cards { gap:22px; align-items:stretch; }
+.mode-card { position:relative; border-radius:6px 22px 6px 6px; border:none; padding:26px 60px 24px 22px;
+  background:var(--tab-paper); color:var(--ink); overflow:visible;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.55), inset 0 -1px 0 rgba(0,0,0,.12), 0 26px 40px -26px rgba(0,0,0,.8);
+  background-image:repeating-linear-gradient(0deg, rgba(0,0,0,.03) 0 1px, transparent 1px 3px); }
+.mode-card.accent { background-color:var(--tab-slate); color:#f3f1ea; }
+.mode-card:hover { transform:translateY(-4px); border:none; }
+/* 頁籤突起 */
+.mode-card::before { content:""; position:absolute; top:-14px; left:18px; width:38%; height:16px;
+  background:inherit; border-radius:9px 9px 0 0;
+  clip-path:polygon(0 100%, 0 0, calc(100% - 14px) 0, 100% 100%); }
+/* 直排檔案碼（CODE_001 // DRIFT） */
+.mode-card::after { content:attr(data-code); position:absolute; right:16px; top:20px;
+  writing-mode:vertical-rl; font-family:var(--mono); font-size:.62rem; letter-spacing:.24em;
+  color:currentColor; opacity:.62; text-transform:uppercase; }
+.mode-card-tag { border-radius:2px; border:1px solid currentColor; color:currentColor; opacity:.75;
+  font-size:.6rem; letter-spacing:.18em; padding:3px 8px; }
+.mode-card.accent .mode-card-tag { border-color:currentColor; color:currentColor; }
+.mode-card h3 { font-family:var(--disp); font-size:1.3rem; letter-spacing:-.01em; }
+.mode-card p { color:currentColor; opacity:.72; }
+.mode-card p code { color:currentColor; opacity:1; font-weight:600; }
+.mode-card-cta { color:currentColor; font-weight:600; letter-spacing:.14em; }
+.mode-card-cta::before { content:"● "; font-size:.5rem; vertical-align:middle; }
+.mode-chooser-hint a { color:var(--tab-paper); }
+.mode-pill { border-radius:3px; letter-spacing:.06em; }
+.mode-pill.active { border-color:var(--tab-paper); background:var(--tab-paper); color:var(--ink); font-weight:700; }
+
+/* ---- 報告分頁：迷你頁籤 ---- */
+.rnav { gap:4px; padding:14px 18px 0; border-bottom:1.5px solid var(--tab-kraft); }
+.rtab { border-radius:8px 0 0 0; color:#7d8794; padding:10px 30px 9px 14px;
+  clip-path:polygon(0 0, calc(100% - 18px) 0, 100% 100%, 0 100%); margin-right:-8px; }
+.rtab.active { background:var(--tab-kraft); color:var(--ink); }
+.rtab.active .cnt { color:var(--ink); opacity:.65; }
+.rtab.active::before, .rtab.active::after { display:none; }
+.rpane-title .en { color:#6c7684; }
+
+/* ---- 按鈕：酸性海報「黑字白底」對比，主按鈕改紙色 ---- */
+button { border-radius:4px; background:linear-gradient(180deg, rgba(255,255,255,.04), transparent), #273140; }
+button.primary { background:linear-gradient(180deg,#f3efe4,#d9d2c1); color:var(--ink); border-color:#d9d2c1;
+  text-transform:uppercase; letter-spacing:.1em; font-size:.8rem;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,.7), 0 10px 24px -10px rgba(220,213,196,.35); }
+button.primary:hover { background:linear-gradient(180deg,#ffffff,#e6e0d1);
+  box-shadow: inset 0 1px 0 #fff, 0 14px 28px -10px rgba(220,213,196,.45); }
+.demo-guide-btn { border-radius:4px; background:var(--tab-paper); color:var(--ink); }
+.demo-guide-btn:hover { background:#fff; }
+
+/* ---- 說話者標籤：業務=紙色、客戶=朱紅 ---- */
+.seg.s .who .b-s { background:var(--tab-paper); color:var(--ink); border-color:var(--tab-paper); box-shadow:none; }
+.seg.c .who .b-c { background:linear-gradient(180deg,#ec6a52,#d64a33); }
+.seg .who .spk-badge { border-radius:2px; }
+
+/* ---- 統計數字：酸性重字 ---- */
+.stat .num { font-family:var(--acid); font-weight:400; font-size:2.1rem; letter-spacing:-.02em;
+  background:linear-gradient(178deg,#fbfaf6,#c9c6bd 45%,#8a909a 52%,#eceae4);
+  -webkit-background-clip:text; background-clip:text; color:transparent; }
+.stat .lbl { text-transform:uppercase; font-family:var(--mono); font-size:.62rem; }
+
+/* ---- 拖放區：檔案夾內頁 ---- */
+#drop { border-radius:6px; border:1px dashed #4a5564; }
+#drop::before, #drop::after { border-color:var(--tab-paper); }
+#drop.drag { border-color:var(--tab-paper); box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 0 0 3px rgba(220,213,196,.16); }
+#fname { color:var(--ok); }
+.bridge-drop, .bridge-file, .bridge-mode-panel, .bridge-log-panel, .quota-box, .card, .field, .bridge-token { border-radius:6px; }
+.bridge-file.on { border-color:var(--tab-paper); background:rgba(220,213,196,.1); }
+.bridge-consent { background:rgba(216,187,115,.08); border-color:#6b5a2e; }
+
+/* ---- 頁尾：條碼與檔號 ---- */
+.footer { border-top:1px solid #3a4553; }
+.footer .mono { color:#5b6573; }
+.barcode { background:repeating-linear-gradient(90deg,#5b6573 0 2px,transparent 2px 5px,#5b6573 5px 6px,transparent 6px 10px); }
+.faq li .idx { color:var(--tab-kraft); }
+.faq li:hover { background:rgba(232,228,220,.03); }
+.sec-head .num { color:var(--ink); }
+
+/* Toast */
+#toast { border-radius:4px; background:rgba(33,42,54,.9); border-color:rgba(232,228,220,.16); }
+
+@media (max-width:640px) {
+  .sec-head { flex-wrap:wrap; }
+  .sec-head .tag { width:100%; padding:6px 0 6px; align-self:auto; }
+  .mode-card { padding-right:48px; }
+  .hero::after { display:none; }
+}
