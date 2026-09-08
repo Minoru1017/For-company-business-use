@@ -1,8 +1,8 @@
 ; Call Coach Assistant — Windows installer (Inno Setup 6)
-; Build: iscc /DAppVersion=11.1.0 CallCoachAssistant.iss
+; Build: iscc /DAppVersion=11.1.1 CallCoachAssistant.iss
 
 #ifndef AppVersion
-#define AppVersion "11.1.0"
+#define AppVersion "11.1.1"
 #endif
 
 [Setup]
@@ -22,7 +22,7 @@ ArchitecturesInstallIn64BitMode=x64compatible
 UninstallDisplayIcon={app}\CallCoachAssistant.exe
 
 [Languages]
-Name: "chinesetrad"; MessagesFile: "compiler:Languages\ChineseTraditional.isl"
+Name: "en"; MessagesFile: "compiler:Default.isl"
 
 [Tasks]
 Name: "desktopicon"; Description: "建立桌面捷徑"; GroupDescription: "其他選項:"; Flags: checkedonce
@@ -38,10 +38,19 @@ Name: "{autodesktop}\Call Coach 本機助手"; Filename: "{app}\CallCoachAssista
 Filename: "{app}\runtime\python\python.exe"; Parameters: """{app}\installer\setup_env.py"""; StatusMsg: "正在安裝 WhisperX 轉錄環境（約 5～15 分鐘，請保持網路連線）..."; Flags: waituntilterminated; Description: "準備轉錄環境（WhisperX）"
 Filename: "{app}\CallCoachAssistant.exe"; Description: "啟動 Call Coach 本機助手"; Flags: nowait postinstall skipifsilent
 
-[Messages]
-chinesetrad.WelcomeLabel2=此精靈將安裝 [name] 到您的電腦。%n%n建議使用預設安裝位置 %1（避免中文使用者名稱路徑問題）。%n%n安裝過程會自動準備 ffmpeg 與 WhisperX（需下載約 1～3 GB），請保持網路連線。%n%n安裝完成後，請在 Call Coach 網頁的 DEMO 模式貼上 Hugging Face Token 即可開始轉錄。
-
 [Code]
+procedure InitializeWizard();
+begin
+  WizardForm.WelcomeLabel1.Caption := '歡迎使用 Call Coach 本機助手安裝精靈';
+  WizardForm.WelcomeLabel2.Caption :=
+    '此精靈將安裝 Call Coach 本機轉錄助手到您的電腦。' + #13#10 + #13#10 +
+    '建議使用預設安裝位置 C:\CallCoachAssistant（避免中文使用者名稱路徑問題）。' + #13#10 + #13#10 +
+    '安裝過程會自動準備 ffmpeg 與 WhisperX（需下載約 1～3 GB），請保持網路連線。' + #13#10 + #13#10 +
+    '安裝完成後，請在 Call Coach 網頁的 DEMO 模式貼上 Hugging Face Token 即可開始轉錄。';
+  WizardForm.FinishedLabel.Caption := 'Call Coach 本機助手已安裝完成。';
+  WizardForm.FinishedLabel2.Caption := '請從開始選單啟動「Call Coach 本機助手」，並在 Call Coach DEMO 模式貼上 HF_TOKEN。';
+end;
+
 function InitializeSetup(): Boolean;
 begin
   Result := True;
