@@ -74,7 +74,8 @@ demo-workspace/
 
 ## 疑難排解
 
-- **CallCoachAssistant.exe / python312.dll 錯誤**：代表使用了**舊版**或點錯檔案。刪除整個資料夾，下載最新 Releases，只雙擊 **`啟動 Call Coach.cmd`**。若資料夾內有 `_internal` 即為舊版
+- **安裝精靈完成但 DEMO 顯示缺轉錄環境**：從開始選單啟動 **Call Coach 本機助手**，按 **「安裝／修復轉錄環境」**。日誌：`C:\CallCoachAssistant\logs\install-setup.log`
+- **CallCoachAssistant.exe / python312.dll 錯誤**：代表使用了**舊版**或點錯檔案。請改用安裝精靈 Setup.exe
 - **完整環境安裝出現 Failed to fetch**：請確認 `CallCoachAssistant.cmd` 黑窗仍開啟，並下載 [最新版 Releases](https://github.com/Minoru1017/For-company-business-use/releases/latest)。若仍失敗，改按「僅安裝 WhisperX」
 - **雙擊 start_call_coach 沒反應**：改用 `setup_portable.cmd` 或 `start_call_coach.cmd`（命令指令檔，不是 .pyw）
 - **Call Coach 顯示未連線**：確認助手黑窗仍開啟；若使用 **Python 3.13/3.14**，請執行 **`setup_portable.cmd`** 安裝內建 Python 3.12
