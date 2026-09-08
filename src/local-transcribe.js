@@ -16,14 +16,14 @@ let transcribeBusy = false;
 let uploadXhr = null;
 let uploadStartAt = 0;
 let bridgeApiToken = null;
-let transcribeMode = localStorage.getItem(TRANSCRIBE_MODE_KEY) || 'standard';
-let cloudConsent = localStorage.getItem(CLOUD_CONSENT_KEY) === '1';
 
 const LARGE_FILE_MB = 80;
 const HF_TOKEN_URL = 'https://huggingface.co/settings/tokens';
 const TOKEN_PAGE_KEY = 'call_coach_hf_token_opened';
 const TRANSCRIBE_MODE_KEY = 'callCoachTranscribeMode';
 const CLOUD_CONSENT_KEY = 'callCoachCloudConsent';
+let transcribeMode = localStorage.getItem(TRANSCRIBE_MODE_KEY) || 'standard';
+let cloudConsent = localStorage.getItem(CLOUD_CONSENT_KEY) === '1';
 const REPO_ZIP_URL = 'https://github.com/Minoru1017/For-company-business-use/archive/refs/heads/main.zip';
 const ASSISTANT_SETUP_URL =
   'https://github.com/Minoru1017/For-company-business-use/releases/latest/download/CallCoachAssistant-Setup.exe';
