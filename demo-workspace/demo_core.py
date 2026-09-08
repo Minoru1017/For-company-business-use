@@ -10,7 +10,10 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
 
-ROOT = Path(__file__).resolve().parent
+from app_paths import is_frozen, resolve_paths
+
+ROOT, BUNDLE = resolve_paths()
+STATIC = BUNDLE / "demo_app"
 PORTABLE_PY = ROOT / "runtime" / "python" / "python.exe"
 VENV_PY = ROOT / ".venv" / "Scripts" / "python.exe"
 WHISPERX = ROOT / ".venv" / "Scripts" / "whisperx.exe"
@@ -182,11 +185,29 @@ def cache_env() -> dict[str, str]:
     return env
 
 
+def base_python_exe() -> Path:
+    """Interpreter used to create .venv (must be a real python.exe when packaged)."""
+    if PORTABLE_PY.is_file():
+        return PORTABLE_PY
+    return Path(sys.executable)
+
+
+def ensure_workspace_files(log: LogFn = default_log) -> None:
+    for name in ("models", "input", "output"):
+        (ROOT / name).mkdir(exist_ok=True)
+    env_example = ROOT / ".env.example"
+    if not env_example.exists():
+        bundled = BUNDLE / ".env.example"
+        if bundled.is_file():
+            shutil.copy(bundled, env_example)
+            log("已複製 .env.example")
+
+
 def python_version_info() -> tuple[bool, str, str | None]:
     ver = f"{sys.version_info.major}.{sys.version_info.minor}.{sys.version_info.micro}"
     ok = sys.version_info >= REQUIRED_PY
     warning: str | None = None
-    if sys.version_info > RECOMMENDED_PY_MAX:
+    if sys.version_info[:2] > RECOMMENDED_PY_MAX:
         warning = (
             f"Python {ver} 過新，WhisperX 建議使用 3.10～3.12。"
             " 若安裝或轉錄失敗，請改用 Python 3.12。"
@@ -232,6 +253,7 @@ class EnvStatus:
             "ready_to_transcribe": self.ready_to_transcribe,
             "root": str(ROOT),
             "input_folder": str(ROOT / "input"),
+            "packaged": is_frozen(),
             "can_uninstall": self.venv_ok,
             "call_coach_url": CALL_COACH_URL,
             "hf_links": HF_LINKS,
@@ -322,17 +344,21 @@ def run_command(
 
 def run_setup(log: LogFn = default_log) -> int:
     log("=== 開始安裝轉錄工具 ===")
-    if sys.version_info < REQUIRED_PY:
+    py = base_python_exe()
+    if is_frozen() and not PORTABLE_PY.is_file():
+        log("[錯誤] 找不到內建 Python（runtime\\python\\python.exe）")
+        log("請重新下載完整 CallCoachAssistant-Windows.zip 並解壓。")
+        return 1
+
+    if not is_frozen() and sys.version_info < REQUIRED_PY:
         log(f"[錯誤] 需要 Python {REQUIRED_PY[0]}.{REQUIRED_PY[1]}+")
         return 1
 
-    for name in ("models", "input", "output"):
-        (ROOT / name).mkdir(exist_ok=True)
-        log(f"資料夾 OK: {name}/")
+    ensure_workspace_files(log)
 
     if not VENV_PY.exists():
-        log("建立虛擬環境 .venv ...")
-        code = run_command([sys.executable, "-m", "venv", str(ROOT / ".venv")], log=log)
+        log(f"建立虛擬環境 .venv（使用 {py.name}）...")
+        code = run_command([str(py), "-m", "venv", str(ROOT / ".venv")], log=log)
         if code != 0:
             return code
 
@@ -347,8 +373,10 @@ def run_setup(log: LogFn = default_log) -> int:
 
     env_file = ROOT / ".env"
     if not env_file.exists():
-        shutil.copy(ROOT / ".env.example", env_file)
-        log("已建立 .env — 請在下一步填入 HF_TOKEN")
+        example = ROOT / ".env.example"
+        if example.exists():
+            shutil.copy(example, env_file)
+            log("已建立 .env — 請在下一步填入 HF_TOKEN")
 
     if not shutil.which("ffmpeg"):
         log("[提醒] 找不到 ffmpeg，請安裝: winget install Gyan.FFmpeg")

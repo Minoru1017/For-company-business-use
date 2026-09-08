@@ -2,6 +2,10 @@ runtime/
 .venv/
 models/
 .env
+__pycache__/
+*.pyc
+build/
+dist/
 output/*.srt
 output/*.wav
 input/*.mp4

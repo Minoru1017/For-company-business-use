@@ -1,0 +1,33 @@
+name: Build Call Coach Assistant (Windows)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "demo-workspace/**"
+      - ".github/workflows/build-assistant.yml"
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: demo-workspace
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build Windows app package
+        shell: pwsh
+        run: ./build_windows.ps1
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CallCoachAssistant-Windows
+          path: demo-workspace/dist/CallCoachAssistant-Windows.zip
+          if-no-files-found: error

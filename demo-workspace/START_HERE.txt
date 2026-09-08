@@ -1,24 +1,17 @@
 Call Coach 本機助手 — 從這裡開始
 ==============================
 
-【公司電腦 — setup_all 開不起來時】
+【最簡單 — Windows 應用程式】
+  1. 下載 CallCoachAssistant-Windows.zip（GitHub Releases）
+  2. 解壓後雙擊 CallCoachAssistant.exe
+  3. 保持小視窗開啟 → Call Coach DEMO → 完整環境安裝
+
+  不需安裝 Python、不需 winget、不需管理員
+
+【公司電腦 — 腳本方式】
   雙擊 setup_portable.cmd
-  → 不需 winget、不需管理員
-  → 下載 Python 3.12 到 runtime\python\（約 30 MB）
-  → 自動啟動助手（黑窗請保持開啟）
 
-【一般電腦 — 首次使用】
+【一般電腦 — 腳本方式】
   雙擊 setup_all.cmd
-  → 自動安裝 Python 3.12 + ffmpeg（需 winget）
-  → 自動啟動本機助手
-
-【已裝 Python 3.10～3.12】
-  雙擊 start_call_coach.cmd（命令指令檔，不是 .pyw）
-
-【必要條件】
-  Python 3.10～3.12（不要用 3.13/3.14）
-  下載：https://www.python.org/downloads/
-
-啟動成功後會自動開啟 Call Coach → DEMO 模式 → 完整環境安裝
 
 說明見 README.md

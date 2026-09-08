@@ -21,6 +21,8 @@ const LARGE_FILE_MB = 80;
 const HF_TOKEN_URL = 'https://huggingface.co/settings/tokens';
 const TOKEN_PAGE_KEY = 'call_coach_hf_token_opened';
 const REPO_ZIP_URL = 'https://github.com/Minoru1017/For-company-business-use/archive/refs/heads/main.zip';
+const ASSISTANT_RELEASE_URL =
+  'https://github.com/Minoru1017/For-company-business-use/releases/latest/download/CallCoachAssistant-Windows.zip';
 
 function fmtSize(bytes) {
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
@@ -104,17 +106,18 @@ function renderOfflineWizard(offlineEl) {
     <p class="hint">首次使用請依下列步驟；助手啟動後此區會自動消失。</p>
     <ol class="setup-wizard-steps">
       <li>
-        <strong>① 下載 demo-workspace</strong>
-        <p class="hint">下載專案 ZIP，解壓後找到 <code>demo-workspace</code> 資料夾放到本機（例如桌面）。</p>
+        <strong>① 下載 Windows 應用程式（推薦）</strong>
+        <p class="hint">下載 <code>CallCoachAssistant-Windows.zip</code>，解壓後雙擊 <code>CallCoachAssistant.exe</code>。不需安裝 Python、不需 winget。</p>
         <div class="bridge-actions">
-          <a class="btn" href="${REPO_ZIP_URL}" target="_blank" rel="noopener noreferrer">下載專案 ZIP</a>
+          <a class="btn primary" href="${ASSISTANT_RELEASE_URL}" target="_blank" rel="noopener noreferrer">下載本機助手（Windows）</a>
         </div>
       </li>
       <li>
-        <strong>② 安裝並啟動（Windows）</strong>
-        <p class="hint"><strong>公司電腦</strong>（setup_all 開不起來）：雙擊 <code>setup_portable.cmd</code> — 不需 winget、不需管理員，Python 會放在本資料夾 <code>runtime\python\</code>。</p>
-        <p class="hint"><strong>一般電腦</strong>：雙擊 <code>setup_all.cmd</code> — 自動安裝 Python 3.12 + ffmpeg。</p>
-        <p class="hint">若已裝 Python 3.10～3.12：雙擊 <code>start_call_coach.cmd</code>（命令指令檔，不是 .pyw）。<strong>黑窗請保持開啟。</strong></p>
+        <strong>② 或下載 demo-workspace 原始檔</strong>
+        <p class="hint">公司電腦：雙擊 <code>setup_portable.cmd</code>。一般電腦：<code>setup_all.cmd</code>。已裝 Python 3.10～3.12：<code>start_call_coach.cmd</code>。</p>
+        <div class="bridge-actions">
+          <a class="btn" href="${REPO_ZIP_URL}" target="_blank" rel="noopener noreferrer">下載專案 ZIP</a>
+        </div>
       </li>
       <li>
         <strong>③ 等待連線</strong>
