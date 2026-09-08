@@ -70,7 +70,7 @@ function bridgeFetchError(err) {
   const msg = String(err?.message || '');
   if (/failed to fetch|networkerror|network error|load failed/i.test(msg)) {
     return (
-      '無法連線本機轉錄助手。請確認：① CallCoachAssistant.cmd 黑窗仍開啟 ' +
+      '無法連線本機轉錄助手。請確認：①「啟動 Call Coach.cmd」黑窗仍開啟 ' +
       '② 網頁在 DEMO 模式 ③ 已下載最新版助手（Releases）'
     );
   }
@@ -118,7 +118,7 @@ function renderOfflineWizard(offlineEl) {
     <ol class="setup-wizard-steps">
       <li>
         <strong>① 下載 Windows 應用程式（推薦）</strong>
-        <p class="hint">下載 <code>CallCoachAssistant-Windows.zip</code>，解壓後雙擊 <code>CallCoachAssistant.cmd</code>（支援中文使用者名稱路徑）。若 <code>.exe</code> 出現 python312.dll 錯誤，請改用 <code>.cmd</code>。不需安裝 Python、不需 winget。</p>
+        <p class="hint">下載 <code>CallCoachAssistant-Windows.zip</code>（v11.0.2+），解壓後<strong>只</strong>雙擊 <code>啟動 Call Coach.cmd</code>。若出現 python312.dll 或資料夾有 <code>_internal</code>，代表舊版或點錯 .exe — 請刪除重下。不需安裝 Python、不需 winget。</p>
         <div class="bridge-actions">
           <a class="btn primary" href="${ASSISTANT_RELEASE_URL}" target="_blank" rel="noopener noreferrer">下載本機助手（Windows）</a>
         </div>

@@ -25,6 +25,7 @@ $AppFiles = @(
     "upload_parse.py",
     "job_log.py",
     "app_paths.py",
+    "啟動 Call Coach.cmd",
     "CallCoachAssistant.cmd",
     ".env.example",
     "START_HERE.txt",
@@ -35,24 +36,13 @@ foreach ($file in $AppFiles) {
 }
 Copy-Item -Recurse "demo_app" "$Dist\demo_app"
 
-# Optional legacy .exe via PyInstaller (separate folder — must not overwrite portable $Dist)
-$PyiDist = "dist\CallCoachAssistant-exe"
-try {
-    python -m pip install -q -r requirements-build.txt
-    if (Test-Path "build") { Remove-Item "build" -Recurse -Force }
-    if (Test-Path $PyiDist) { Remove-Item $PyiDist -Recurse -Force }
-    python -m PyInstaller --noconfirm call_coach_assistant.spec
-    $BuiltExe = "$PyiDist\CallCoachAssistant.exe"
-    if (Test-Path $BuiltExe) {
-        Copy-Item $BuiltExe $Dist -Force
-        Write-Host "[OK] Built optional CallCoachAssistant.exe (use .cmd if DLL error)"
-    }
-} catch {
-    Write-Host "[提醒] PyInstaller 略過: $_"
-}
+$Version = (Get-Content "..\package.json" -Raw | ConvertFrom-Json).version
+Set-Content -Path "$Dist\VERSION.txt" -Value "Call Coach Assistant Windows v$Version" -Encoding UTF8
 
-if (-not (Test-Path "$Dist\CallCoachAssistant.cmd")) {
-    throw "Build failed: CallCoachAssistant.cmd not found"
+# Do not ship CallCoachAssistant.exe — PyInstaller fails on Chinese user profile paths.
+
+if (-not (Test-Path "$Dist\啟動 Call Coach.cmd")) {
+    throw "Build failed: 啟動 Call Coach.cmd not found"
 }
 
 $Zip = "dist\CallCoachAssistant-Windows.zip"
@@ -61,4 +51,4 @@ Compress-Archive -Path $Dist -DestinationPath $Zip -Force
 
 Write-Host ""
 Write-Host "[Done] $Zip"
-Write-Host "請雙擊 CallCoachAssistant.cmd 啟動（建議，支援中文路徑）"
+Write-Host "請雙擊「啟動 Call Coach.cmd」啟動（支援中文路徑，勿用 .exe）"

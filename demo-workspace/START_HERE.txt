@@ -1,15 +1,18 @@
 Call Coach 本機助手 — 從這裡開始
 ==============================
 
-【Windows 應用程式 — 請點這個】
-  1. 解壓 CallCoachAssistant-Windows.zip
-  2. 雙擊 CallCoachAssistant.cmd  ← 建議（支援中文路徑）
-  3. 保持黑窗開啟 → Call Coach DEMO → 完整環境安裝
+【請點這個檔案啟動】
+  → 雙擊「啟動 Call Coach.cmd」
+  → 保持黑窗開啟 → Call Coach DEMO → 完整環境安裝
 
-  若 CallCoachAssistant.exe 出現 python312.dll 錯誤：
-  → 請改用 CallCoachAssistant.cmd，或將資料夾移到 C:\CallCoachAssistant
+【如何確認是新版（v11.0.2+）】
+  ✓ 有「啟動 Call Coach.cmd」和 demo_app.py
+  ✓ 有 runtime\python\ 資料夾
+  ✗ 沒有 _internal 資料夾（有 _internal = 舊版，請刪除重下）
 
-【公司電腦 — demo-workspace 腳本】
-  雙擊 setup_portable.cmd
+【若出現 python312.dll 錯誤】
+  → 代表您點了 CallCoachAssistant.exe（舊版）
+  → 請關閉錯誤視窗，改用「啟動 Call Coach.cmd」
+  → 或刪除整個資料夾，至 Releases 重新下載最新 zip
 
-說明見 README.md
+下載：https://github.com/Minoru1017/For-company-business-use/releases/latest
