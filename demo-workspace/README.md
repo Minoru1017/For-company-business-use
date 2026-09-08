@@ -8,7 +8,7 @@
 
 1. 至 [Releases](https://github.com/Minoru1017/For-company-business-use/releases/latest) 下載 **`CallCoachAssistant-Windows.zip`**
 2. 解壓到任意資料夾（路徑含中文時建議用 `C:\CallCoachAssistant`）
-3. 雙擊 **`CallCoachAssistant.cmd`**（建議；支援中文使用者名稱）或 `CallCoachAssistant.exe`
+3. 雙擊 **`啟動 Call Coach.cmd`**（支援中文使用者名稱路徑；**不要用 .exe**）
 4. 保持視窗開啟 → Call Coach **DEMO** → **完整環境安裝**
 
 不需安裝 Python、不需 winget、不需管理員。內含 Python 3.12 與轉錄助手。
@@ -29,7 +29,7 @@
 .\build_windows.ps1
 ```
 
-產出：`dist/CallCoachAssistant-Windows.zip`（含 `CallCoachAssistant.cmd` + 內建 Python 3.12；可選 `CallCoachAssistant.exe`）。
+產出：`dist/CallCoachAssistant-Windows.zip`（含 `啟動 Call Coach.cmd` + 內建 Python 3.12；**不含 .exe**）。
 
 GitHub Actions 亦會在 `main` 分支更新 `demo-workspace/` 時自動建置，可到 Actions 或 Releases 下載 artifact。
 
@@ -68,7 +68,7 @@ demo-workspace/
 
 ## 疑難排解
 
-- **CallCoachAssistant.exe 無法開啟 / python312.dll 錯誤**：請改雙擊 **`CallCoachAssistant.cmd`**，或將整個資料夾移到 **`C:\CallCoachAssistant`**（路徑不要有中文）後再試
+- **CallCoachAssistant.exe / python312.dll 錯誤**：代表使用了**舊版**或點錯檔案。刪除整個資料夾，下載最新 Releases，只雙擊 **`啟動 Call Coach.cmd`**。若資料夾內有 `_internal` 即為舊版
 - **完整環境安裝出現 Failed to fetch**：請確認 `CallCoachAssistant.cmd` 黑窗仍開啟，並下載 [最新版 Releases](https://github.com/Minoru1017/For-company-business-use/releases/latest)。若仍失敗，改按「僅安裝 WhisperX」
 - **雙擊 start_call_coach 沒反應**：改用 `setup_portable.cmd` 或 `start_call_coach.cmd`（命令指令檔，不是 .pyw）
 - **Call Coach 顯示未連線**：確認助手黑窗仍開啟；若使用 **Python 3.13/3.14**，請執行 **`setup_portable.cmd`** 安裝內建 Python 3.12
