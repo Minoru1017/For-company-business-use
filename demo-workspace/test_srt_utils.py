@@ -31,6 +31,64 @@ class ChunkPlanTest(unittest.TestCase):
         self.assertEqual(max_parallel_workers(5), 3)
         self.assertEqual(max_parallel_workers(2), 2)
 
+    def test_run_parallel_transcribe_defines_workers(self):
+        from unittest.mock import MagicMock, patch
+        from pathlib import Path
+        import tempfile
+
+        from transcribe_parallel import run_parallel_transcribe
+
+        with tempfile.TemporaryDirectory() as tmp:
+            wav = Path(tmp) / "demo.wav"
+            wav.write_bytes(b"\x00" * 64)
+            part_a = Path(tmp) / "chunk_000.wav"
+            part_b = Path(tmp) / "chunk_001.wav"
+            part_a.write_bytes(b"\x00" * 64)
+            part_b.write_bytes(b"\x00" * 64)
+            work = Path(tmp) / "work"
+            out = Path(tmp) / "out"
+            final = out / "demo.srt"
+            logs: list[str] = []
+
+            def fake_run_command(*_a, **_k):
+                out_sub = _k.get("log")
+                chunk_out = Path(_a[0][-1]) if _a else None
+                return 0
+
+            def fake_run_command2(cmd, log=None, **_k):
+                out_dir = Path(cmd[-1])
+                out_dir.mkdir(parents=True, exist_ok=True)
+                (out_dir / "part.srt").write_text(
+                    "1\n00:00:01,000 --> 00:00:02,000\n[SPEAKER_00] hi\n",
+                    encoding="utf-8",
+                )
+                return 0
+
+            with patch(
+                "transcribe_parallel.split_wav_chunks",
+                return_value=[(part_a, 0.0), (part_b, 1440.0)],
+            ):
+                code = run_parallel_transcribe(
+                    audio=wav,
+                    chunk_count=2,
+                    ffmpeg="ffmpeg",
+                    work_root=work,
+                    output_dir=out,
+                    final_srt=final,
+                    whisperx_cmd=["whisperx"],
+                    model="medium",
+                    default_threads=8,
+                    batch=8,
+                    env_vars={},
+                    run_command=fake_run_command2,
+                    log=logs.append,
+                    hooks=MagicMock(),
+                    cancel_check=lambda: False,
+                )
+            self.assertEqual(code, 0)
+            self.assertTrue(any("最多 2 段同時跑" in line for line in logs))
+            self.assertTrue(final.is_file())
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -586,8 +586,10 @@ def run_transcribe(mp4_name: str | None = None, log: LogFn = default_log, hooks:
 
     duration = probe_duration_seconds(audio, ffmpeg, log) if audio.suffix.lower() == ".wav" else 0.0
     chunk_count = chunk_count_for_duration(duration) if duration > 0 else 1
+    use_parallel = chunk_count > 1 and bool(ffmpeg)
+    code = 0
 
-    if chunk_count > 1 and ffmpeg:
+    if use_parallel:
         stem = Path(mp4.name).stem
         final_srt = ROOT / "output" / f"{stem}.srt"
         code = run_parallel_transcribe(
@@ -609,11 +611,11 @@ def run_transcribe(mp4_name: str | None = None, log: LogFn = default_log, hooks:
         )
         if code == CANCEL_EXIT:
             return code
-        if code != 0:
-            log("[錯誤] 轉錄失敗")
-            return code
-    else:
-        if duration > 0 and chunk_count == 1:
+
+    if not use_parallel or code != 0:
+        if use_parallel and code != 0:
+            log("[提醒] 分段平行轉錄失敗，改為單檔完整轉錄（較慢但較穩定）…")
+        elif duration > 0 and chunk_count == 1:
             log(f"[2/2] 音檔約 {int(duration // 60)} 分鐘，單段轉錄…")
         else:
             log("[2/2] 開始轉錄（2 小時 DEMO 約 1.5～3 小時，請接電源）…")
