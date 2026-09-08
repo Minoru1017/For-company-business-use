@@ -4,14 +4,34 @@
 
 ## 快速開始
 
-**公司電腦**（`setup_all.cmd` 開不起來）：雙擊 **`setup_portable.cmd`** — 不需 winget、不需管理員，Python 會下載到 `runtime\python\`。
+### 方式 A：Windows 應用程式（推薦，尤其公司電腦）
 
-**一般電腦**：雙擊 **`setup_all.cmd`**，會自動安裝 Python 3.12 + ffmpeg（需 winget）並啟動助手。
+1. 至 [Releases](https://github.com/Minoru1017/For-company-business-use/releases/latest) 下載 **`CallCoachAssistant-Windows.zip`**
+2. 解壓到任意資料夾（例如 `C:\CallCoachAssistant`）
+3. 雙擊 **`CallCoachAssistant.exe`** — 會開啟小視窗並自動連到 Call Coach
+4. 在 Call Coach 選 **DEMO · 錄影轉逐字稿** → **完整環境安裝** → 設定 Token → 轉錄
 
-1. 下載整個 `demo-workspace` 資料夾到本機（例如 `C:\Users\經銷業務\demo-workspace`）
-2. 雙擊 **`setup_portable.cmd`**（公司電腦）或 **`setup_all.cmd`**（一般電腦）或 **`start_call_coach.cmd`**（已裝 Python 3.10～3.12）
-3. 瀏覽器開啟 Call Coach → 選擇 **DEMO · 錄影轉逐字稿**
-4. **完整環境安裝** → 設定 Token → 放入 MP4 → 開始轉錄 → 自動進入分析
+不需安裝 Python、不需 winget、不需管理員。內含 Python 3.12 與轉錄助手。
+
+### 方式 B：demo-workspace 腳本（開發者）
+
+**公司電腦**：雙擊 **`setup_portable.cmd`**。**一般電腦**：**`setup_all.cmd`**。
+
+1. 下載整個 `demo-workspace` 資料夾到本機
+2. 依上列方式啟動，或 **`start_call_coach.cmd`**（已裝 Python 3.10～3.12）
+3. 瀏覽器開啟 Call Coach → DEMO 模式 → **完整環境安裝**
+
+## 自行打包 Windows 應用程式
+
+在 **Windows** 上於 `demo-workspace` 目錄執行：
+
+```powershell
+.\build_windows.ps1
+```
+
+產出：`dist/CallCoachAssistant-Windows.zip`（含 `CallCoachAssistant.exe` + 內建 Python 3.12）。
+
+GitHub Actions 亦會在 `main` 分支更新 `demo-workspace/` 時自動建置，可到 Actions 或 Releases 下載 artifact。
 
 ## 資料夾結構
 

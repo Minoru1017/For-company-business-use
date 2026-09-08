@@ -26,7 +26,7 @@ import security
 import upload_parse
 
 ROOT = demo_core.ROOT
-STATIC = ROOT / "demo_app"
+STATIC = demo_core.STATIC
 PORT = 8765
 CALL_COACH_URL = demo_core.CALL_COACH_URL
 
@@ -423,27 +423,66 @@ class Handler(BaseHTTPRequestHandler):
         )
 
 
+def _run_with_window(server: ThreadingHTTPServer, host: str, url: str) -> int:
+    import tkinter as tk
+    from tkinter import messagebox
+
+    def open_browser() -> None:
+        webbrowser.open(url)
+
+    def on_quit() -> None:
+        if messagebox.askokcancel("結束", "確定要停止本機轉錄助手嗎？"):
+            server.shutdown()
+            root.destroy()
+
+    def serve() -> None:
+        server.serve_forever()
+
+    threading.Timer(1.0, open_browser).start()
+    threading.Thread(target=serve, daemon=True).start()
+
+    root = tk.Tk()
+    root.title("Call Coach 本機助手")
+    root.geometry("380x210")
+    root.resizable(False, False)
+    tk.Label(root, text="Call Coach 本機助手", font=("", 13, "bold")).pack(pady=(18, 6))
+    tk.Label(root, text=f"本機 API：http://{host}:{PORT}/").pack()
+    tk.Label(root, text="請保持此視窗開啟，關閉即停止服務", fg="#555").pack(pady=(8, 12))
+    tk.Button(root, text="開啟 Call Coach", command=open_browser, width=28).pack(pady=4)
+    tk.Button(root, text="結束助手", command=on_quit, width=28).pack(pady=4)
+    root.protocol("WM_DELETE_WINDOW", on_quit)
+    root.mainloop()
+    server.server_close()
+    return 0
+
+
 def main() -> int:
+    demo_core.ensure_workspace_files()
+
     if not STATIC.exists():
         print(f"[錯誤] 找不到介面檔案: {STATIC}")
         return 1
 
     _, ver, warning = demo_core.python_version_info()
-    if warning:
+    if warning and not demo_core.is_frozen():
         print(f"[提醒] {warning}")
 
     host = "127.0.0.1"
     url = CALL_COACH_URL
-    print("=== Call Coach 本機助手 ===")
-    print(f"工作目錄: {ROOT}")
-    print(f"Python: {ver}")
-    print(f"Call Coach: {url}")
-    print(f"本機 API: http://{host}:{PORT}/api/status")
-    print("（關閉此視窗即停止服務）\n")
+    if not demo_core.is_frozen():
+        print("=== Call Coach 本機助手 ===")
+        print(f"工作目錄: {ROOT}")
+        print(f"Python: {ver}")
+        print(f"Call Coach: {url}")
+        print(f"本機 API: http://{host}:{PORT}/api/status")
+        print("（關閉此視窗即停止服務）\n")
 
     server = ThreadingHTTPServer((host, PORT), Handler)
-    threading.Timer(1.0, lambda: webbrowser.open(url)).start()
 
+    if demo_core.is_frozen():
+        return _run_with_window(server, host, url)
+
+    threading.Timer(1.0, lambda: webbrowser.open(url)).start()
     try:
         server.serve_forever()
     except KeyboardInterrupt:
