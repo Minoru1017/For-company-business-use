@@ -19,6 +19,7 @@ a = Analysis(
         "transcribe_parallel",
         "transcribe_modes",
         "azure_transcribe",
+        "team_config",
         "srt_utils",
         "proc_utils",
         "tkinter",

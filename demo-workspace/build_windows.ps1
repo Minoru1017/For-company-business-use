@@ -63,6 +63,7 @@ $AppFiles = @(
     "transcribe_parallel.py",
     "transcribe_modes.py",
     "azure_transcribe.py",
+    "team_config.py",
     "security.py",
     "upload_parse.py",
     "job_log.py",
