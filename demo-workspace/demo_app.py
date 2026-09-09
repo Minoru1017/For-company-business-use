@@ -42,7 +42,7 @@ class JobState:
         self.cancel_requested = False
         self.cancel_uninstall = False
         self.cancel_remove_models = False
-        self.current_proc: subprocess.Popen | None = None
+        self.procs: dict[int, subprocess.Popen] = {}
         self.log_file: str | None = None
 
     def reset(self, kind: str) -> bool:
@@ -56,27 +56,39 @@ class JobState:
             self.cancel_requested = False
             self.cancel_uninstall = False
             self.cancel_remove_models = False
-            self.current_proc = None
+            self.procs = {}
             self.log_file = None
             return True
 
     def append(self, msg: str) -> None:
         with self.lock:
-            self.logs.append(msg)
+            job_log.append_compact(self.logs, msg)
 
     def finish(self, code: int) -> None:
-        import job_log
-
         with self.lock:
             logs_copy = list(self.logs)
             kind = self.kind
             self.exit_code = code
             self.running = False
-            self.current_proc = None
+            self.procs = {}
         if kind:
             path = job_log.save_job_log(kind, logs_copy, code)
             with self.lock:
                 self.log_file = str(path)
+
+    def add_proc(self, proc: subprocess.Popen) -> None:
+        with self.lock:
+            self.procs[proc.pid] = proc
+
+    def remove_proc(self, proc: subprocess.Popen) -> None:
+        with self.lock:
+            self.procs.pop(proc.pid, None)
+
+    def kill_all_procs(self) -> None:
+        with self.lock:
+            procs = list(self.procs.values())
+        for proc in procs:
+            demo_core.kill_proc(proc)
 
     def request_cancel(self, uninstall: bool = False, remove_models: bool = False) -> tuple[bool, str]:
         with self.lock:
@@ -87,9 +99,7 @@ class JobState:
             self.cancel_requested = True
             self.cancel_uninstall = uninstall
             self.cancel_remove_models = remove_models
-            proc = self.current_proc
-        if proc is not None:
-            demo_core.kill_proc(proc)
+        self.kill_all_procs()
         return True, "正在取消轉錄…"
 
     def snapshot(self) -> dict:
@@ -113,9 +123,14 @@ class JobHooks(demo_core.JobHooks):
     def __init__(self, job: JobState) -> None:
         self.job = job
 
-    def register_proc(self, proc: subprocess.Popen | None) -> None:
-        with self.job.lock:
-            self.job.current_proc = proc
+    def register_proc(self, proc: subprocess.Popen) -> None:
+        self.job.add_proc(proc)
+
+    def unregister_proc(self, proc: subprocess.Popen) -> None:
+        self.job.remove_proc(proc)
+
+    def kill_all(self) -> None:
+        self.job.kill_all_procs()
 
     def is_cancelled(self) -> bool:
         with self.job.lock:
@@ -146,9 +161,15 @@ def run_job(kind: str, fn) -> tuple[bool, str]:
                     code = uninstall_code
             if cancelled:
                 code = demo_core.CANCEL_EXIT
-        except Exception as e:  # noqa: BLE001
-            JOB.append(f"[錯誤] {e}")
+        except BaseException as e:  # noqa: BLE001 — never let a worker die silently
+            import traceback
+
+            JOB.append(f"[錯誤] 助手內部錯誤：{type(e).__name__}: {e}")
+            for line in traceback.format_exc().rstrip().splitlines():
+                JOB.append(f"    {line}")
             code = 1
+        finally:
+            JOB.kill_all_procs()
         JOB.finish(code)
 
     threading.Thread(target=worker, daemon=True).start()

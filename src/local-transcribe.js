@@ -687,11 +687,21 @@ function transcribeFailToast(logs) {
   return `轉錄失敗：${err.replace(/^\[錯誤\]\s*/, '')}`;
 }
 
+// Consecutive /api/job failures tolerated before giving up. While several
+// WhisperX processes saturate the CPU the assistant can miss a poll or two;
+// one hiccup must not make the UI drop a job that is still running.
+const POLL_MAX_FAILURES = 20;
+
 async function pollJob(onDone, { trackTranscribe = false, trackSetup = false } = {}) {
   clearInterval(pollTimer);
+  let failures = 0;
+  let inFlight = false;
   const tick = async () => {
+    if (inFlight) return;
+    inFlight = true;
     try {
       const j = await api('/api/job');
+      failures = 0;
       const setupKinds = new Set(['setup', 'full-setup', 'install-ffmpeg', 'uninstall']);
       const isSetup = setupKinds.has(j.kind);
       if (isSetup || trackSetup) {
@@ -726,13 +736,33 @@ async function pollJob(onDone, { trackTranscribe = false, trackSetup = false } =
         }
         onDone(j.exit_code === 0, j);
       }
-    } catch {
+    } catch (err) {
+      failures += 1;
+      if (failures < POLL_MAX_FAILURES) {
+        if (trackTranscribe && failures >= 3) {
+          setTranscribeUI({
+            active: true,
+            message: `本機轉錄進行中…（助手暫時沒有回應，正在重試 ${failures}/${POLL_MAX_FAILURES}）`,
+          });
+        }
+        return;
+      }
       clearInterval(pollTimer);
       if (trackTranscribe) {
         transcribeBusy = false;
         setTranscribeUI({ active: false });
       }
-      onDone(false, { logs: ['[錯誤] 無法連線本機轉錄助手'] });
+      const detail = err?.status ? `HTTP ${err.status}` : '連線中斷';
+      const logs = [
+        `[錯誤] 無法連線本機轉錄助手（${detail}）`,
+        '助手視窗可能已關閉或當機。請重新啟動「Call Coach 本機助手」；',
+        '若轉錄仍在背景進行，重新整理網頁即可繼續追蹤，完成後按「載入最新 SRT」。',
+        '詳細原因請看 logs 資料夾中最新的 transcribe-*.log。',
+      ];
+      if (trackTranscribe) showLog(logs, { failed: true, title: '與助手失去連線' });
+      onDone(false, { logs });
+    } finally {
+      inFlight = false;
     }
   };
   await tick();

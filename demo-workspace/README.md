@@ -81,5 +81,7 @@ demo-workspace/
 - **Call Coach 顯示未連線**：確認助手黑窗仍開啟；若使用 **Python 3.13/3.14**，請執行 **`setup_portable.cmd`** 安裝內建 Python 3.12
 - **大檔 MP4 很慢**：建議手動複製到 `input\`，再按「重新掃描」
 - **轉錄失敗**：查看 Call Coach 下方日誌；常見為 Token 未設定或 ffmpeg 未安裝（`winget install Gyan.FFmpeg`）
+- **長 DEMO 轉錄快結束時中斷、`output\.chunks\...\part_000` 是空的、沒有 .srt**：分段平行轉錄時某段 WhisperX 在對齊／辨識發言者階段被記憶體壓力擠掉。v11.3.3 起會依實體記憶體決定同時跑幾段（16 GB 標準模式為 2 段）、失敗的段會單獨重試一次，並在 `logs\transcribe-*.log` 記錄結束碼與原因。若仍失敗，可先改用「快速模式」或設定環境變數 `CALL_COACH_MAX_PARALLEL=1`
+- **進階調校（環境變數）**：`CALL_COACH_MAX_PARALLEL`（同時轉錄段數上限，1～5）、`CALL_COACH_THREADS`（每段執行緒）、`CALL_COACH_BATCH`（batch size，1～16）、`CALL_COACH_RAM_GB`（覆寫記憶體偵測）
 - **一鍵安裝失敗**：在 Call Coach 按「複製日誌」或「下載日誌」，或開啟 `logs\` 資料夾將 `.log` 檔傳給技術支援
 - **解除安裝**：在 DEMO 模式按「解除安裝轉錄環境」

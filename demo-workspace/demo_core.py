@@ -54,9 +54,19 @@ CANCEL_EXIT = 130
 
 
 class JobHooks:
-    """Optional hooks for cancellable subprocess jobs."""
+    """Optional hooks for cancellable subprocess jobs.
 
-    def register_proc(self, proc: subprocess.Popen | None) -> None:
+    Several subprocesses may be alive at once (parallel chunk transcription), so
+    the hooks track a set rather than a single "current" process.
+    """
+
+    def register_proc(self, proc: subprocess.Popen) -> None:
+        return None
+
+    def unregister_proc(self, proc: subprocess.Popen) -> None:
+        return None
+
+    def kill_all(self) -> None:
         return None
 
     def is_cancelled(self) -> bool:
@@ -285,6 +295,11 @@ def shell_env(extra: dict[str, str] | None = None) -> dict[str, str]:
     env = os.environ.copy()
     if extra:
         env.update(extra)
+    # Child Python (whisperx / pip) writes to a pipe; on zh-TW Windows that
+    # defaults to cp950 and print() of a simplified character or emoji raises
+    # UnicodeEncodeError, killing WhisperX mid-run. run_command decodes UTF-8.
+    env.setdefault("PYTHONUTF8", "1")
+    env.setdefault("PYTHONIOENCODING", "utf-8")
     ff = ffmpeg_exe()
     if ff:
         ff_dir = str(Path(ff).parent)
@@ -473,10 +488,32 @@ def run_command(
         code = proc.wait()
         if hooks and hooks.is_cancelled():
             return CANCEL_EXIT
+        if code != 0:
+            log(f"[提醒] 程序結束碼 {code}{describe_exit_code(code)}")
         return code
     finally:
         if hooks:
-            hooks.register_proc(None)
+            hooks.unregister_proc(proc)
+
+
+def describe_exit_code(code: int) -> str:
+    """Human hint for common Windows crash codes (WhisperX dying mid-run)."""
+    unsigned = code & 0xFFFFFFFF
+    hints = {
+        0xC0000005: "記憶體存取錯誤（通常是記憶體不足或 torch/ctranslate2 崩潰）",
+        0xC000012D: "記憶體不足（系統 commit 額度用盡）",
+        0xC0000409: "堆疊緩衝區溢位／執行期錯誤",
+        0xC00000FD: "堆疊溢位",
+        0xC0000135: "缺少 DLL",
+        0xC000013A: "被使用者中斷（Ctrl+C）",
+    }
+    if unsigned in hints:
+        return f"：{hints[unsigned]}"
+    if code < 0 and sys.platform != "win32":
+        return f"：被訊號 {-code} 終止（可能是 OOM killer）"
+    if code == 137:
+        return "：被系統強制結束（記憶體不足）"
+    return ""
 
 
 def create_venv(log: LogFn = default_log) -> int:
@@ -649,6 +686,7 @@ def run_transcribe(
     from azure_transcribe import run_azure_transcribe
     from transcribe_modes import MODE_AZURE, MODE_LABELS, model_for_mode, normalize_mode, validate_transcribe_request
     from transcribe_parallel import (
+        MAX_CHUNKS,
         chunk_count_for_duration,
         estimate_transcribe_minutes,
         max_parallel_workers,
@@ -726,12 +764,13 @@ def run_transcribe(
         return code
 
     duration = probe_duration_seconds(mp4, ffmpeg, log) if ffmpeg else 0.0
-    chunk_count = chunk_count_for_duration(duration) if duration > 0 else 1
+    parallel = max_parallel_workers(MAX_CHUNKS, whisper_model) if duration > 0 else 1
+    chunk_count = chunk_count_for_duration(duration, parallel) if duration > 0 else 1
     use_parallel = chunk_count > 1 and bool(ffmpeg)
     code = 0
 
     if use_parallel:
-        parallel = max_parallel_workers(chunk_count)
+        parallel = min(parallel, chunk_count)
         eta_low, eta_high = estimate_transcribe_minutes(duration, chunk_count, parallel)
         log(
             f"[1/2] Faster-Whisper 分段模式（{whisper_model}）：直接從 MP4 切 {chunk_count} 段"
@@ -771,6 +810,7 @@ def run_transcribe(
             log=log,
             hooks=hooks,
             cancel_check=lambda: bool(hooks and hooks.is_cancelled()),
+            parallel=parallel,
         )
         if code == CANCEL_EXIT:
             return code
