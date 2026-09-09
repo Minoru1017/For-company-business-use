@@ -4,11 +4,11 @@ from __future__ import annotations
 import math
 import os
 import shutil
-import subprocess
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 from typing import Callable
 
+from proc_utils import quiet_run
 from srt_utils import merge_srt_parts
 
 LogFn = Callable[[str], None]
@@ -62,7 +62,7 @@ def probe_duration_seconds(audio: Path, ffmpeg: str | None, log: LogFn) -> float
     if not ffprobe:
         log("[提醒] 找不到 ffprobe，略過分段平行轉錄")
         return 0.0
-    proc = subprocess.run(
+    proc = quiet_run(
         [
             ffprobe,
             "-v",
@@ -75,7 +75,6 @@ def probe_duration_seconds(audio: Path, ffmpeg: str | None, log: LogFn) -> float
         ],
         capture_output=True,
         text=True,
-        check=False,
     )
     if proc.returncode != 0:
         log(f"[提醒] 無法讀取音檔長度：{proc.stderr.strip()}")
@@ -122,7 +121,7 @@ def _split_one_chunk(
         "pcm_s16le",
         str(out),
     ]
-    proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
+    proc = quiet_run(cmd, capture_output=True, text=True)
     if proc.returncode != 0:
         raise RuntimeError(f"切分音檔失敗：{proc.stderr.strip() or proc.returncode}")
     return out, start
