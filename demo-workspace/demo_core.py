@@ -340,6 +340,27 @@ def python_version_info() -> tuple[bool, str, str | None]:
     return ok, ver, warning
 
 
+def smart_app_control_state() -> str:
+    """Windows 11 Smart App Control: 'off' | 'on' | 'evaluation' | 'unknown'.
+
+    SAC blocks unsigned executables (our PyInstaller exe, ffmpeg, whisperx) and can only be
+    turned off, never re-enabled without reinstalling Windows.
+    """
+    if sys.platform != "win32":
+        return "off"
+    try:
+        import winreg
+
+        with winreg.OpenKey(
+            winreg.HKEY_LOCAL_MACHINE,
+            r"SYSTEM\CurrentControlSet\Control\CI\Policy",
+        ) as key:
+            value, _ = winreg.QueryValueEx(key, "VerifiedAndReputablePolicyState")
+    except OSError:
+        return "unknown"
+    return {0: "off", 1: "on", 2: "evaluation"}.get(int(value), "unknown")
+
+
 @dataclass
 class EnvStatus:
     python_ok: bool
@@ -389,6 +410,7 @@ class EnvStatus:
             "call_coach_url": CALL_COACH_URL,
             "hf_links": HF_LINKS,
             "transcribe_modes": ["fast", "standard", "azure"],
+            "smart_app_control": smart_app_control_state(),
         }
 
 

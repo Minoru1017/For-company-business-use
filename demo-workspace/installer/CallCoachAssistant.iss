@@ -50,6 +50,21 @@ begin
 end;
 
 function InitializeSetup(): Boolean;
+var
+  SacState: Cardinal;
 begin
   Result := True;
+  if RegQueryDWordValue(HKLM, 'SYSTEM\CurrentControlSet\Control\CI\Policy',
+                        'VerifiedAndReputablePolicyState', SacState) then
+  begin
+    if (SacState = 1) or (SacState = 2) then
+    begin
+      MsgBox('偵測到 Windows Smart App Control 已開啟（或處於評估模式）。' + #13#10 + #13#10 +
+             'Smart App Control 會封鎖未簽章的程式，本機轉錄（WhisperX / ffmpeg）可能無法執行。' + #13#10 + #13#10 +
+             '建議：安裝完成後改用「Azure 雲端轉錄」模式，或請 IT 關閉 Smart App Control' + #13#10 +
+             '（Windows 安全性 → 應用程式與瀏覽器控制 → Smart App Control 設定）。' + #13#10 + #13#10 +
+             '注意：Smart App Control 關閉後無法再開啟。',
+             mbInformation, MB_OK);
+    end;
+  end;
 end;

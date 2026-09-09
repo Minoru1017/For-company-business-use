@@ -209,6 +209,7 @@ export function initLocalTranscribe({ onTranscriptReady, showToast, getMode }) {
     const pythonWarn = st.python_warning
       ? `<p class="bridge-python-warn">${escapeHTML(st.python_warning)}</p>`
       : '';
+    const sacWarn = sacBanner(st.smart_app_control);
 
     const files = st.mp4_files || [];
     if (!selectedMp4 || !files.includes(selectedMp4)) selectedMp4 = files[0] || null;
@@ -244,6 +245,7 @@ export function initLocalTranscribe({ onTranscriptReady, showToast, getMode }) {
       ${setupBanner}
       <ul class="bridge-checks">${checkHtml}</ul>
       ${pythonWarn}
+      ${sacWarn}
 
       <div class="bridge-manual">
         <strong>推薦：大檔 DEMO 請手動複製（比拖曳快）</strong>
@@ -642,6 +644,21 @@ function bindLogActions(showToast) {
     await api('/api/open-folder', { method: 'POST', body: JSON.stringify({ folder: 'logs' }) });
     showToast('已開啟 logs 資料夾');
   });
+}
+
+function sacBanner(state) {
+  if (state !== 'on' && state !== 'evaluation') return '';
+  const mode = state === 'on' ? '已開啟' : '評估模式';
+  return `
+    <div class="bridge-sac-warn">
+      <strong>▲ Windows Smart App Control ${mode} — 會封鎖本機轉錄元件</strong>
+      <p class="hint">Smart App Control 只允許有數位簽章或信譽良好的程式執行；助手、ffmpeg 與 WhisperX 目前未簽章，轉錄可能出現「已封鎖部分功能」或直接失敗。可行做法：</p>
+      <ol class="bridge-sac-steps">
+        <li><strong>改用「Azure 雲端轉錄」模式</strong>：僅需 ffmpeg 抽音軌，受影響元件最少（需勾選知情同意）。</li>
+        <li><strong>請 IT 關閉 Smart App Control</strong>：Windows 安全性 → 應用程式與瀏覽器控制 → Smart App Control 設定 → 關閉。<span class="bridge-sac-note">注意：關閉後無法再開啟（需重灌 Windows），請先與 IT 確認。</span></li>
+        <li><strong>由公司提供程式碼簽章憑證</strong>：我們的安裝包已支援簽章，簽章後 Smart App Control 會放行。</li>
+      </ol>
+    </div>`;
 }
 
 function transcribeBlockReason(st) {

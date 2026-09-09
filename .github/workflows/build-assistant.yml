@@ -40,6 +40,12 @@ jobs:
 
       - name: Build Windows installer and package
         shell: pwsh
+        env:
+          # Optional: set these repository secrets to produce Authenticode-signed artifacts
+          # (required for Windows 11 Smart App Control). Build stays unsigned when absent.
+          CODESIGN_PFX_BASE64: ${{ secrets.CODESIGN_PFX_BASE64 }}
+          CODESIGN_PFX_PASSWORD: ${{ secrets.CODESIGN_PFX_PASSWORD }}
+          CODESIGN_TIMESTAMP_URL: ${{ secrets.CODESIGN_TIMESTAMP_URL }}
         run: ./build_windows.ps1
 
       - uses: actions/upload-artifact@v4
@@ -67,6 +73,8 @@ jobs:
             5. 開啟 [Call Coach](https://minoru1017.github.io/For-company-business-use/) → **DEMO · 轉錄** → 貼上 HF_TOKEN
 
             不需 `.cmd`、不需 winget、不需自行安裝 Python。
+
+            > **Windows 11 Smart App Control** 開啟時會封鎖未簽章程式。若看到「已封鎖此應用程式的部分功能」，請改用 DEMO 的「Azure 雲端轉錄」模式，或請 IT 關閉 Smart App Control（關閉後無法再開啟）。
 
             ### 進階 — ZIP 免安裝版
 
