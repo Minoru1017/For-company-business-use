@@ -10,6 +10,28 @@ Set-Location $PSScriptRoot
 
 Write-Host "=== Build Call Coach Assistant (Windows) ==="
 
+# Optional Authenticode signing — active only when CODESIGN_PFX_BASE64 is provided.
+# Smart App Control (Windows 11) blocks unsigned executables; signing lets it pass.
+$SignPfx = $null
+if ($env:CODESIGN_PFX_BASE64) {
+    $SignPfx = Join-Path $env:TEMP "callcoach-codesign.pfx"
+    [IO.File]::WriteAllBytes($SignPfx, [Convert]::FromBase64String($env:CODESIGN_PFX_BASE64))
+    Write-Host "[Sign] Code-signing certificate loaded"
+} else {
+    Write-Host "[Sign] CODESIGN_PFX_BASE64 not set — artifacts will be unsigned (Smart App Control may block)"
+}
+
+function Sign-File([string]$Path) {
+    if (-not $SignPfx) { return }
+    $signtool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" -ErrorAction SilentlyContinue |
+        Sort-Object FullName -Descending | Select-Object -First 1 -ExpandProperty FullName
+    if (-not $signtool) { throw "signtool.exe not found (install Windows SDK)" }
+    $ts = if ($env:CODESIGN_TIMESTAMP_URL) { $env:CODESIGN_TIMESTAMP_URL } else { "http://timestamp.digicert.com" }
+    & $signtool sign /f $SignPfx /p $env:CODESIGN_PFX_PASSWORD /fd SHA256 /tr $ts /td SHA256 /d "Call Coach Assistant" $Path
+    if ($LASTEXITCODE -ne 0) { throw "signtool failed for $Path" }
+    Write-Host "[Sign] $Path"
+}
+
 & .\scripts\bootstrap_portable_python.ps1
 & .\scripts\bootstrap_portable_ffmpeg.ps1
 
@@ -65,6 +87,9 @@ python -m PyInstaller --noconfirm call_coach_assistant.spec
 if (-not (Test-Path "$PyiDist\CallCoachAssistant.exe")) {
     throw "PyInstaller build failed"
 }
+Sign-File "$PyiDist\CallCoachAssistant.exe"
+Sign-File "$Payload\runtime\ffmpeg\ffmpeg.exe"
+Sign-File "$Payload\runtime\ffmpeg\ffprobe.exe"
 Copy-Item "$PyiDist\CallCoachAssistant.exe" $Payload -Force
 Copy-Item "$PyiDist\_internal" "$Payload\_internal" -Recurse -Force
 Write-Host "[OK] CallCoachAssistant.exe (install to C:\CallCoachAssistant)"
@@ -92,9 +117,12 @@ if (-not $SkipInstaller) {
         if (-not (Test-Path $Setup)) {
             throw "Installer build failed: $Setup not found"
         }
+        Sign-File $Setup
         Write-Host "[Done] $Setup"
     }
 }
+
+if ($SignPfx) { Remove-Item $SignPfx -Force -ErrorAction SilentlyContinue }
 
 Write-Host ""
 Write-Host "公司電腦請使用 CallCoachAssistant-Setup.exe 安裝精靈"
