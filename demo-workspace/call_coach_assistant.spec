@@ -20,6 +20,7 @@ a = Analysis(
         "transcribe_modes",
         "azure_transcribe",
         "srt_utils",
+        "proc_utils",
         "tkinter",
     ],
     hookspath=[],

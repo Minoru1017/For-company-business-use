@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Callable
 
 from app_paths import is_frozen, resolve_paths
+from proc_utils import no_window_kwargs, quiet_run
 
 ROOT, BUNDLE = resolve_paths()
 STATIC = BUNDLE / "demo_app"
@@ -66,10 +67,9 @@ def kill_proc(proc: subprocess.Popen) -> None:
     if proc.poll() is not None:
         return
     if sys.platform == "win32":
-        subprocess.run(
+        quiet_run(
             ["taskkill", "/F", "/T", "/PID", str(proc.pid)],
             capture_output=True,
-            check=False,
         )
     else:
         proc.terminate()
@@ -378,14 +378,16 @@ class EnvStatus:
 
 
 def faster_whisper_installed() -> bool:
+    """Filesystem check only — this runs on every /api/status poll, so it must not spawn a process."""
     if not VENV_PY.exists():
         return False
-    proc = subprocess.run(
-        [str(VENV_PY), "-c", "import faster_whisper"],
-        capture_output=True,
-        check=False,
-    )
-    return proc.returncode == 0
+    site = ROOT / ".venv" / "Lib" / "site-packages"
+    if not site.is_dir():
+        candidates = list((ROOT / ".venv" / "lib").glob("python3*/site-packages")) if (ROOT / ".venv" / "lib").is_dir() else []
+        if not candidates:
+            return False
+        site = candidates[0]
+    return (site / "faster_whisper").is_dir()
 
 
 def get_status() -> EnvStatus:
@@ -456,6 +458,7 @@ def run_command(
         encoding="utf-8",
         errors="replace",
         bufsize=1,
+        **no_window_kwargs(),
     )
     if hooks:
         hooks.register_proc(proc)
