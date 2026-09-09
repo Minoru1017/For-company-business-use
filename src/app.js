@@ -20,6 +20,7 @@ import { applyBuiltinSpeakerLabels, enrichSegments, parse, parseVibeJson } from 
 import { bumpUsage, checkQuotaBefore, getLimit, getUsage, quotaPercent, saveUsage } from './quota.js';
 import { labeledRatio } from './speaker-labels.js';
 import { appendAIReportSection } from './report-format.js';
+import { SAMPLE_TRANSCRIPT_NAME, SAMPLE_TRANSCRIPT_SRT } from './sample-transcript.js';
 import { autoGuess } from './speaker.js';
 import { animateStats, bindUI, renderAnalysisUI, showQuotaModal, showToast } from './ui.js';
 import { $, escapeHTML, fmt } from './utils.js';
@@ -73,6 +74,13 @@ function bindUpload() {
     if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]);
   };
   $('file').onchange = () => $('file').files[0] && loadFile($('file').files[0]);
+  document.querySelectorAll('[data-load-sample]').forEach((btn) => {
+    btn.onclick = () => {
+      if (loadTranscriptText(SAMPLE_TRANSCRIPT_SRT, SAMPLE_TRANSCRIPT_NAME)) {
+        $('labelCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    };
+  });
 }
 
 function loadTranscriptText(text, filename = 'transcript.srt') {

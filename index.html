@@ -57,10 +57,18 @@
     <div id="drop">點擊選擇 或 拖曳逐字稿檔到這裡<br><span class="mono-hint" style="font-family:var(--mono);font-size:.7rem;letter-spacing:.15em;color:#555">VIBE .JSON / SRT / VTT / TXT — LOCAL ONLY</span><div id="fname"></div></div>
     <input type="file" id="file" accept=".vibe.json,.json,.srt,.vtt,.txt,text/plain,application/json" hidden>
     <p class="hint" style="margin-top:10px">電訪建議用 Vibe 錄音並匯出 <code>transcript.vibe.json</code>（見 <a href="https://github.com/Minoru1017/For-company-business-use/blob/main/docs/vibe-export-checklist.md" target="_blank" rel="noopener noreferrer">Vibe 檢查清單</a>）。</p>
+    <div class="sample-actions">
+      <button type="button" class="btn" data-load-sample>載入範例逐字稿</button>
+      <span class="hint">沒有檔案也能先體驗：內建一段 3 分鐘的虛構 AI 課程 DEMO 電訪。</span>
+    </div>
   </section>
 
   <section class="sec" id="demoSection" hidden>
-    <div class="sec-head"><span class="num">01</span><h2>DEMO 本機轉錄</h2><span class="tag">MP4 → SRT · 不上雲</span></div>
+    <div class="sec-head"><span class="num">01</span><h2>DEMO 轉錄</h2><span class="tag">MP4 → SRT · 本機或 Azure</span></div>
+    <div class="sample-actions">
+      <button type="button" class="btn" data-load-sample>載入範例逐字稿</button>
+      <span class="hint">還沒裝助手或沒有錄影？先用內建範例走一遍「標記 → 分析 → 報告」。</span>
+    </div>
     <div id="localBridgePanel" class="local-bridge"></div>
     <div id="demoOfflineHint" class="demo-offline" hidden></div>
   </section>
