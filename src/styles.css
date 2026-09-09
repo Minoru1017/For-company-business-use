@@ -56,10 +56,10 @@ body { font-family:var(--sans); background:var(--bg); color:var(--text);
 .bridge-checklist-head strong { color:var(--ok); font-size:.9rem; }
 .bridge-checklist-mode { font-family:var(--mono); font-size:.66rem; letter-spacing:.12em; color:var(--muted); border:1px solid var(--border); padding:2px 8px; border-radius:3px; }
 .bridge-team-note { margin:0 0 8px; font-size:.78rem; color:var(--ok); }
-.bridge-checks-list { display:block; }
-.bridge-checks-list li { display:grid; grid-template-columns:auto 1fr auto; align-items:center; gap:8px 10px; padding:6px 0; border-top:1px dashed rgba(255,255,255,.08); font-size:.82rem; color:var(--text); }
-.bridge-checks-list li:first-child { border-top:0; }
-.bridge-checks-list li.todo .bridge-check-label { color:var(--warn); }
+.bridge-checks.bridge-checks-list { display:block; }
+.bridge-checks.bridge-checks-list li { display:grid; grid-template-columns:auto 1fr auto; align-items:center; gap:8px 10px; padding:6px 0; border-top:1px dashed rgba(255,255,255,.08); font-size:.82rem; color:var(--text); }
+.bridge-checks.bridge-checks-list li:first-child { border-top:0; }
+.bridge-checks.bridge-checks-list li.todo .bridge-check-label { color:var(--warn); }
 .bridge-check-detail { display:block; font-size:.72rem; color:var(--muted); margin-top:2px; }
 .bridge-check-warn { grid-column:1 / -1; margin:0; font-size:.74rem; color:var(--warn); line-height:1.5; }
 .bridge-fix { padding:5px 10px; font-size:.74rem; }

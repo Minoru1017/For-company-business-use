@@ -149,7 +149,7 @@ def run_azure_fast_transcribe(
         }
     )
     body, content_type = encode_multipart({"definition": definition}, "audio", audio.name, audio.read_bytes())
-    log(f"[Azure] 上傳 {size / (1024**2):.0f} MB 音訊至 Azure Speech Fast Transcription（{speech_region}，zh-TW，發言者辨識）…")
+    log(f"[Azure] 上傳 {size / (1024**2):.1f} MB 音訊至 Azure Speech Fast Transcription（{speech_region}，zh-TW，發言者辨識）…")
     log("[Azure] 音訊僅用於轉錄，不會存入 Call Coach 網站；Azure 處理完即不保留")
 
     req = urllib.request.Request(

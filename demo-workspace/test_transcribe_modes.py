@@ -37,6 +37,8 @@ class TranscribeModesTest(unittest.TestCase):
     def test_model_for_mode(self):
         self.assertEqual(model_for_mode(MODE_FAST), "small")
         self.assertEqual(model_for_mode(MODE_STANDARD), "medium")
+        # Azure mode has no local model; must not raise (run_transcribe calls this for every mode).
+        self.assertEqual(model_for_mode(MODE_AZURE), "medium")
 
     def test_validate_azure_consent(self):
         self.assertIsNotNone(validate_transcribe_request(MODE_AZURE, False, True))
