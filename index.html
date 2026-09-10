@@ -17,7 +17,7 @@
   <div class="mode-chooser-inner">
     <p class="mode-chooser-kicker">CALL COACH</p>
     <h2 class="mode-chooser-title">選擇工作流程</h2>
-    <p class="mode-chooser-lead">同一套工具，依情境選擇電訪分析或 DEMO 錄影轉錄。</p>
+    <p class="mode-chooser-lead">同一套工具，依情境選擇電訪分析、DEMO 錄影轉錄，或開發電訪的臨場陪練。</p>
     <div class="mode-cards">
       <button type="button" class="mode-card" data-mode="dev" data-code="CODE_001 // DRIFT">
         <span class="mode-card-tag">開發 · 電訪</span>
@@ -30,6 +30,12 @@
         <h3>錄影轉逐字稿</h3>
         <p>1～2 小時 MP4 在本機轉錄（不上雲），完成後自動進入分析。</p>
         <span class="mode-card-cta">本機轉錄 →</span>
+      </button>
+      <button type="button" class="mode-card drill" data-mode="drill" data-code="CODE_003 // SPAR">
+        <span class="mode-card-tag">開發 · 陪練</span>
+        <h3>臨場反應陪練</h3>
+        <p>客戶接起電話，<code>你主動問</code>、限時接話。練不慌、不套話、不卡住——不是被動看分析。</p>
+        <span class="mode-card-cta">開始撥號 →</span>
       </button>
     </div>
     <p class="hint mode-chooser-hint">首次使用 DEMO：<strong>公司電腦</strong>請下載 <a href="https://github.com/Minoru1017/For-company-business-use/releases/latest/download/CallCoachAssistant-Setup.exe" target="_blank" rel="noopener noreferrer">CallCoachAssistant-Setup.exe</a> 安裝精靈（不需 .cmd）；安裝完成後從開始選單啟動助手。</p>
@@ -46,6 +52,7 @@
     <nav class="mode-bar" id="modeBar" hidden>
       <button type="button" class="mode-pill" data-mode="dev">開發 · 電訪</button>
       <button type="button" class="mode-pill" data-mode="demo">DEMO · 轉錄</button>
+      <button type="button" class="mode-pill" data-mode="drill">開發 · 陪練</button>
     </nav>
     <h1 class="display" data-text="CALL&#10;COACH">CALL<br><span class="ghost">COACH</span></h1>
     <p class="tagline" id="heroTagline">電訪逐字稿分析工具——把每一通電話變成可複盤的專業判斷。<br>
@@ -63,6 +70,11 @@
     <div class="sec-head"><span class="num">01</span><h2>DEMO 本機轉錄</h2><span class="tag">MP4 → SRT · 不上雲</span></div>
     <div id="localBridgePanel" class="local-bridge"></div>
     <div id="demoOfflineHint" class="demo-offline" hidden></div>
+  </section>
+
+  <section class="sec" id="drillSection" hidden>
+    <div class="sec-head"><span class="num">01</span><h2>電訪開發 · 臨場陪練</h2><span class="tag">你主動問 · 客戶即時回 · 限時接話</span></div>
+    <div id="drillPanel" class="drill"></div>
   </section>
 
   <section class="sec" id="labelCard" hidden>
