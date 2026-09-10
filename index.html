@@ -85,6 +85,14 @@
     <div id="drillPanel" class="drill"></div>
   </section>
 
+  <section class="sec history-sec" id="historySection" hidden>
+    <details id="historyDetails">
+      <summary class="history-summary"><span class="num">↻</span><h2>最近分析</h2><span class="tag" id="historyCount">0 筆</span><span class="hint history-hint">存在這台電腦的瀏覽器，一鍵回看，不用再找檔案</span></summary>
+      <ul class="history-list" id="historyList"></ul>
+      <div class="btns" style="margin-top:8px"><button id="historyClear" type="button">清空紀錄</button></div>
+    </details>
+  </section>
+
   <section class="sec" id="labelCard" hidden>
     <div class="sec-head"><span class="num">02</span><h2>標記說話者</h2><span class="tag">Speaker Tagging</span></div>
     <div class="hint" style="margin:0 0 12px">點選句子聚焦後，按 <kbd style="font-family:var(--mono);padding:2px 6px;border:1px solid #444;border-radius:4px;font-size:.75rem">Tab</kbd> 切換「業務／客戶」，<kbd style="font-family:var(--mono);padding:2px 6px;border:1px solid #444;border-radius:4px;font-size:.75rem">↑↓</kbd> 移動，點空白處收起。</div>
@@ -220,7 +228,30 @@
       </div>
     </section>
 
-    <div class="btns" style="margin-bottom:6px"><button class="primary" id="copyReport" type="button">複製完整報告（文字版）</button></div>
+    <section class="sec" id="exportSection">
+      <div class="sec-head"><span class="num">10</span><h2>把結果帶走</h2><span class="tag">Copy · Download · Print</span></div>
+      <div class="export-bar">
+        <div class="export-group">
+          <span class="export-label">貼到群組／回報</span>
+          <button class="primary" id="copySummary" type="button">複製摘要（LINE／Slack）</button>
+          <button id="copyChecklist" type="button">複製「下一通要問」清單</button>
+          <button id="copyReport" type="button">複製完整報告（文字版）</button>
+        </div>
+        <div class="export-group">
+          <span class="export-label">存檔／歸檔</span>
+          <button id="downloadMd" type="button">下載報告 .md</button>
+          <button id="downloadSrt" type="button">下載已標記逐字稿 .srt</button>
+          <button id="printReport" type="button">列印／存成 PDF</button>
+        </div>
+        <div class="export-group" id="exportBridgeGroup" hidden>
+          <span class="export-label">本機助手</span>
+          <button id="saveToBridge" type="button">存到助手 output 資料夾（與 SRT 放一起）</button>
+          <button id="openOutputFolder" type="button">開啟 output 資料夾</button>
+        </div>
+      </div>
+      <p class="hint" id="exportHint">摘要與清單是純文字，直接貼進 LINE／Slack 就能看；.md 可放 Notion／Obsidian；.srt 含你調好的業務／客戶標記，下次載入不用重標。</p>
+    </section>
+
     <div class="footer">
       <span class="mono">CALL COACH — CONSULTATIVE SALES ANALYZER</span>
       <div class="barcode"></div>

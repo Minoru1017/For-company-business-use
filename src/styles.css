@@ -845,3 +845,61 @@ button.primary:hover { background:linear-gradient(180deg,#ffffff,#e6e0d1);
   .mode-card { padding-right:48px; }
   .hero::after { display:none; }
 }
+
+/* ---- 把結果帶走：匯出列 ---- */
+.export-bar { display:flex; flex-direction:column; gap:12px; }
+.export-group { display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:12px 14px;
+  background:rgba(37,47,61,.45); border:1px solid var(--border); border-radius:6px; }
+.export-group[hidden] { display:none; }
+.export-label { font-family:var(--mono); font-size:.62rem; letter-spacing:.2em; color:var(--muted); min-width:110px; text-transform:uppercase; }
+.export-group button { font-size:.8rem; padding:8px 16px; }
+
+/* ---- 最近分析 ---- */
+.history-sec details { border:1px dashed var(--border); border-radius:6px; padding:10px 14px; }
+.history-sec details[open] { border-style:solid; }
+.history-summary { display:flex; align-items:center; gap:12px; cursor:pointer; list-style:none; }
+.history-summary::-webkit-details-marker { display:none; }
+.history-summary .num { font-family:var(--mono); font-size:1.1rem; color:var(--accent); }
+.history-summary h2 { font-family:var(--disp); font-size:1rem; margin:0; }
+.history-summary .tag { font-family:var(--mono); font-size:.62rem; letter-spacing:.2em; color:var(--muted); }
+.history-hint { margin:0 0 0 auto; }
+.history-list { list-style:none; margin:12px 0 0; padding:0; display:flex; flex-direction:column; gap:6px; }
+.history-item { display:flex; align-items:center; gap:12px; flex-wrap:wrap; padding:10px 12px;
+  background:rgba(37,47,61,.45); border:1px solid var(--border); border-radius:6px; font-size:.82rem; }
+.history-item.current { border-color:var(--warn); }
+.history-main { display:flex; flex-direction:column; gap:2px; flex:1; min-width:200px; }
+.history-src { color:var(--text); font-weight:600; word-break:break-all; }
+.history-meta { color:var(--muted); font-family:var(--mono); font-size:.7rem; letter-spacing:.04em; }
+.history-time { color:var(--muted); font-family:var(--mono); font-size:.7rem; }
+.history-actions { display:flex; gap:6px; }
+.history-actions button { font-size:.74rem; padding:6px 12px; }
+.history-del { color:var(--muted); }
+.history-del:hover { color:var(--bad); border-color:var(--bad); }
+
+/* ---- 列印／存成 PDF：只留報告本體，白底黑字 ---- */
+@media print {
+  html, body { background:#fff !important; color:#111 !important; }
+  body::before, body::after, .hero::after, .report-shell::before, .report-shell::after, .hero .display::before, .hero .display::after { display:none !important; }
+  .hero, .mode-bar, #modeChooser, #devSection, #demoSection, #drillSection, #labelCard, #historySection,
+  #exportSection, .footer, #toast, #quotaModal, .rnav, .rpager, .rfoot, .ai-progress, .quota-box,
+  #aiOut ~ .hint, .sample-actions { display:none !important; }
+  #mainApp, #result { display:block !important; }
+  .wrap { max-width:none; padding:0; }
+  .sec { margin-bottom:18px; break-inside:avoid; }
+  .sec-head .num, .sec-head h2 { background:#eee !important; color:#111 !important; box-shadow:none !important; clip-path:none !important; }
+  .card, .report-shell, .stats, .stat, .step, .layer, .rule-card, .purpose-card, .purpose-playbook, .export-group {
+    background:#fff !important; border:1px solid #bbb !important; color:#111 !important; box-shadow:none !important; }
+  .rpane { display:block !important; animation:none !important; margin-bottom:12px; }
+  .rpane-title { color:#111 !important; }
+  .rpane ul.report li, .report li { color:#111 !important; background:#fff !important; border-bottom:1px solid #ddd !important; }
+  .rpane .q { color:#7a4a00 !important; }
+  .rpane .ev, .ev { color:#555 !important; }
+  .hint, .stat .lbl { color:#444 !important; }
+  .stat .num, .sec-head h2, h2, h4, h5 { color:#111 !important; }
+  .chart-box { max-height:260px; }
+  /* Gemini 區塊：只印結果，不印 Key 與按鈕 */
+  #apiKey, #aiModel, #verifyModel, #aiBtn, #aiCancel, #rememberKey, #aiConsent, #aiStatus,
+  #result .sec:has(#aiOut[hidden]) { display:none !important; }
+  #result .sec .row { display:none !important; }
+  a { color:inherit !important; text-decoration:none; }
+}
