@@ -10,26 +10,74 @@ Set-Location $PSScriptRoot
 
 Write-Host "=== Build Call Coach Assistant (Windows) ==="
 
-# Optional Authenticode signing — active only when CODESIGN_PFX_BASE64 is provided.
-# Smart App Control (Windows 11) blocks unsigned executables; signing lets it pass.
+# Optional Authenticode signing. Active when one of these is provided:
+#   CODESIGN_PFX_BASE64       base64 of a .pfx/.p12 (CI secret)          + CODESIGN_PFX_PASSWORD
+#   CODESIGN_PFX_PATH         path to a local .pfx/.p12 (developer PC)   + CODESIGN_PFX_PASSWORD
+#   CODESIGN_CERT_THUMBPRINT  certificate on a USB token / Windows store (OV/EV certificate)
+# See CODESIGN.md for how to obtain a certificate and what Smart App Control accepts
+# (public CA, RSA) versus internal-trust only.
 $SignPfx = $null
-if ($env:CODESIGN_PFX_BASE64) {
+$SignTemp = $false
+$SignEnabled = $false
+if ($env:CODESIGN_CERT_THUMBPRINT) {
+    $thumb = $env:CODESIGN_CERT_THUMBPRINT -replace "\s", ""
+    $cert = Get-ChildItem Cert:\CurrentUser\My, Cert:\LocalMachine\My -ErrorAction SilentlyContinue |
+        Where-Object { $_.Thumbprint -eq $thumb } | Select-Object -First 1
+    if (-not $cert) { throw "CODESIGN_CERT_THUMBPRINT $thumb not found in CurrentUser\My or LocalMachine\My (is the token plugged in?)" }
+    $SignEnabled = $true
+} elseif ($env:CODESIGN_PFX_BASE64) {
     $SignPfx = Join-Path $env:TEMP "callcoach-codesign.pfx"
     [IO.File]::WriteAllBytes($SignPfx, [Convert]::FromBase64String($env:CODESIGN_PFX_BASE64))
-    Write-Host "[Sign] Code-signing certificate loaded"
-} else {
-    Write-Host "[Sign] CODESIGN_PFX_BASE64 not set — artifacts will be unsigned (Smart App Control may block)"
+    $SignTemp = $true
+} elseif ($env:CODESIGN_PFX_PATH) {
+    if (-not (Test-Path $env:CODESIGN_PFX_PATH)) { throw "CODESIGN_PFX_PATH not found: $env:CODESIGN_PFX_PATH" }
+    $SignPfx = (Resolve-Path $env:CODESIGN_PFX_PATH).Path
 }
 
+if ($SignPfx) {
+    if (-not $env:CODESIGN_PFX_PASSWORD) { throw "CODESIGN_PFX_PASSWORD is required when a signing certificate is provided" }
+    $env:CODESIGN_PFX_FILE = $SignPfx
+    $cert = New-Object System.Security.Cryptography.X509Certificates.X509Certificate2(
+        $SignPfx, $env:CODESIGN_PFX_PASSWORD,
+        [System.Security.Cryptography.X509Certificates.X509KeyStorageFlags]::EphemeralKeySet)
+    $SignEnabled = $true
+}
+
+if ($SignEnabled) {
+    $keyAlg = $cert.PublicKey.Oid.FriendlyName
+    $keySize = ""
+    try {
+        $rsa = [System.Security.Cryptography.X509Certificates.RSACertificateExtensions]::GetRSAPublicKey($cert)
+        if ($rsa) { $keySize = "$($rsa.ExportParameters($false).Modulus.Length * 8) bit" }
+    } catch { }
+    $selfSigned = ($cert.Subject -eq $cert.Issuer)
+    Write-Host "[Sign] Certificate: $($cert.Subject)"
+    Write-Host "[Sign]   issuer: $($cert.Issuer)"
+    Write-Host "[Sign]   key: $keyAlg $keySize, valid until $($cert.NotAfter.ToString('yyyy-MM-dd'))"
+    if ($cert.NotAfter -lt (Get-Date)) { throw "Signing certificate expired on $($cert.NotAfter)" }
+    if ($keyAlg -ne "RSA") {
+        Write-Warning "[Sign] Key algorithm is $keyAlg — Smart App Control only accepts RSA signatures. Re-issue the certificate with RSA (2048+)."
+    }
+    if ($selfSigned) {
+        Write-Warning "[Sign] Self-signed certificate: valid only on PCs where IT installed the .cer (scripts\Trust-CallCoachPublisher.ps1). Does NOT satisfy Smart App Control / SmartScreen."
+    }
+    $hasCodeSigningEku = $false
+    foreach ($ext in $cert.Extensions) {
+        if ($ext -is [System.Security.Cryptography.X509Certificates.X509EnhancedKeyUsageExtension]) {
+            foreach ($oid in $ext.EnhancedKeyUsages) { if ($oid.Value -eq "1.3.6.1.5.5.7.3.3") { $hasCodeSigningEku = $true } }
+        }
+    }
+    if (-not $hasCodeSigningEku) { Write-Warning "[Sign] Certificate lacks the Code Signing EKU (1.3.6.1.5.5.7.3.3); Windows will reject the signature." }
+} else {
+    Write-Host "[Sign] No signing certificate (CODESIGN_PFX_BASE64 / CODESIGN_PFX_PATH / CODESIGN_CERT_THUMBPRINT) — artifacts will be unsigned (Smart App Control may block)"
+}
+
+$SignScript = Join-Path $PSScriptRoot "scripts\Sign-File.ps1"
+
 function Sign-File([string]$Path) {
-    if (-not $SignPfx) { return }
-    $signtool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" -ErrorAction SilentlyContinue |
-        Sort-Object FullName -Descending | Select-Object -First 1 -ExpandProperty FullName
-    if (-not $signtool) { throw "signtool.exe not found (install Windows SDK)" }
-    $ts = if ($env:CODESIGN_TIMESTAMP_URL) { $env:CODESIGN_TIMESTAMP_URL } else { "http://timestamp.digicert.com" }
-    & $signtool sign /f $SignPfx /p $env:CODESIGN_PFX_PASSWORD /fd SHA256 /tr $ts /td SHA256 /d "Call Coach Assistant" $Path
-    if ($LASTEXITCODE -ne 0) { throw "signtool failed for $Path" }
-    Write-Host "[Sign] $Path"
+    if (-not $SignEnabled) { return }
+    & powershell.exe -NoProfile -ExecutionPolicy Bypass -File $SignScript $Path
+    if ($LASTEXITCODE -ne 0) { throw "Signing failed for $Path" }
 }
 
 & .\scripts\bootstrap_portable_python.ps1
@@ -113,17 +161,32 @@ if (-not $SkipInstaller) {
         Write-Host "[提醒] Inno Setup 未安裝，略過 Setup.exe（請在 CI 或安裝 Inno Setup 6 後重試）"
     } else {
         Write-Host "[Build] Inno Setup installer ..."
-        & $Iscc "installer\CallCoachAssistant.iss" "/DAppVersion=$Version"
+        $IsccArgs = @("installer\CallCoachAssistant.iss", "/DAppVersion=$Version")
+        if ($SignEnabled) {
+            # Let Inno Setup sign Setup.exe *and* the embedded uninstaller (unins000.exe);
+            # an unsigned uninstaller is otherwise blocked by Smart App Control.
+            # $q = double quote, $f = file to sign (Inno Setup SignTool syntax).
+            $SignCmd = 'powershell.exe -NoProfile -ExecutionPolicy Bypass -File $q' + $SignScript + '$q $f'
+            $IsccArgs += "/DSignBuild"
+            $IsccArgs += "/Ssigntool=$SignCmd"
+        }
+        & $Iscc @IsccArgs
+        if ($LASTEXITCODE -ne 0) { throw "ISCC failed (exit $LASTEXITCODE)" }
         $Setup = "dist\CallCoachAssistant-Setup.exe"
         if (-not (Test-Path $Setup)) {
             throw "Installer build failed: $Setup not found"
         }
-        Sign-File $Setup
+        if ($SignEnabled) {
+            $sig = Get-AuthenticodeSignature $Setup
+            Write-Host "[Sign] $Setup — $($sig.Status) — $($sig.SignerCertificate.Subject)"
+            if (-not $sig.SignerCertificate) { throw "Setup.exe is not signed although a certificate was provided" }
+        }
         Write-Host "[Done] $Setup"
     }
 }
 
-if ($SignPfx) { Remove-Item $SignPfx -Force -ErrorAction SilentlyContinue }
+if ($SignTemp) { Remove-Item $SignPfx -Force -ErrorAction SilentlyContinue }
+Remove-Item Env:\CODESIGN_PFX_FILE -ErrorAction SilentlyContinue
 
 Write-Host ""
 Write-Host "公司電腦請使用 CallCoachAssistant-Setup.exe 安裝精靈"

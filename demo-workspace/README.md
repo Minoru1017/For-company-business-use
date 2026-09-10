@@ -101,7 +101,7 @@ demo-workspace/
 
 ## 疑難排解
 
-- **Smart App Control 已封鎖此應用程式的部分功能**（Windows 11）：SAC 只放行有數位簽章或信譽良好的程式；助手 exe、ffmpeg、WhisperX 未簽章會被擋。做法：① 改用「Azure 雲端轉錄」模式；② 請 IT 關閉 SAC（Windows 安全性 → 應用程式與瀏覽器控制 → Smart App Control 設定；**關閉後無法再開啟**）；③ 由公司提供程式碼簽章憑證，在 GitHub Secrets 設定 `CODESIGN_PFX_BASE64` / `CODESIGN_PFX_PASSWORD`，CI 會自動簽章 Setup.exe 與助手
+- **Smart App Control 已封鎖此應用程式的部分功能**（Windows 11）：SAC 只放行有數位簽章或信譽良好的程式；助手 exe、ffmpeg、WhisperX 未簽章會被擋。做法：① 改用「Azure 雲端轉錄」模式；② 請 IT 關閉 SAC（Windows 安全性 → 應用程式與瀏覽器控制 → Smart App Control 設定；**關閉後無法再開啟**）；③ 由公司提供程式碼簽章憑證，在 GitHub Secrets 設定 `CODESIGN_PFX_BASE64` / `CODESIGN_PFX_PASSWORD`，CI 會自動簽章 Setup.exe、助手與解除安裝程式。**哪種憑證有效、ServBay／自簽憑證的限制、如何申請與佈署**，見 [CODESIGN.md](CODESIGN.md)
 - **安裝精靈完成但 DEMO 顯示缺轉錄環境**：從開始選單啟動 **Call Coach 本機助手**，按 **「安裝／修復轉錄環境」**。日誌：`C:\CallCoachAssistant\logs\install-setup.log`
 - **CallCoachAssistant.exe / python312.dll 錯誤**：代表使用了**舊版**或點錯檔案。請改用安裝精靈 Setup.exe
 - **完整環境安裝出現 Failed to fetch**：請確認 `CallCoachAssistant.cmd` 黑窗仍開啟，並下載 [最新版 Releases](https://github.com/Minoru1017/For-company-business-use/releases/latest)。若仍失敗，改按「僅安裝 WhisperX」
