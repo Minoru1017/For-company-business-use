@@ -49,6 +49,33 @@ body { font-family:var(--sans); background:var(--bg); color:var(--text);
 .bridge-sac-note { display:block; color:var(--warn); font-size:.76rem; margin-top:2px; }
 .bridge-python-warn { background:#1f1a10; border:1px solid #5d4d1e; color:var(--warn); border-radius:8px; padding:10px 12px; margin:0 0 12px; font-size:.82rem; line-height:1.5; }
 
+/* ---- 首次啟動檢查清單 ---- */
+.bridge-checklist { background:#121a14; border:1px solid #2f5d43; border-radius:10px; padding:12px 14px; margin-bottom:12px; }
+.bridge-checklist.ready { border-color:var(--ok); }
+.bridge-checklist-head { display:flex; align-items:center; justify-content:space-between; gap:8px; margin-bottom:8px; }
+.bridge-checklist-head strong { color:var(--ok); font-size:.9rem; }
+.bridge-checklist-mode { font-family:var(--mono); font-size:.66rem; letter-spacing:.12em; color:var(--muted); border:1px solid var(--border); padding:2px 8px; border-radius:3px; }
+.bridge-team-note { margin:0 0 8px; font-size:.78rem; color:var(--ok); }
+.bridge-checks.bridge-checks-list { display:block; }
+.bridge-checks.bridge-checks-list li { display:grid; grid-template-columns:auto 1fr auto; align-items:center; gap:8px 10px; padding:6px 0; border-top:1px dashed rgba(255,255,255,.08); font-size:.82rem; color:var(--text); }
+.bridge-checks.bridge-checks-list li:first-child { border-top:0; }
+.bridge-checks.bridge-checks-list li.todo .bridge-check-label { color:var(--warn); }
+.bridge-check-detail { display:block; font-size:.72rem; color:var(--muted); margin-top:2px; }
+.bridge-check-warn { grid-column:1 / -1; margin:0; font-size:.74rem; color:var(--warn); line-height:1.5; }
+.bridge-fix { padding:5px 10px; font-size:.74rem; }
+.bridge-mode-default { font-family:var(--mono); font-size:.62rem; letter-spacing:.1em; color:var(--ok); border:1px solid #2f5d43; padding:1px 6px; border-radius:3px; margin-left:6px; vertical-align:middle; }
+.bridge-azure-ok { display:flex; align-items:center; gap:8px; flex-wrap:wrap; margin:8px 0 0; }
+.bridge-inline-btn { padding:3px 9px; font-size:.72rem; }
+.bridge-token-wrap { margin-top:10px; }
+.bridge-advanced, .bridge-team { border:1px solid var(--border); border-radius:10px; padding:10px 14px; margin-bottom:12px; background:#101010; font-size:.82rem; }
+.bridge-advanced summary, .bridge-team summary { cursor:pointer; color:var(--muted); font-size:.82rem; }
+.bridge-advanced[open] summary, .bridge-team[open] summary { color:var(--text); margin-bottom:8px; }
+.bridge-team-text { width:100%; margin:8px 0 10px; padding:10px 12px; border-radius:8px; border:1px solid var(--border); background:var(--panel2); color:var(--text); font-family:var(--mono); font-size:.76rem; resize:vertical; }
+.bridge-team-opt { display:block; margin-top:6px; font-size:.76rem; color:var(--muted); }
+.bridge-team-opt input { margin-right:6px; }
+.sample-actions { margin-top:10px; display:flex; flex-wrap:wrap; gap:8px; align-items:center; }
+.sample-actions .hint { margin:0; }
+
 .side-label { position:fixed; top:50%; font-family:var(--mono); font-size:.66rem;
               letter-spacing:.35em; color:#4a4a4a; text-transform:uppercase;
               white-space:nowrap; z-index:5; pointer-events:none; writing-mode:vertical-rl; }
@@ -538,7 +565,8 @@ body::after  { background:radial-gradient(circle at 40% 40%, rgba(132,147,168,.1
 }
 .stat { background:rgba(37,47,61,.75); }
 .step, .layer, .rule-card, .purpose-card, .purpose-playbook, .bridge-mode-panel,
-.bridge-log-panel, .demo-offline, .mode-pill, .field, .bridge-token, .bridge-file {
+.bridge-log-panel, .demo-offline, .mode-pill, .field, .bridge-token, .bridge-file,
+.bridge-advanced, .bridge-team, .bridge-team-text {
   background:rgba(37,47,61,.62); border-color:var(--border);
 }
 .bridge-log, .bridge-path, .demo-guide-tree { background:#141a22; }
@@ -676,7 +704,8 @@ button.primary:hover { background:linear-gradient(180deg,#ffffff,#e6e0d1);
 #drop::before, #drop::after { border-color:var(--tab-paper); }
 #drop.drag { border-color:var(--tab-paper); box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 0 0 3px rgba(220,213,196,.16); }
 #fname { color:var(--ok); }
-.bridge-drop, .bridge-file, .bridge-mode-panel, .bridge-log-panel, .quota-box, .card, .field, .bridge-token { border-radius:6px; }
+.bridge-drop, .bridge-file, .bridge-mode-panel, .bridge-log-panel, .quota-box, .card, .field, .bridge-token,
+.bridge-checklist, .bridge-advanced, .bridge-team, .bridge-team-text { border-radius:6px; }
 .bridge-file.on { border-color:var(--tab-paper); background:rgba(220,213,196,.1); }
 .bridge-consent { background:rgba(216,187,115,.08); border-color:#6b5a2e; }
 
