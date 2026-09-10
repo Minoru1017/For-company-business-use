@@ -3,11 +3,23 @@
  * DEMO audio never leaves the machine; only finished SRT is loaded into Call Coach.
  */
 import { escapeHTML } from './utils.js';
+import {
+  enableNotifications,
+  notificationState,
+  notifyEnabled,
+  notifyJobDone,
+  progressTitle,
+  renderProgressHtml,
+  setNotifyEnabled,
+  waitSummary,
+} from './wait-progress.js';
 
 const LOCAL_API = 'http://127.0.0.1:8765';
 const API_TOKEN_HEADER = 'X-Call-Coach-Token';
 
 let pollTimer = null;
+let baseTitle = '';
+let lastBridgeStatus = null;
 let refreshTimer = null;
 let offlinePollTimer = null;
 let selectedMp4 = null;
@@ -117,10 +129,29 @@ async function api(path, opts = {}, retried = false) {
 export async function checkLocalBridge() {
   try {
     const st = await api('/api/status');
-    return st && typeof st.python_ok === 'boolean' ? st : null;
+    lastBridgeStatus = st && typeof st.python_ok === 'boolean' ? st : null;
   } catch {
-    return null;
+    lastBridgeStatus = null;
   }
+  return lastBridgeStatus;
+}
+
+/** 最近一次偵測到的助手狀態（不發請求）；離線時為 null。 */
+export function getBridgeStatus() {
+  return lastBridgeStatus;
+}
+
+export function bridgeSupports(capability) {
+  return !!lastBridgeStatus?.api_capabilities?.includes?.(capability);
+}
+
+/** 把報告／已標記 SRT 存到助手的 output 資料夾（與逐字稿放在一起）。 */
+export async function saveReportToBridge(filename, content) {
+  return api('/api/report', { method: 'POST', body: JSON.stringify({ filename, content }) });
+}
+
+export async function openBridgeFolder(folder = 'output') {
+  return api('/api/open-folder', { method: 'POST', body: JSON.stringify({ folder }) });
 }
 
 function needsFullSetup(st) {
@@ -437,7 +468,14 @@ export function initLocalTranscribe({ onTranscriptReady, showToast, getMode }) {
         <button type="button" class="btn bridge-cancel hidden" id="bridgeCancelTranscribe">取消轉錄</button>
         <button type="button" class="btn" id="bridgeImport" ${st.srt_files?.length ? '' : 'disabled'}>載入最新 SRT</button>
       </div>
-      <div class="bridge-transcribe-status hidden" id="bridgeTranscribeStatus"></div>
+      <div class="bridge-wait hidden" id="bridgeWait">
+        <div class="bridge-transcribe-status" id="bridgeTranscribeStatus"></div>
+        <div class="bridge-wait-progress" id="bridgeWaitProgress"></div>
+        <div class="bridge-wait-foot">
+          <span class="hint">可以先去做別的事：關掉這個分頁也沒關係，回來會自動接上進度。</span>
+          <button type="button" class="btn bridge-notify" id="bridgeNotifyToggle">${escapeHTML(notifyButtonLabel())}</button>
+        </div>
+      </div>
       <div class="bridge-log-panel hidden" id="bridgeLogPanel">
         <div class="bridge-log-head">
           <strong id="bridgeLogTitle">安裝記錄</strong>
@@ -553,6 +591,7 @@ export function initLocalTranscribe({ onTranscriptReady, showToast, getMode }) {
       cancelTranscribe(showToast, refreshStatus)
     );
     panel.querySelector('#bridgeImport')?.addEventListener('click', () => importLatest(onTranscriptReady, showToast));
+    panel.querySelector('#bridgeNotifyToggle')?.addEventListener('click', () => toggleNotify(showToast));
     bindLogActions(showToast);
     if (transcribeBusy) setTranscribeUI({ active: true });
     maybeAutoOpenTokenPage(st, showToast);
@@ -727,23 +766,63 @@ async function uploadMp4(file, showToast, refreshStatus) {
   }
 }
 
-function setTranscribeUI({ active, message = '轉錄進行中…請保持助手視窗開啟' }) {
+function notifyButtonLabel() {
+  if (!notifyEnabled()) return '完成時通知我（提示音＋桌面通知）';
+  const st = notificationState();
+  if (st === 'granted') return '✓ 完成會通知（點此關閉）';
+  if (st === 'denied') return '✓ 完成會播提示音（瀏覽器已封鎖桌面通知）';
+  return '✓ 完成會播提示音（點此關閉）';
+}
+
+async function toggleNotify(showToast) {
+  if (notifyEnabled()) {
+    setNotifyEnabled(false);
+    showToast?.('已關閉完成通知');
+  } else {
+    const perm = await enableNotifications();
+    if (perm === 'granted') showToast?.('完成時會播提示音並發桌面通知（切到別的視窗也看得到）');
+    else if (perm === 'denied') showToast?.('瀏覽器封鎖了桌面通知，完成時仍會播提示音');
+    else showToast?.('完成時會播提示音');
+  }
+  const btn = document.getElementById('bridgeNotifyToggle');
+  if (btn) btn.textContent = notifyButtonLabel();
+}
+
+function setTranscribeUI({ active, message = '轉錄進行中…請保持助手視窗開啟', progress = null, cancelRequested = false }) {
+  const wait = document.getElementById('bridgeWait');
   const status = document.getElementById('bridgeTranscribeStatus');
+  const prog = document.getElementById('bridgeWaitProgress');
   const cancel = document.getElementById('bridgeCancelTranscribe');
   const start = document.getElementById('bridgeTranscribe');
-  if (!status) return;
+  if (!status || !wait) return;
 
   if (active) {
-    status.classList.remove('hidden');
+    wait.classList.remove('hidden');
     status.classList.add('busy');
-    status.textContent = message;
+    const summary = progress && !cancelRequested ? waitSummary(progress) : '';
+    status.textContent = summary ? `${message}　${summary}` : message;
+    if (prog) prog.innerHTML = renderProgressHtml(progress, { cancelRequested });
     cancel?.classList.remove('hidden');
     if (start) start.disabled = true;
   } else {
-    status.classList.add('hidden');
+    wait.classList.add('hidden');
     status.classList.remove('busy');
+    if (prog) prog.innerHTML = '';
     cancel?.classList.add('hidden');
   }
+}
+
+function setWaitTitle(progress) {
+  if (typeof document === 'undefined') return;
+  // 模式切換會改寫 document.title；只要目前標題不是我們寫的進度標題，就以它為基底
+  if (!document.title.startsWith('⏳ ')) baseTitle = document.title;
+  if (!baseTitle) baseTitle = document.title;
+  document.title = progress ? progressTitle(progress, baseTitle) : baseTitle;
+}
+
+function restoreTitle() {
+  if (baseTitle && typeof document !== 'undefined') document.title = baseTitle;
+  baseTitle = '';
 }
 
 function showLog(lines, { failed = false, title = '執行記錄' } = {}) {
@@ -964,13 +1043,25 @@ async function pollJob(onDone, { trackTranscribe = false, trackSetup = false } =
         showLog(j.logs);
       }
       if (trackTranscribe && j.running && j.kind === 'transcribe') {
-        setTranscribeUI({ active: true, message: j.cancel_requested ? '正在取消轉錄…' : '轉錄進行中…請保持助手視窗開啟' });
+        setTranscribeUI({
+          active: true,
+          message: j.cancel_requested ? '正在取消轉錄…' : '轉錄進行中…請保持助手視窗開啟',
+          progress: j.progress,
+          cancelRequested: !!j.cancel_requested,
+        });
+        setWaitTitle(j.progress);
       }
       if (!j.running && j.exit_code !== null) {
         clearInterval(pollTimer);
         if (trackTranscribe) {
           transcribeBusy = false;
           setTranscribeUI({ active: false });
+          restoreTitle();
+          if (j.exit_code === 0) {
+            notifyJobDone({ title: 'Call Coach：轉錄完成', body: '逐字稿已產生，回到 Call Coach 就會自動載入並可開始分析。' });
+          } else if (j.exit_code !== 130) {
+            notifyJobDone({ title: 'Call Coach：轉錄失敗', body: transcribeFailToast(j.logs), ok: false });
+          }
         }
         onDone(j.exit_code === 0, j);
       }
@@ -979,6 +1070,7 @@ async function pollJob(onDone, { trackTranscribe = false, trackSetup = false } =
       if (trackTranscribe) {
         transcribeBusy = false;
         setTranscribeUI({ active: false });
+        restoreTitle();
       }
       onDone(false, { logs: ['[錯誤] 無法連線本機轉錄助手'] });
     }
@@ -1150,8 +1242,8 @@ async function runTranscribe(onTranscriptReady, showToast, refreshStatus) {
     showLog([transcribeMode === 'azure' ? '正在啟動 Azure 雲端轉錄，請稍候…' : '正在啟動本機轉錄，請稍候…']);
     showToast(
       transcribeMode === 'azure'
-        ? 'Azure 雲端轉錄中…（音訊上傳至 Microsoft Azure）'
-        : '本機轉錄中…（長影片音軌抽出可能需數分鐘才會出現進度）'
+        ? 'Azure 雲端轉錄中…下方會顯示階段與預計完成時間'
+        : '本機轉錄中…下方會顯示階段、百分比與預計完成時間'
     );
     pollJob(async (ok, j) => {
       await refreshStatus();

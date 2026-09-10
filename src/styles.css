@@ -183,6 +183,28 @@ h2 { font-family:var(--disp); font-size:.98rem; margin-bottom:12px; color:var(--
 .bridge-or { text-align: center; color: var(--muted); font-size: .78rem; margin: 10px 0; }
 .bridge-transcribe-status { font-size: .82rem; padding: 10px 12px; border-radius: 8px; margin-bottom: 8px; line-height: 1.5; }
 .bridge-transcribe-status.busy { background: #1f1a10; border: 1px solid #5d4d1e; color: var(--warn); }
+.bridge-wait { margin-bottom: 10px; }
+.bridge-wait-progress:empty { display: none; }
+.bridge-wait-progress { background: #101010; border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; margin-bottom: 8px; }
+.wait-steps { list-style: none; margin: 0 0 10px; padding: 0; display: flex; flex-wrap: wrap; gap: 6px 14px; }
+.wait-step { display: flex; align-items: center; gap: 6px; font-size: .78rem; color: var(--muted); }
+.wait-step-idx { display: inline-flex; align-items: center; justify-content: center; width: 18px; height: 18px; border-radius: 50%; border: 1px solid #3a3a3a; font-family: var(--mono); font-size: .62rem; }
+.wait-step.done { color: var(--ok); }
+.wait-step.done .wait-step-idx { border-color: var(--ok); background: rgba(61,220,132,.12); }
+.wait-step.active { color: var(--text); }
+.wait-step.active .wait-step-idx { border-color: var(--warn); color: var(--warn); box-shadow: 0 0 0 3px rgba(255,190,60,.15); animation: waitPulse 1.6s ease-in-out infinite; }
+@keyframes waitPulse { 0%,100% { box-shadow: 0 0 0 2px rgba(255,190,60,.1); } 50% { box-shadow: 0 0 0 5px rgba(255,190,60,.22); } }
+.wait-bar { height: 8px; background: #242424; border-radius: 6px; overflow: hidden; }
+.wait-bar-fill { height: 100%; background: linear-gradient(90deg, var(--warn), var(--accent)); border-radius: 6px; transition: width .6s ease; }
+.wait-row { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; margin-top: 8px; font-size: .82rem; }
+.wait-pct { font-family: var(--mono); font-size: 1.15rem; color: var(--text); }
+.wait-phase { color: var(--text); flex: 1; min-width: 160px; }
+.wait-detail { color: var(--muted); font-size: .76rem; }
+.wait-eta { color: var(--warn); }
+.wait-meta { color: var(--muted); font-family: var(--mono); font-size: .7rem; letter-spacing: .04em; }
+.bridge-wait-foot { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 8px; }
+.bridge-wait-foot .hint { margin: 0; }
+.bridge-notify { font-size: .76rem; padding: 7px 14px; }
 .bridge-cancel { margin-bottom: 10px; border-color: #5d2f28; color: var(--bad); }
 .bridge-mode-panel { background: #141414; border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; margin-bottom: 12px; }
 .bridge-mode-panel strong { display: block; margin-bottom: 8px; font-size: .88rem; }
@@ -565,7 +587,7 @@ body::after  { background:radial-gradient(circle at 40% 40%, rgba(132,147,168,.1
 }
 .stat { background:rgba(37,47,61,.75); }
 .step, .layer, .rule-card, .purpose-card, .purpose-playbook, .bridge-mode-panel,
-.bridge-log-panel, .demo-offline, .mode-pill, .field, .bridge-token, .bridge-file,
+.bridge-log-panel, .bridge-wait-progress, .demo-offline, .mode-pill, .field, .bridge-token, .bridge-file,
 .bridge-advanced, .bridge-team, .bridge-team-text {
   background:rgba(37,47,61,.62); border-color:var(--border);
 }
@@ -704,7 +726,7 @@ button.primary:hover { background:linear-gradient(180deg,#ffffff,#e6e0d1);
 #drop::before, #drop::after { border-color:var(--tab-paper); }
 #drop.drag { border-color:var(--tab-paper); box-shadow: inset 0 1px 0 rgba(255,255,255,.08), 0 0 0 3px rgba(220,213,196,.16); }
 #fname { color:var(--ok); }
-.bridge-drop, .bridge-file, .bridge-mode-panel, .bridge-log-panel, .quota-box, .card, .field, .bridge-token,
+.bridge-drop, .bridge-file, .bridge-mode-panel, .bridge-log-panel, .bridge-wait-progress, .quota-box, .card, .field, .bridge-token,
 .bridge-checklist, .bridge-advanced, .bridge-team, .bridge-team-text { border-radius:6px; }
 .bridge-file.on { border-color:var(--tab-paper); background:rgba(220,213,196,.1); }
 .bridge-consent { background:rgba(216,187,115,.08); border-color:#6b5a2e; }

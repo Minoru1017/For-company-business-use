@@ -331,11 +331,16 @@ async function runAIAnalysis() {
 
   let totalTokens = 0;
   const partials = [];
+  const startedAt = Date.now();
   try {
     for (let i = 0; i < chunks.length; i++) {
       if (aiAbort.signal.aborted) throw new Error('已取消分析');
       const prefix = chunks.length > 1 ? `【第 ${i + 1}/${chunks.length} 段逐字稿】\n` : '';
-      setAIProgress(i, chunks.length, `AI 分析中：第 ${i + 1} / ${chunks.length} 段…`);
+      // 以已完成段的平均耗時推估剩餘；第一段前只能給經驗值
+      const perChunk = i ? (Date.now() - startedAt) / i : 0;
+      const remainSec = i ? Math.ceil((perChunk * (chunks.length - i)) / 1000) : null;
+      const eta = remainSec == null ? '（每段通常 10～40 秒）' : `（約還需 ${remainSec >= 60 ? `${Math.ceil(remainSec / 60)} 分` : `${remainSec} 秒`}）`;
+      setAIProgress(i, chunks.length, `AI 分析中：第 ${i + 1} / ${chunks.length} 段…${eta}`);
       const { parsed, usedTokens } = await callGeminiResilient({
         apiKey: key,
         model,
