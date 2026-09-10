@@ -42,7 +42,9 @@ jobs:
         shell: pwsh
         env:
           # Optional: set these repository secrets to produce Authenticode-signed artifacts
-          # (required for Windows 11 Smart App Control). Build stays unsigned when absent.
+          # (Setup.exe, uninstaller, CallCoachAssistant.exe, ffmpeg/ffprobe). Build stays
+          # unsigned when absent. Which certificate satisfies Smart App Control (public CA,
+          # RSA) vs. internal trust only (self-signed / ServBay): see demo-workspace/CODESIGN.md
           CODESIGN_PFX_BASE64: ${{ secrets.CODESIGN_PFX_BASE64 }}
           CODESIGN_PFX_PASSWORD: ${{ secrets.CODESIGN_PFX_PASSWORD }}
           CODESIGN_TIMESTAMP_URL: ${{ secrets.CODESIGN_TIMESTAMP_URL }}

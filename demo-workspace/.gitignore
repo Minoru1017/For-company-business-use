@@ -13,3 +13,4 @@ input/*.wav
 *.uploading
 logs/
 *.log
+team-config.env

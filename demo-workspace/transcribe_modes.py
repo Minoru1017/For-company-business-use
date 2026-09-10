@@ -27,7 +27,8 @@ def normalize_mode(mode: str | None) -> str:
 
 
 def model_for_mode(mode: str) -> str:
-    return MODE_MODELS[normalize_mode(mode)]
+    """Local Whisper model for a mode; Azure has no local model, so fall back to standard."""
+    return MODE_MODELS.get(normalize_mode(mode), MODE_MODELS[MODE_STANDARD])
 
 
 def requires_cloud_consent(mode: str) -> bool:
