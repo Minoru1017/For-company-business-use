@@ -80,6 +80,10 @@ def kill_proc(proc: subprocess.Popen) -> None:
 
 
 def default_log(msg: str) -> None:
+    from progress_tracker import PROGRESS_PREFIX
+
+    if msg.startswith(PROGRESS_PREFIX):
+        return
     print(msg, flush=True)
 
 
@@ -265,30 +269,17 @@ def extract_wav_from_mp4(
     log: LogFn,
     env_vars: dict[str, str],
     hooks: JobHooks | None,
+    progress=None,
 ) -> int:
     log("[1/2] 從 MP4 抽出音軌（長影片可能需 5～15 分鐘，請耐心等候）...")
-    return run_command(
-        [
-            ffmpeg,
-            "-y",
-            "-hide_banner",
-            "-loglevel",
-            "error",
-            "-i",
-            str(mp4),
-            "-vn",
-            "-ac",
-            "1",
-            "-ar",
-            "16000",
-            "-c:a",
-            "pcm_s16le",
-            str(wav),
-        ],
-        log=log,
-        env=env_vars,
-        hooks=hooks,
-    )
+    cmd = [ffmpeg, "-y", "-hide_banner", "-loglevel", "error"]
+    if progress is not None:
+        # key=value progress on stdout; the tracker consumes those lines so the log stays readable
+        cmd += ["-nostats", "-progress", "pipe:1"]
+        progress.phase("extract", "ffmpeg 抽出 16 kHz 單聲道音軌")
+        log = progress.wrap_ffmpeg_log(log)
+    cmd += ["-i", str(mp4), "-vn", "-ac", "1", "-ar", "16000", "-c:a", "pcm_s16le", str(wav)]
+    return run_command(cmd, log=log, env=env_vars, hooks=hooks)
 
 
 def whisperx_cmd() -> list[str]:
@@ -496,7 +487,15 @@ class EnvStatus:
             "installer_setup": (ROOT / ".setup_complete").is_file(),
             "bundled_ffmpeg": BUNDLED_FFMPEG.is_file(),
             "can_uninstall": self.venv_ok,
-            "api_capabilities": ["setup", "full-setup", "install-ffmpeg", "team-config", "azure-fast"],
+            "api_capabilities": [
+                "setup",
+                "full-setup",
+                "install-ffmpeg",
+                "team-config",
+                "azure-fast",
+                "progress",
+                "report-save",
+            ],
             "call_coach_url": CALL_COACH_URL,
             "hf_links": HF_LINKS,
             "transcribe_modes": ["fast", "standard", "azure"],
@@ -780,6 +779,7 @@ def run_transcribe(
     cloud_consent: bool = False,
 ) -> int:
     from azure_transcribe import run_azure_transcribe
+    from progress_tracker import ProgressTracker, estimate_azure_minutes
     from transcribe_modes import MODE_AZURE, MODE_LABELS, model_for_mode, normalize_mode, validate_transcribe_request
     from transcribe_parallel import (
         chunk_count_for_duration,
@@ -792,23 +792,28 @@ def run_transcribe(
     mode = normalize_mode(mode)
     log("=== 開始轉錄 DEMO ===")
     log(f"模式：{MODE_LABELS[mode]}")
+    progress = ProgressTracker(log, mode=mode)
+
+    def fail(code: int) -> int:
+        progress.finish(ok=False)
+        return code
 
     if hooks and hooks.is_cancelled():
         log("[已取消] 轉錄已停止")
-        return CANCEL_EXIT
+        return fail(CANCEL_EXIT)
 
     err = validate_transcribe_request(mode, cloud_consent, has_azure_config())
     if err:
         log(f"[錯誤] {err}")
-        return 1
+        return fail(1)
 
     if mode != MODE_AZURE:
         if not VENV_PY.exists():
             log("[錯誤] 本機轉錄環境尚未安裝，請先按「一鍵安裝」；或改用 Azure 雲端轉錄（免安裝）")
-            return 1
+            return fail(1)
         if not has_valid_token():
             log("[錯誤] 本機轉錄請先設定 HF_TOKEN；或改用 Azure 雲端轉錄（不需 HF Token）")
-            return 1
+            return fail(1)
 
     env_vars = shell_env(cache_env())
     (ROOT / "models").mkdir(exist_ok=True)
@@ -822,7 +827,7 @@ def run_transcribe(
             mp4 = find_mp4()
     except FileNotFoundError as e:
         log(f"[錯誤] {e}")
-        return 1
+        return fail(1)
 
     log(f"錄影檔: {mp4.name}")
     wav = mp4.with_suffix(".wav")
@@ -833,17 +838,29 @@ def run_transcribe(
     stem = Path(mp4.name).stem
     final_srt = ROOT / "output" / f"{stem}.srt"
 
+    # ffprobe hints about parallel mode are irrelevant for Azure, keep that path quiet
+    probe_log: LogFn = log if mode != MODE_AZURE else (lambda _m: None)
+    duration = probe_duration_seconds(mp4, ffmpeg, probe_log) if ffmpeg else 0.0
+    if duration > 0:
+        progress.set_duration(duration)
+        log(f"音訊長度：約 {int(duration // 60)} 分 {int(duration % 60)} 秒")
+
     if mode == MODE_AZURE:
         if not ffmpeg:
             log("[錯誤] Azure 轉錄需要 ffmpeg 抽出音軌")
-            return 1
-        code = extract_wav_from_mp4(mp4, wav, ffmpeg, log, env_vars, hooks)
+            return fail(1)
+        progress.use_plan("azure")
+        eta_low, eta_high = estimate_azure_minutes(duration)
+        progress.set_eta_minutes(eta_low, eta_high)
+        log(f"預估總耗時約 {eta_low}～{eta_high} 分鐘（含上傳）")
+        code = extract_wav_from_mp4(mp4, wav, ffmpeg, log, env_vars, hooks, progress=progress)
         if code == CANCEL_EXIT:
-            return code
+            return fail(code)
         if code != 0:
             log("[錯誤] 音軌抽取失敗")
-            return code
+            return fail(code)
         azure_key, azure_region = azure_config()
+        progress.phase("azure", "上傳音訊並等待 Azure 回傳（單一請求，無法中途顯示百分比）")
         try:
             code = run_azure_transcribe(
                 wav,
@@ -860,12 +877,14 @@ def run_transcribe(
             except OSError:
                 pass
         if code == 0:
+            progress.phase("save", final_srt.name)
             log("=== 轉錄完成 ===")
             log(f"逐字稿: {final_srt.name}")
             log(f"請上傳至 Call Coach: {CALL_COACH_URL}")
-        return code
+            progress.finish(ok=True)
+            return 0
+        return fail(code)
 
-    duration = probe_duration_seconds(mp4, ffmpeg, log) if ffmpeg else 0.0
     chunk_count = chunk_count_for_duration(duration) if duration > 0 else 1
     use_parallel = chunk_count > 1 and bool(ffmpeg)
     code = 0
@@ -873,24 +892,33 @@ def run_transcribe(
     if use_parallel:
         parallel = max_parallel_workers(chunk_count)
         eta_low, eta_high = estimate_transcribe_minutes(duration, chunk_count, parallel)
+        progress.use_plan("parallel")
+        progress.set_eta_minutes(eta_low, eta_high)
         log(
             f"[1/2] Faster-Whisper 分段模式（{whisper_model}）：直接從 MP4 切 {chunk_count} 段"
             f"（預估總耗時約 {eta_low}～{eta_high} 分鐘）…"
         )
     elif ffmpeg:
-        code = extract_wav_from_mp4(mp4, wav, ffmpeg, log, env_vars, hooks)
+        progress.use_plan("local")
+        eta_low, eta_high = estimate_transcribe_minutes(duration, 1, 1)
+        progress.set_eta_minutes(eta_low, eta_high)
+        code = extract_wav_from_mp4(mp4, wav, ffmpeg, log, env_vars, hooks, progress=progress)
         if code == CANCEL_EXIT:
-            return code
+            return fail(code)
         if code != 0:
             log("[錯誤] 音軌抽取失敗")
-            return code
+            return fail(code)
         duration = probe_duration_seconds(wav, ffmpeg, log) if duration <= 0 else duration
     else:
+        progress.use_plan("local")
+        progress.skip_phase("extract")
+        eta_low, eta_high = estimate_transcribe_minutes(duration, 1, 1)
+        progress.set_eta_minutes(eta_low, eta_high)
         log("[提醒] 未安裝 ffmpeg，直接對 MP4 轉錄")
 
     if hooks and hooks.is_cancelled():
         log("[已取消] 轉錄已停止")
-        return CANCEL_EXIT
+        return fail(CANCEL_EXIT)
 
     audio = mp4 if use_parallel else (wav if ffmpeg else mp4)
 
@@ -911,20 +939,24 @@ def run_transcribe(
             log=log,
             hooks=hooks,
             cancel_check=lambda: bool(hooks and hooks.is_cancelled()),
+            progress=progress,
         )
         if code == CANCEL_EXIT:
-            return code
+            return fail(code)
 
     if not use_parallel or code != 0:
         if use_parallel and code != 0:
             log("[提醒] 分段平行轉錄失敗，改為單檔完整轉錄（較慢但較穩定）…")
+            progress.use_plan("local")
+            eta_low, eta_high = estimate_transcribe_minutes(duration, 1, 1)
+            progress.set_eta_minutes(eta_low, eta_high)
             if ffmpeg and not wav.exists():
-                code = extract_wav_from_mp4(mp4, wav, ffmpeg, log, env_vars, hooks)
+                code = extract_wav_from_mp4(mp4, wav, ffmpeg, log, env_vars, hooks, progress=progress)
                 if code == CANCEL_EXIT:
-                    return code
+                    return fail(code)
                 if code != 0:
                     log("[錯誤] 音軌抽取失敗")
-                    return code
+                    return fail(code)
             audio = wav if ffmpeg else mp4
         elif duration > 0 and chunk_count == 1:
             eta_low, eta_high = estimate_transcribe_minutes(duration, 1, 1)
@@ -934,49 +966,104 @@ def run_transcribe(
             )
         else:
             log(f"[2/2] Faster-Whisper {whisper_model} 轉錄（2 小時 DEMO 約 1.5～3 小時，請接電源）…")
+        progress.phase("transcribe", "載入模型")
+        progress.set_part_total(1)
         code = run_command(
             whisperx_cmd()
-            + [
-                str(audio),
-                "--model",
-                whisper_model,
-                "--language",
-                "zh",
-                "--device",
-                "cpu",
-                "--compute_type",
-                "int8",
-                "--threads",
-                str(threads),
-                "--batch_size",
-                str(batch),
-                "--diarize",
-                "--min_speakers",
-                "2",
-                "--max_speakers",
-                "2",
-                "--output_format",
-                "srt",
-                "--output_dir",
-                str(ROOT / "output"),
-            ],
-            log=log,
+            + whisperx_args(
+                audio,
+                model=whisper_model,
+                threads=threads,
+                batch=batch,
+                output_dir=ROOT / "output",
+            ),
+            log=progress.wrap_whisperx_log(log, 0),
             env=env_vars,
             hooks=hooks,
         )
         if code == CANCEL_EXIT:
             log("[已取消] 轉錄已停止")
-            return code
+            return fail(code)
         if code != 0:
             log("[錯誤] 轉錄失敗")
-            return code
+            return fail(code)
+        progress.part_done(0)
 
+    progress.phase("save", final_srt.name)
     srts = list((ROOT / "output").glob("*.srt"))
     log("=== 轉錄完成 ===")
     for s in srts:
         log(f"逐字稿: {s.name}")
     log(f"請上傳至 Call Coach: {CALL_COACH_URL}")
+    progress.finish(ok=True)
     return 0
+
+
+def whisperx_args(audio: Path, *, model: str, threads: int, batch: int, output_dir: Path) -> list[str]:
+    """CLI arguments shared by single-file and per-chunk WhisperX runs."""
+    return [
+        str(audio),
+        "--model",
+        model,
+        "--language",
+        "zh",
+        "--device",
+        "cpu",
+        "--compute_type",
+        "int8",
+        "--threads",
+        str(threads),
+        "--batch_size",
+        str(batch),
+        "--diarize",
+        "--min_speakers",
+        "2",
+        "--max_speakers",
+        "2",
+        "--output_format",
+        "srt",
+        # emits "Progress: xx%" during transcription/alignment so the UI can show real percent
+        "--print_progress",
+        "True",
+        "--output_dir",
+        str(output_dir),
+    ]
+
+
+REPORT_EXTS = (".md", ".txt", ".srt")
+REPORT_MAX_BYTES = 2 * 1024 * 1024
+_REPORT_BAD_CHARS_RE = re.compile(r'[\\/:*?"<>|\x00-\x1f]+')
+
+
+def safe_report_name(name: str) -> str:
+    """Normalise a user-supplied report filename into a safe basename inside output/."""
+    base = Path(str(name or "")).name.strip()
+    base = _REPORT_BAD_CHARS_RE.sub("_", base).strip(" .")
+    if not base:
+        raise ValueError("檔名不可為空")
+    stem, ext = Path(base).stem, Path(base).suffix.lower()
+    if ext not in REPORT_EXTS:
+        raise ValueError("僅允許 .md / .txt / .srt")
+    stem = stem.strip(" .")
+    if not stem or stem.startswith("."):
+        raise ValueError("檔名不可為空")
+    if len(stem) > 120:
+        stem = stem[:120]
+    return f"{stem}{ext}"
+
+
+def save_report(name: str, content: str) -> Path:
+    """Write an exported report / labelled SRT next to the transcripts in output/."""
+    if not isinstance(content, str) or not content.strip():
+        raise ValueError("內容不可為空")
+    if len(content.encode("utf-8")) > REPORT_MAX_BYTES:
+        raise ValueError("內容過大（上限 2 MB）")
+    filename = safe_report_name(name)
+    out_dir = ROOT / "output"
+    out_dir.mkdir(exist_ok=True)
+    path = out_dir / filename
+    path.write_text(content, encoding="utf-8")
+    return path
 
 
 def open_folder(folder: str) -> None:

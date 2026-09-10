@@ -18,6 +18,8 @@ a = Analysis(
         "upload_parse",
         "transcribe_parallel",
         "transcribe_modes",
+        "progress_tracker",
+        "job_log",
         "azure_transcribe",
         "team_config",
         "srt_utils",
