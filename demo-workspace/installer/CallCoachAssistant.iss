@@ -1,11 +1,17 @@
 ; Call Coach Assistant — Windows installer (Inno Setup 6)
 ; Build: iscc /DAppVersion=11.1.1 CallCoachAssistant.iss
+; Signed build (from build_windows.ps1):
+;   iscc /DAppVersion=... /DSignBuild "/Ssigntool=powershell.exe ... Sign-File.ps1 $f" CallCoachAssistant.iss
 
 #ifndef AppVersion
 #define AppVersion "11.1.1"
 #endif
 
 [Setup]
+#ifdef SignBuild
+SignTool=signtool
+SignedUninstaller=yes
+#endif
 AppId={{A7B3C4D5-E6F7-4890-ABCD-EF1234567890}
 AppName=Call Coach 本機助手
 AppVersion={#AppVersion}
