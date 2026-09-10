@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<title>AI 工具免費 vs 付費比較（2026 年 9 月）</title>
+<style>
+  @page { size: A4; margin: 16mm 14mm 18mm 14mm; }
+  * { box-sizing: border-box; }
+  body { font-family: "WenQuanYi Micro Hei", "Noto Sans CJK TC", "Droid Sans Fallback", sans-serif; font-size: 10.5pt; line-height: 1.6; color: #1f2937; margin: 0; }
+  h1 { font-size: 20pt; margin: 0 0 4px; letter-spacing: .02em; }
+  h2 { font-size: 14pt; margin: 22px 0 8px; padding-bottom: 4px; border-bottom: 2px solid #111827; page-break-after: avoid; }
+  h3 { font-size: 11.5pt; margin: 16px 0 6px; color: #111827; page-break-after: avoid; }
+  .meta { color: #6b7280; font-size: 9pt; margin-bottom: 14px; }
+  .lead { background: #f3f4f6; border-left: 4px solid #111827; padding: 8px 12px; margin: 10px 0 14px; }
+  table { width: 100%; border-collapse: collapse; margin: 6px 0 10px; font-size: 9.2pt; page-break-inside: auto; }
+  tr { page-break-inside: avoid; }
+  th, td { border: 1px solid #d1d5db; padding: 5px 7px; vertical-align: top; text-align: left; }
+  th { background: #e5e7eb; font-weight: 700; }
+  td:first-child, th:first-child { white-space: nowrap; }
+  ul { margin: 4px 0 8px 18px; padding: 0; }
+  li { margin: 2px 0; }
+  .pro { color: #065f46; }
+  .con { color: #991b1b; }
+  .tag { display: inline-block; font-size: 8.5pt; padding: 0 6px; border: 1px solid #9ca3af; border-radius: 3px; color: #374151; margin-left: 4px; }
+  .note { font-size: 9pt; color: #6b7280; }
+  .box { border: 1px solid #d1d5db; border-radius: 6px; padding: 10px 12px; margin: 8px 0; page-break-inside: avoid; }
+  .box h3 { margin-top: 0; }
+  .pb { page-break-before: always; }
+  footer { margin-top: 24px; font-size: 8.5pt; color: #6b7280; border-top: 1px solid #d1d5db; padding-top: 6px; }
+</style>
+</head>
+<body>
+
+<h1>AI 工具：免費能做什麼、付費才能做什麼</h1>
+<div class="meta">主流產品方案與優劣比較 ・ 整理日期 2026-09-10 ・ 定價為美金、以各家官網公開方案為準；用量限額在 2026 年已多次調整，訂閱前請再確認當天數字。</div>
+
+<div class="lead">
+<strong>一句話結論：</strong>免費層已經夠用來「問問題、寫短文、看圖、搜尋」；付費買的是 <strong>用量、旗艦模型、代理式功能（深度研究／寫程式／自動化）、長文件處理</strong>。$200 等級的高階方案只適合每天都撞到 $20 方案用量牆的人。
+</div>
+
+<h2>一、免費 vs 付費：跨產品通則</h2>
+<table>
+<thead><tr><th>面向</th><th>免費層普遍能做</th><th>付費（約 $20/月）才解鎖</th><th>高階層（$100～300/月）才有</th></tr></thead>
+<tbody>
+<tr><td>模型</td><td>中階模型（Flash / Instant / Sonnet 級），尖峰時降級或排隊</td><td>旗艦模型可自選、推理深度可調</td><td>「Pro / Heavy / Deep Think」最高推理版</td></tr>
+<tr><td>用量</td><td>每日或每 5 小時一小額配額，聊到一半會被暫停</td><td>5～10 倍配額、優先通道</td><td>5～20 倍付費配額，實務上接近不限</td></tr>
+<tr><td>上傳／長文</td><td>檔案上傳有限、上下文 32K～200K</td><td>上下文 256K～1M、大量上傳</td><td>最大上下文</td></tr>
+<tr><td>深度研究、Agent、影片</td><td>沒有，或每月幾次試用</td><td>有，但每月次數有上限</td><td>次數上限拉到最高</td></tr>
+<tr><td>寫程式代理</td><td>沒有（Codex / Claude Code 皆需付費）</td><td>有，配額與聊天共用</td><td>大幅提高配額</td></tr>
+<tr><td>資料用於訓練</td><td>預設會，可手動關閉</td><td>個人方案仍預設會，可關閉</td><td>商務／企業方案預設不訓練</td></tr>
+<tr><td>廣告</td><td>部分有（ChatGPT Free / Go）</td><td>無</td><td>無</td></tr>
+</tbody>
+</table>
+
+<h2>二、通用型 AI 助理逐一比較</h2>
+
+<div class="box">
+<h3>ChatGPT（OpenAI）</h3>
+<table>
+<thead><tr><th>方案</th><th>價格</th><th>內容</th></tr></thead>
+<tbody>
+<tr><td>Free</td><td>$0</td><td>GPT-5.6 Luna 標準對話；有限訊息、上傳、圖片、語音；無 Deep Research、無 Agent；有廣告</td></tr>
+<tr><td>Go</td><td>$8</td><td>配額加大，但仍有廣告、無進階推理、無 Agent</td></tr>
+<tr><td>Plus</td><td>$20</td><td>GPT-5.6 Sol 旗艦、Deep Research（約 10 次/月）、Agent 模式、Codex 寫程式、Sora 影片、Custom GPTs、Projects、記憶、無廣告</td></tr>
+<tr><td>Pro</td><td>$100 / $200</td><td>5 倍／20 倍用量、Sol Pro 推理、最大上下文（400K）、Codex 上限最高</td></tr>
+</tbody>
+</table>
+<ul>
+<li class="pro"><strong>優勢：</strong>功能最廣——一個訂閱含影片、代理、寫程式、建站；生態與外掛最多；一般使用者最熟悉。</li>
+<li class="con"><strong>劣勢：</strong>只有 OpenAI 一家模型；最想用的功能（Deep Research、Sora）正是計量最嚴的；四層方案令人困惑；便宜層有廣告。</li>
+</ul>
+</div>
+
+<div class="box">
+<h3>Claude（Anthropic）</h3>
+<table>
+<thead><tr><th>方案</th><th>價格</th><th>內容</th></tr></thead>
+<tbody>
+<tr><td>Free</td><td>$0</td><td>Sonnet 級聊天；含網頁搜尋、檔案產生、程式執行、延伸思考、Artifacts、記憶；<strong>無 Claude Code、無 Research、無 Projects</strong></td></tr>
+<tr><td>Pro</td><td>$20（年繳 $17）</td><td>Claude Code、Cowork、Design、Research、無限 Projects、全模型（含 Opus）、Chrome 擴充、Microsoft 365 整合、5 倍用量</td></tr>
+<tr><td>Max</td><td>$100 / $200</td><td>5 倍／20 倍 Pro 用量、更高輸出上限、尖峰優先、新功能搶先</td></tr>
+</tbody>
+</table>
+<ul>
+<li class="pro"><strong>優勢：</strong>寫作品質與程式碼公認最好之一；長文件（1M 上下文）；Claude Code 是目前最強的終端寫程式代理之一；隱私政策較保守。</li>
+<li class="con"><strong>劣勢：</strong>用量牆最有感（5 小時 + 每週雙重限額，Claude Code 燒配額很快）；沒有影片生成；免費層沒有代理功能；只有 Anthropic 模型。</li>
+</ul>
+</div>
+
+<div class="box">
+<h3>Gemini（Google）</h3>
+<table>
+<thead><tr><th>方案</th><th>價格</th><th>內容</th></tr></thead>
+<tbody>
+<tr><td>Free</td><td>$0</td><td>Gemini 3.5 Flash（少量 3.1 Pro）、多模態、Gemini Live、15 GB 雲端、上下文 32K</td></tr>
+<tr><td>AI Plus</td><td>$4.99～7.99</td><td>最便宜入門：2 倍用量、128K 上下文、Gmail/Docs 內 AI、200～400 GB 儲存、NotebookLM</td></tr>
+<tr><td>AI Pro</td><td>$19.99</td><td>Gemini 3.1 Pro、1M 上下文、Deep Research、Veo 影片、2～5 TB 儲存、YouTube Premium Lite</td></tr>
+<tr><td>AI Ultra</td><td>$99.99～199.99</td><td>Deep Think 推理、5～20 倍用量、Gemini Spark 代理、20 TB</td></tr>
+</tbody>
+</table>
+<ul>
+<li class="pro"><strong>優勢：</strong>CP 值最高（同價附大量雲端與 Workspace 整合）；免費層上下文與多模態強；有最便宜的付費入門；深度用 Gmail/Docs/Sheets 的人幾乎沒有第二選擇。</li>
+<li class="con"><strong>劣勢：</strong>用量上限寫得最模糊；免費層只有 32K 上下文；寫程式代理較弱；產品線改名頻繁。</li>
+</ul>
+</div>
+
+<div class="box">
+<h3>Microsoft Copilot</h3>
+<table>
+<thead><tr><th>方案</th><th>價格</th><th>內容</th></tr></thead>
+<tbody>
+<tr><td>Free</td><td>$0</td><td>Windows / Edge / 網頁內建，每日提示次數有上限</td></tr>
+<tr><td>個人付費</td><td>$19.99</td><td>獨立 Copilot Pro 已於 2026/8 停售；只剩 Microsoft 365 Premium（含 Office 全套 + 6 TB + 進階 Copilot）</td></tr>
+<tr><td>企業</td><td>約 $18～21/人/月</td><td>M365 Copilot Business：Word / Excel / Teams 內嵌</td></tr>
+</tbody>
+</table>
+<ul>
+<li class="pro"><strong>優勢：</strong>公司電腦通常已經有；資料留在租戶內，IT 最容易接受；Office 內嵌無需切換。</li>
+<li class="con"><strong>劣勢：</strong>底層是 OpenAI 模型但常落後一代；個人版必須連 Office 一起買；獨立功能面最窄。</li>
+</ul>
+</div>
+
+<div class="box">
+<h3>Perplexity</h3>
+<table>
+<thead><tr><th>方案</th><th>價格</th><th>內容</th></tr></thead>
+<tbody>
+<tr><td>Free</td><td>$0</td><td>無限快速搜尋（附引用）、每天 5 次 Pro 搜尋</td></tr>
+<tr><td>Pro</td><td>$20（年繳 $200）</td><td>300+ 次 Pro 搜尋/日、可切 GPT / Claude / Gemini / Sonar、無限上傳、每月 $5 API 額度</td></tr>
+<tr><td>Max</td><td>$200</td><td>不限高階模型、Labs 不限、優先支援</td></tr>
+</tbody>
+</table>
+<ul>
+<li class="pro"><strong>優勢：</strong>唯一在 $20 給你多家模型切換；引用最清楚，適合查證與研究；免費層就很實用。</li>
+<li class="con"><strong>劣勢：</strong>是「答案引擎」不是全能助理，長文、寫程式、影片都不是主場；模型是別人的，旗艦版本會延後。</li>
+</ul>
+</div>
+
+<div class="box">
+<h3>Grok（xAI）</h3>
+<table>
+<thead><tr><th>方案</th><th>價格</th><th>內容</th></tr></thead>
+<tbody>
+<tr><td>Free</td><td>$0</td><td>每 2 小時 2 次提問、X 即時資料</td></tr>
+<tr><td>SuperGrok Lite / SuperGrok</td><td>$10 / $30</td><td>Grok 4.x、深度搜尋、圖片編輯、較高用量</td></tr>
+<tr><td>Plus / Heavy</td><td>$100 / $300</td><td>Grok Heavy 最強推理、多代理、優先支援</td></tr>
+</tbody>
+</table>
+<ul>
+<li class="pro"><strong>優勢：</strong>X 即時輿情獨家；API 輸出價便宜；Heavy 版推理很強。</li>
+<li class="con"><strong>劣勢：</strong>消費者訂價最貴（主付費層 $30 而別家 $20）；免費層幾乎不能用；內容安全政策爭議，公司環境常不採用。</li>
+</ul>
+</div>
+
+<div class="box">
+<h3>完全免費的選項</h3>
+<table>
+<thead><tr><th>產品</th><th>優勢</th><th>劣勢</th></tr></thead>
+<tbody>
+<tr><td>Meta AI（WhatsApp / IG / FB 內建）</td><td>Llama 4、不用帳號、隨手問</td><td>無檔案、無專業功能</td></tr>
+<tr><td>DeepSeek（網頁版）</td><td>V3 / R1 免費、推理強</td><td>資料進中國伺服器，公司環境多半禁用；尖峰常塞</td></tr>
+<tr><td>本機開源模型（Ollama / LM Studio 跑 Llama、Qwen、Gemma）</td><td>零成本、資料不出機、無限量</td><td>需 16 GB+ RAM 或 GPU；品質約落後旗艦一年；無代理生態</td></tr>
+</tbody>
+</table>
+</div>
+
+<h2 class="pb">三、垂直領域：語音轉錄</h2>
+<p class="note">對應 Call Coach DEMO 錄影轉逐字稿的場景。</p>
+<table>
+<thead><tr><th>方案</th><th>免費</th><th>付費</th><th>優勢</th><th>劣勢</th></tr></thead>
+<tbody>
+<tr><td>WhisperX / Faster-Whisper（本機）</td><td>完全免費、無限量</td><td>—</td><td>音訊不出機、支援分軌（誰在說話）</td><td>慢（48 分鐘約 50～90 分鐘）、要 HF Token、吃記憶體、Smart App Control 會擋</td></tr>
+<tr><td>Azure Speech（Fast Transcription）</td><td>F0 免費層約 5 小時/月</td><td>標準層約 $1/小時起</td><td>2～5 分鐘完成、繁中與分軌品質好、企業合規</td><td>音訊上雲、要信用卡；區域限制（eastasia 沒有，需 southeastasia / japaneast）</td></tr>
+<tr><td>OpenAI Whisper API / gpt-4o-transcribe</td><td>無</td><td>約 $0.006/分</td><td>便宜、整合簡單</td><td>無內建分軌；單檔 25 MB 限制要自己切</td></tr>
+<tr><td>Google Speech-to-Text</td><td>每月 60 分鐘</td><td>約 $0.016/分</td><td>Workspace 整合</td><td>繁中分軌品質參差</td></tr>
+<tr><td>Otter / Fireflies / Notta 等 SaaS</td><td>每月 300～600 分鐘</td><td>$10～20/月</td><td>開會直接錄、有摘要</td><td>資料在第三方；無法客製輸出格式</td></tr>
+</tbody>
+</table>
+
+<h2>四、垂直領域：寫程式</h2>
+<table>
+<thead><tr><th>工具</th><th>免費</th><th>付費</th><th>優勢</th><th>劣勢</th></tr></thead>
+<tbody>
+<tr><td>GitHub Copilot</td><td>每月 2,000 次補全 + 50 次對話</td><td>Pro $10 / Pro+ $39</td><td>最便宜、IDE 整合成熟</td><td>代理能力落後 Cursor / Claude Code</td></tr>
+<tr><td>Cursor</td><td>Hobby 有限次數</td><td>Pro $20 / Ultra $200</td><td>編輯器內代理最順、可選多家模型、雲端代理</td><td>用量制難預估；重度使用會爆額</td></tr>
+<tr><td>Claude Code</td><td>無（需 Pro 以上或 API）</td><td>隨 Claude Pro / Max</td><td>終端代理最強、長任務可靠</td><td>燒配額快；Pro 層一天可能撞牆 2～3 次</td></tr>
+<tr><td>Codex（ChatGPT）</td><td>無</td><td>隨 Plus / Pro</td><td>與 ChatGPT 同訂閱</td><td>只有 OpenAI 模型</td></tr>
+<tr><td>Gemini CLI / Code Assist</td><td>每天 1,000 次請求</td><td>隨 AI Pro</td><td>免費額度最大</td><td>品質略遜 Claude Code</td></tr>
+</tbody>
+</table>
+
+<h2>五、怎麼選（依公司情境）</h2>
+<table>
+<thead><tr><th>情境</th><th>建議</th></tr></thead>
+<tbody>
+<tr><td>業務同事，只需問問題、整理文件</td><td>免費 Gemini 或 ChatGPT Free 就夠；公司已有 M365 就直接用 Copilot，最不會被 IT 擋</td></tr>
+<tr><td>一個人要付一份 $20</td><td>寫作與長文件多 → Claude Pro；功能要最廣 → ChatGPT Plus；活在 Google 生態 → AI Pro（附 2～5 TB 最划算）；主要做查證研究 → Perplexity Pro</td></tr>
+<tr><td>DEMO 錄影轉錄</td><td>不能上雲的客戶案子用本機 WhisperX；日常量大走 Azure Fast Transcription（一小時 DEMO 約台幣 30～40 元），用 team-config.env 集中管理金鑰</td></tr>
+<tr><td>不建議買</td><td>$200 等級個人方案（除非天天撞 $20 方案用量牆）；Grok 用在公司環境；已停售的 Copilot Pro</td></tr>
+</tbody>
+</table>
+
+<div class="lead">
+<strong>共通陷阱：</strong>個人方案預設會把對話拿去訓練模型，要自己到設定關掉；客戶資料請走商務／企業方案或本機模型。各家限額 2026 年已調整多次，訂閱前看一次官網當天的數字。
+</div>
+
+<footer>資料來源：各廠商官方定價頁與 2026 年 6～8 月第三方方案比較文章（aiplancomparison、digitalapplied、ITECS、CoreAI 等）。方案名稱與價格為整理日快照，僅供決策參考。</footer>
+
+</body>
+</html>

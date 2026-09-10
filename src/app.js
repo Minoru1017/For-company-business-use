@@ -13,6 +13,7 @@ import {
   mergeAIResults,
   pickPreferredModel,
 } from './gemini.js';
+import { initDrill } from './drill.js';
 import { initLocalTranscribe } from './local-transcribe.js';
 import { initModeChooser, resolveMode } from './mode.js';
 import { bindLabelCollapseHandlers, createLabelController } from './labels.js';
@@ -408,6 +409,27 @@ function init() {
     },
     showToast,
     getMode: resolveMode,
+  });
+
+  initDrill({
+    // 陪練逐字稿已含說話者標籤，直接跑分析並跳到結果
+    onTranscriptReady: (text, filename) => {
+      if (loadTranscriptText(text, filename)) $('analyze').click();
+    },
+    showToast,
+    getApiKey: () => $('apiKey').value.trim(),
+    setApiKey: (value) => {
+      $('apiKey').value = value;
+      keyStorage.save(value);
+    },
+    getModel: () => {
+      const m = $('aiModel').value.trim() || DEFAULT_MODEL;
+      return isDeprecatedModel(m) ? DEFAULT_MODEL : m;
+    },
+    onGeminiUsed: (tokens) => {
+      bumpUsage(tokens);
+      renderQuota();
+    },
   });
 }
 
