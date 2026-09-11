@@ -64,10 +64,18 @@
     <div id="drop">點擊選擇 或 拖曳逐字稿檔到這裡<br><span class="mono-hint" style="font-family:var(--mono);font-size:.7rem;letter-spacing:.15em;color:#555">VIBE .JSON / SRT / VTT / TXT — LOCAL ONLY</span><div id="fname"></div></div>
     <input type="file" id="file" accept=".vibe.json,.json,.srt,.vtt,.txt,text/plain,application/json" hidden>
     <p class="hint" style="margin-top:10px">電訪建議用 Vibe 錄音並匯出 <code>transcript.vibe.json</code>（見 <a href="https://github.com/Minoru1017/For-company-business-use/blob/main/docs/vibe-export-checklist.md" target="_blank" rel="noopener noreferrer">Vibe 檢查清單</a>）。</p>
+    <div class="sample-actions">
+      <button type="button" class="btn" data-load-sample>載入範例逐字稿</button>
+      <span class="hint">沒有檔案也能先體驗：內建一段 3 分鐘的虛構 AI 課程 DEMO 電訪。</span>
+    </div>
   </section>
 
   <section class="sec" id="demoSection" hidden>
-    <div class="sec-head"><span class="num">01</span><h2>DEMO 本機轉錄</h2><span class="tag">MP4 → SRT · 不上雲</span></div>
+    <div class="sec-head"><span class="num">01</span><h2>DEMO 轉錄</h2><span class="tag">MP4 → SRT · 本機或 Azure</span></div>
+    <div class="sample-actions">
+      <button type="button" class="btn" data-load-sample>載入範例逐字稿</button>
+      <span class="hint">還沒裝助手或沒有錄影？先用內建範例走一遍「標記 → 分析 → 報告」。</span>
+    </div>
     <div id="localBridgePanel" class="local-bridge"></div>
     <div id="demoOfflineHint" class="demo-offline" hidden></div>
   </section>
@@ -75,6 +83,14 @@
   <section class="sec" id="drillSection" hidden>
     <div class="sec-head"><span class="num">01</span><h2>電訪開發 · 臨場陪練</h2><span class="tag">你主動問 · 客戶即時回 · 限時接話</span></div>
     <div id="drillPanel" class="drill"></div>
+  </section>
+
+  <section class="sec history-sec" id="historySection" hidden>
+    <details id="historyDetails">
+      <summary class="history-summary"><span class="num">↻</span><h2>最近分析</h2><span class="tag" id="historyCount">0 筆</span><span class="hint history-hint">存在這台電腦的瀏覽器，一鍵回看，不用再找檔案</span></summary>
+      <ul class="history-list" id="historyList"></ul>
+      <div class="btns" style="margin-top:8px"><button id="historyClear" type="button">清空紀錄</button></div>
+    </details>
   </section>
 
   <section class="sec" id="labelCard" hidden>
@@ -212,7 +228,30 @@
       </div>
     </section>
 
-    <div class="btns" style="margin-bottom:6px"><button class="primary" id="copyReport" type="button">複製完整報告（文字版）</button></div>
+    <section class="sec" id="exportSection">
+      <div class="sec-head"><span class="num">10</span><h2>把結果帶走</h2><span class="tag">Copy · Download · Print</span></div>
+      <div class="export-bar">
+        <div class="export-group">
+          <span class="export-label">貼到群組／回報</span>
+          <button class="primary" id="copySummary" type="button">複製摘要（LINE／Slack）</button>
+          <button id="copyChecklist" type="button">複製「下一通要問」清單</button>
+          <button id="copyReport" type="button">複製完整報告（文字版）</button>
+        </div>
+        <div class="export-group">
+          <span class="export-label">存檔／歸檔</span>
+          <button id="downloadMd" type="button">下載報告 .md</button>
+          <button id="downloadSrt" type="button">下載已標記逐字稿 .srt</button>
+          <button id="printReport" type="button">列印／存成 PDF</button>
+        </div>
+        <div class="export-group" id="exportBridgeGroup" hidden>
+          <span class="export-label">本機助手</span>
+          <button id="saveToBridge" type="button">存到助手 output 資料夾（與 SRT 放一起）</button>
+          <button id="openOutputFolder" type="button">開啟 output 資料夾</button>
+        </div>
+      </div>
+      <p class="hint" id="exportHint">摘要與清單是純文字，直接貼進 LINE／Slack 就能看；.md 可放 Notion／Obsidian；.srt 含你調好的業務／客戶標記，下次載入不用重標。</p>
+    </section>
+
     <div class="footer">
       <span class="mono">CALL COACH — CONSULTATIVE SALES ANALYZER</span>
       <div class="barcode"></div>

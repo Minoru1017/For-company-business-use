@@ -185,6 +185,7 @@ def run_parallel_transcribe(
     log: LogFn,
     hooks,
     cancel_check: Callable[[], bool],
+    progress=None,
 ) -> int:
     chunk_dir = work_root / ".chunks" / audio.stem
     if chunk_dir.exists():
@@ -201,6 +202,8 @@ def run_parallel_transcribe(
         f"（16GB 記憶體建議上限 {DEFAULT_MAX_PARALLEL}）"
         f" — 預估還需約 {eta_low}～{eta_high} 分鐘（CPU 本機轉錄，請接電源）…"
     )
+    if progress is not None:
+        progress.phase("split", f"ffmpeg 切成 {chunk_count} 段")
     try:
         parts = split_audio_chunks(audio, chunk_count, chunk_dir, ffmpeg, log)
     except RuntimeError as e:
@@ -210,11 +213,17 @@ def run_parallel_transcribe(
     per_threads = threads_per_worker(parallel, default_threads)
     chunk_out = chunk_dir / "out"
     chunk_out.mkdir(parents=True, exist_ok=True)
+    if progress is not None:
+        progress.phase("transcribe", f"{len(parts)} 段、{parallel} 段同時跑")
+        progress.set_part_total(len(parts))
 
     def transcribe_one(item: tuple[int, Path, float]) -> tuple[int, float, Path]:
         idx, chunk_wav, offset = item
         out_sub = chunk_out / f"part_{idx:03d}"
         out_sub.mkdir(parents=True, exist_ok=True)
+        part_log: LogFn = lambda m: log(f"  [段 {idx + 1}] {m}")  # noqa: E731
+        if progress is not None:
+            part_log = progress.wrap_whisperx_log(part_log, idx)
         code = run_command(
             whisperx_cmd
             + [
@@ -238,10 +247,12 @@ def run_parallel_transcribe(
                 "2",
                 "--output_format",
                 "srt",
+                "--print_progress",
+                "True",
                 "--output_dir",
                 str(out_sub),
             ],
-            log=lambda m: log(f"  [段 {idx + 1}] {m}"),
+            log=part_log,
             env=env_vars,
             hooks=hooks,
         )
@@ -250,6 +261,8 @@ def run_parallel_transcribe(
         srts = sorted(out_sub.glob("*.srt"))
         if not srts:
             raise RuntimeError(f"段 {idx + 1} 未產出 SRT")
+        if progress is not None:
+            progress.part_done(idx)
         return idx, offset, srts[0]
 
     indexed = list(enumerate(parts))
@@ -268,6 +281,8 @@ def run_parallel_transcribe(
         return 1
 
     results.sort(key=lambda x: x[0])
+    if progress is not None:
+        progress.phase("save", f"合併 {len(results)} 段")
     merge_inputs = [(r[2].read_text(encoding="utf-8"), r[1]) for r in results]
     final_srt.parent.mkdir(parents=True, exist_ok=True)
     final_srt.write_text(merge_srt_parts(merge_inputs), encoding="utf-8")

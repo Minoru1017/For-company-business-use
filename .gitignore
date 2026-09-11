@@ -14,3 +14,4 @@ demo-workspace/input/*
 !demo-workspace/input/.gitkeep
 node_modules/
 dist/
+team-config.env

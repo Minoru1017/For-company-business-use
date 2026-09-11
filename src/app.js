@@ -14,13 +14,30 @@ import {
   pickPreferredModel,
 } from './gemini.js';
 import { initDrill } from './drill.js';
-import { initLocalTranscribe } from './local-transcribe.js';
+import {
+  buildNextCallChecklist,
+  buildSummaryMessage,
+  copyText,
+  downloadText,
+  exportBaseName,
+  reportTextToMarkdown,
+  segsToSrt,
+} from './export.js';
+import { clearHistory, deleteHistory, formatSavedAt, getHistory, listHistory, saveHistory, updateHistoryReport } from './history.js';
+import {
+  bridgeSupports,
+  checkLocalBridge,
+  initLocalTranscribe,
+  openBridgeFolder,
+  saveReportToBridge,
+} from './local-transcribe.js';
 import { initModeChooser, resolveMode } from './mode.js';
 import { bindLabelCollapseHandlers, createLabelController } from './labels.js';
 import { applyBuiltinSpeakerLabels, enrichSegments, parse, parseVibeJson } from './parser.js';
 import { bumpUsage, checkQuotaBefore, getLimit, getUsage, quotaPercent, saveUsage } from './quota.js';
 import { labeledRatio } from './speaker-labels.js';
 import { appendAIReportSection } from './report-format.js';
+import { SAMPLE_TRANSCRIPT_NAME, SAMPLE_TRANSCRIPT_SRT } from './sample-transcript.js';
 import { autoGuess } from './speaker.js';
 import { animateStats, bindUI, renderAnalysisUI, showQuotaModal, showToast } from './ui.js';
 import { $, escapeHTML, fmt } from './utils.js';
@@ -29,6 +46,10 @@ let segs = [];
 let reportText = '';
 let aiAbort = null;
 let labelCtrl = null;
+let lastResult = null;
+let aiSummary = '';
+let sourceName = 'transcript.srt';
+let currentHistoryId = null;
 
 const keyStorage = {
   get remember() {
@@ -74,6 +95,13 @@ function bindUpload() {
     if (e.dataTransfer.files[0]) loadFile(e.dataTransfer.files[0]);
   };
   $('file').onchange = () => $('file').files[0] && loadFile($('file').files[0]);
+  document.querySelectorAll('[data-load-sample]').forEach((btn) => {
+    btn.onclick = () => {
+      if (loadTranscriptText(SAMPLE_TRANSCRIPT_SRT, SAMPLE_TRANSCRIPT_NAME)) {
+        $('labelCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    };
+  });
 }
 
 function loadTranscriptText(text, filename = 'transcript.srt') {
@@ -96,8 +124,15 @@ function loadTranscriptText(text, filename = 'transcript.srt') {
     return false;
   }
   if (labeledRatio(segs) < 0.5) autoGuess(segs);
+  return finishLoad(filename, isVibe ? 'Vibe' : '逐字稿');
+}
+
+function finishLoad(filename, src) {
   enrichSegments(segs);
-  const src = isVibe ? 'Vibe' : '逐字稿';
+  sourceName = filename || 'transcript.srt';
+  currentHistoryId = null;
+  lastResult = null;
+  aiSummary = '';
   $('fname').textContent = `已載入（${segs.length} 句，來源：${src}）`;
   labelCtrl = createLabelController({ segs, onToast: showToast });
   labelCtrl.resetFocus();
@@ -106,6 +141,16 @@ function loadTranscriptText(text, filename = 'transcript.srt') {
   $('labelCard').hidden = false;
   $('result').hidden = true;
   return true;
+}
+
+/** 從「最近分析」回看：逐字稿與標記都已存好，直接載入並重跑分析。 */
+function loadFromHistory(id) {
+  const item = getHistory(id);
+  if (!item) return showToast('找不到這筆紀錄（可能已被清除）');
+  segs = item.segs.map((s) => ({ ...s }));
+  if (!finishLoad(item.source, '最近分析')) return;
+  currentHistoryId = item.id;
+  $('analyze').click();
 }
 
 function loadFile(f) {
@@ -131,21 +176,178 @@ function bindLabels() {
   $('analyze').onclick = () => {
     const result = runAnalysis(segs);
     reportText = result.reportText;
+    lastResult = result;
+    aiSummary = '';
     renderAnalysisUI(result);
     drawChart(segs, result.keyMoments);
     $('result').hidden = false;
+    const entry = saveHistory({
+      id: currentHistoryId,
+      source: sourceName,
+      segs,
+      result,
+      reportText,
+      mode: resolveMode(),
+    });
+    currentHistoryId = entry.id;
+    renderHistory();
+    refreshExportBar();
     showToast('分析完成');
     window.scrollTo({ top: $('result').offsetTop - 10, behavior: 'smooth' });
   };
 }
 
-function bindCopyReport() {
-  $('copyReport').onclick = () => {
-    navigator.clipboard.writeText(reportText);
-    showToast('報告已複製到剪貼簿');
-    $('copyReport').textContent = '已複製';
-    setTimeout(() => ($('copyReport').textContent = '複製完整報告（文字版）'), 1500);
+// ---------- 產出直接進工作流 ----------
+
+function flashLabel(btn, text, ms = 1500) {
+  const original = btn.dataset.label || btn.textContent;
+  btn.dataset.label = original;
+  btn.textContent = text;
+  setTimeout(() => (btn.textContent = original), ms);
+}
+
+async function copyWithFeedback(btn, text, toast) {
+  if (!text) return showToast('請先完成分析');
+  const ok = await copyText(text);
+  showToast(ok ? toast : '無法寫入剪貼簿，請手動選取複製');
+  if (ok) flashLabel(btn, '已複製 ✓');
+}
+
+function exportContext() {
+  return { source: sourceName, date: new Date(), aiSummary };
+}
+
+function summaryText() {
+  return lastResult ? buildSummaryMessage(lastResult, exportContext()) : '';
+}
+
+function markdownText() {
+  return reportText ? reportTextToMarkdown(reportText, { ...exportContext(), summaryMessage: summaryText() }) : '';
+}
+
+function refreshExportBar() {
+  const group = $('exportBridgeGroup');
+  if (group) group.hidden = !bridgeSupports('report-save');
+}
+
+function bindExports() {
+  $('copyReport').onclick = () => copyWithFeedback($('copyReport'), reportText, '完整報告已複製到剪貼簿');
+  $('copySummary').onclick = () => copyWithFeedback($('copySummary'), summaryText(), '摘要已複製，直接貼到 LINE／Slack');
+  $('copyChecklist').onclick = () =>
+    copyWithFeedback(
+      $('copyChecklist'),
+      lastResult ? buildNextCallChecklist(lastResult, exportContext()) : '',
+      '「下一通要問」清單已複製'
+    );
+  $('downloadMd').onclick = () => {
+    if (!reportText) return showToast('請先完成分析');
+    const name = downloadText(`${exportBaseName(sourceName)}-報告.md`, markdownText(), 'text/markdown;charset=utf-8');
+    showToast(`已下載 ${name}`);
   };
+  $('downloadSrt').onclick = () => {
+    if (!segs.length) return showToast('請先載入逐字稿');
+    const name = downloadText(`${exportBaseName(sourceName)}-已標記.srt`, segsToSrt(segs), 'application/x-subrip;charset=utf-8');
+    showToast(`已下載 ${name}（含業務／客戶標記）`);
+  };
+  $('printReport').onclick = () => {
+    if (!reportText) return showToast('請先完成分析');
+    document.body.classList.add('printing');
+    const done = () => document.body.classList.remove('printing');
+    window.addEventListener('afterprint', done, { once: true });
+    setTimeout(() => {
+      window.print();
+      setTimeout(done, 1000);
+    }, 50);
+  };
+  $('saveToBridge').onclick = async () => {
+    if (!reportText) return showToast('請先完成分析');
+    const base = exportBaseName(sourceName);
+    try {
+      const md = await saveReportToBridge(`${base}-報告.md`, markdownText());
+      await saveReportToBridge(`${base}-已標記.srt`, segsToSrt(segs));
+      showToast(`已存到助手 output：${md.filename}（＋已標記 .srt）`);
+      flashLabel($('saveToBridge'), '已存檔 ✓');
+    } catch (e) {
+      showToast(`存檔失敗：${e?.message || '無法連線本機助手'}`);
+    }
+  };
+  $('openOutputFolder').onclick = async () => {
+    try {
+      await openBridgeFolder('output');
+      showToast('已開啟 output 資料夾');
+    } catch (e) {
+      showToast(e?.message || '無法連線本機助手');
+    }
+  };
+}
+
+// ---------- 最近分析 ----------
+
+function renderHistory() {
+  const sec = $('historySection');
+  const list = $('historyList');
+  if (!sec || !list) return;
+  const items = listHistory();
+  sec.hidden = !items.length;
+  const count = $('historyCount');
+  if (count) count.textContent = `${items.length} 筆`;
+  list.innerHTML = items
+    .map((h) => {
+      const s = h.summary || {};
+      const meta = [
+        `${fmt(s.totalDur || 0)}`,
+        `客戶 ${Math.round((s.custRatio || 0) * 100)}%`,
+        `六步驟 ${s.steps ?? 0}/6`,
+        `L${s.deepest ?? 0}`,
+        s.dominant ? `「${s.dominant}」` : '',
+      ]
+        .filter(Boolean)
+        .join('・');
+      return `<li class="history-item ${h.id === currentHistoryId ? 'current' : ''}" data-id="${escapeHTML(h.id)}">
+        <div class="history-main">
+          <span class="history-src">${escapeHTML(h.source || 'transcript')}</span>
+          <span class="history-meta">${escapeHTML(meta)}</span>
+        </div>
+        <span class="history-time">${escapeHTML(formatSavedAt(h.savedAt))}</span>
+        <span class="history-actions">
+          <button type="button" class="btn" data-act="open">回看</button>
+          <button type="button" class="btn" data-act="copy">複製報告</button>
+          <button type="button" class="btn history-del" data-act="del" aria-label="刪除">✕</button>
+        </span>
+      </li>`;
+    })
+    .join('');
+  list.querySelectorAll('[data-act]').forEach((btn) => {
+    btn.onclick = async (e) => {
+      e.stopPropagation();
+      const id = btn.closest('.history-item')?.dataset.id;
+      if (!id) return;
+      if (btn.dataset.act === 'open') loadFromHistory(id);
+      if (btn.dataset.act === 'del') {
+        deleteHistory(id);
+        if (currentHistoryId === id) currentHistoryId = null;
+        renderHistory();
+        showToast('已刪除這筆紀錄');
+      }
+      if (btn.dataset.act === 'copy') {
+        const item = getHistory(id);
+        const ok = item?.reportText ? await copyText(item.reportText) : false;
+        showToast(ok ? '這筆報告已複製' : '這筆紀錄沒有報告內容');
+      }
+    };
+  });
+}
+
+function bindHistory() {
+  $('historyClear')?.addEventListener('click', () => {
+    if (!listHistory().length) return;
+    if (!confirm('清空所有最近分析紀錄？（只影響這台電腦的瀏覽器）')) return;
+    clearHistory();
+    currentHistoryId = null;
+    renderHistory();
+    showToast('已清空最近分析');
+  });
+  renderHistory();
 }
 
 function loadModelPreference() {
@@ -323,11 +525,16 @@ async function runAIAnalysis() {
 
   let totalTokens = 0;
   const partials = [];
+  const startedAt = Date.now();
   try {
     for (let i = 0; i < chunks.length; i++) {
       if (aiAbort.signal.aborted) throw new Error('已取消分析');
       const prefix = chunks.length > 1 ? `【第 ${i + 1}/${chunks.length} 段逐字稿】\n` : '';
-      setAIProgress(i, chunks.length, `AI 分析中：第 ${i + 1} / ${chunks.length} 段…`);
+      // 以已完成段的平均耗時推估剩餘；第一段前只能給經驗值
+      const perChunk = i ? (Date.now() - startedAt) / i : 0;
+      const remainSec = i ? Math.ceil((perChunk * (chunks.length - i)) / 1000) : null;
+      const eta = remainSec == null ? '（每段通常 10～40 秒）' : `（約還需 ${remainSec >= 60 ? `${Math.ceil(remainSec / 60)} 分` : `${remainSec} 秒`}）`;
+      setAIProgress(i, chunks.length, `AI 分析中：第 ${i + 1} / ${chunks.length} 段…${eta}`);
       const { parsed, usedTokens } = await callGeminiResilient({
         apiKey: key,
         model,
@@ -344,6 +551,8 @@ async function runAIAnalysis() {
     $('aiStatus').textContent = `AI 分析完成 — ${j.summary || ''}`;
     showToast(chunks.length > 1 ? `AI 深度分析完成（${chunks.length} 段合併）` : 'AI 深度分析完成');
     reportText += appendAIReportSection('', j);
+    aiSummary = j.summary || '';
+    if (currentHistoryId) updateHistoryReport(currentHistoryId, reportText);
   } catch (e) {
     if (e.status === 429) {
       showQuotaModal(
@@ -374,7 +583,8 @@ function init() {
   bindUI();
   bindUpload();
   bindLabels();
-  bindCopyReport();
+  bindExports();
+  bindHistory();
   bindApiKey();
   bindAI();
   labelCtrl = createLabelController({ segs, onToast: showToast });
@@ -392,6 +602,10 @@ function init() {
       if (mode === 'demo') window.__refreshBridge?.();
     },
   });
+
+  // 助手在線時，報告可直接存進 output 資料夾；狀態每 8 秒由 local-transcribe 更新
+  checkLocalBridge().then(refreshExportBar);
+  setInterval(refreshExportBar, 8000);
 
   initLocalTranscribe({
     onTranscriptReady: (text, filename) => {

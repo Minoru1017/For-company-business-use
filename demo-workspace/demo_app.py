@@ -23,6 +23,7 @@ from urllib.parse import urlparse
 
 import demo_core
 import job_log
+import progress_tracker
 import security
 import upload_parse
 
@@ -44,6 +45,7 @@ class JobState:
         self.cancel_remove_models = False
         self.current_proc: subprocess.Popen | None = None
         self.log_file: str | None = None
+        self.progress: dict | None = None
 
     def reset(self, kind: str) -> bool:
         with self.lock:
@@ -58,11 +60,17 @@ class JobState:
             self.cancel_remove_models = False
             self.current_proc = None
             self.log_file = None
+            self.progress = None
             return True
 
     def append(self, msg: str) -> None:
+        # Structured progress rides on the log callback but is kept out of the human-readable log.
+        data = progress_tracker.parse_line(msg)
         with self.lock:
-            self.logs.append(msg)
+            if data is not None:
+                self.progress = data
+            else:
+                self.logs.append(msg)
 
     def finish(self, code: int) -> None:
         import job_log
@@ -106,6 +114,7 @@ class JobState:
                 "cancel_uninstall": self.cancel_uninstall,
                 "log_file": self.log_file,
                 "logs_folder": str(job_log.LOGS_DIR),
+                "progress": progress_tracker.enrich(self.progress),
             }
 
 
@@ -355,11 +364,49 @@ class Handler(BaseHTTPRequestHandler):
                 return self._reject(400, "JSON 格式錯誤")
             key = str(data.get("key", "")).strip()
             region = str(data.get("region", "")).strip()
+            endpoint = str(data.get("endpoint", "")).strip()
             try:
-                demo_core.save_azure_config(key, region)
+                demo_core.save_azure_config(key, region, endpoint)
             except ValueError as e:
                 return self._send_json({"ok": False, "message": str(e)}, 400)
             return self._send_json({"ok": True, "status": demo_core.get_status().to_dict()})
+
+        if path == "/api/team-config/import":
+            if JOB.running:
+                return self._send_json({"ok": False, "message": "轉錄或安裝進行中，請稍後再匯入"}, 409)
+            data = self._parse_json(body)
+            if data is None:
+                return self._reject(400, "JSON 格式錯誤")
+            text = str(data.get("text", ""))
+            try:
+                values = demo_core.import_team_config_text(text)
+            except ValueError as e:
+                return self._send_json({"ok": False, "message": str(e)}, 400)
+            except OSError as e:
+                return self._send_json({"ok": False, "message": f"無法寫入設定：{e}"}, 500)
+            from team_config import redact
+
+            return self._send_json(
+                {
+                    "ok": True,
+                    "applied": sorted(values),
+                    "values": redact(values),
+                    "status": demo_core.get_status().to_dict(),
+                }
+            )
+
+        if path == "/api/team-config/export":
+            data = self._parse_json(body)
+            if data is None:
+                return self._reject(400, "JSON 格式錯誤")
+            try:
+                content = demo_core.export_team_config_text(
+                    include_hf_token=bool(data.get("include_hf_token")),
+                    team_name=str(data.get("team_name", "")),
+                )
+            except ValueError as e:
+                return self._send_json({"ok": False, "message": str(e)}, 400)
+            return self._send_json({"ok": True, "filename": "team-config.env", "content": content})
 
         if path == "/api/cancel":
             data = self._parse_json(body)
@@ -412,6 +459,18 @@ class Handler(BaseHTTPRequestHandler):
 
         if path == "/api/upload":
             return self._handle_upload()
+
+        if path == "/api/report":
+            data = self._parse_json(body)
+            if data is None:
+                return self._reject(400, "JSON 格式錯誤")
+            try:
+                saved = demo_core.save_report(str(data.get("filename", "")), data.get("content", ""))
+            except ValueError as e:
+                return self._send_json({"ok": False, "message": str(e)}, 400)
+            except OSError as e:
+                return self._send_json({"ok": False, "message": f"寫入失敗: {e}"}, 500)
+            return self._send_json({"ok": True, "filename": saved.name, "folder": str(saved.parent)})
 
         if path == "/api/uninstall":
             if JOB.running:
@@ -505,6 +564,10 @@ def _run_with_window(server: ThreadingHTTPServer, host: str, url: str) -> int:
 
 def main() -> int:
     demo_core.ensure_workspace_files()
+    try:
+        demo_core.apply_team_config(log=print)
+    except OSError as e:
+        print(f"[提醒] 無法套用團隊設定：{e}")
 
     if not STATIC.exists():
         print(f"[錯誤] 找不到介面檔案: {STATIC}")
