@@ -36,7 +36,7 @@ export function renderKeyMomentsLegend(moments) {
   el.innerHTML = moments
     .map(
       (m) =>
-        `<button type="button" class="key-moment" data-start="${m.startIdx}" title="${escapeHTML(m.detail || '')}">
+        `<button type="button" class="key-moment${m.breakthrough ? ' trust' : ''}" data-start="${m.startIdx}" title="${escapeHTML(m.detail || '')}">
           <span class="key-time">${fmt(m.start)}</span>
           <span class="key-label">${escapeHTML(m.label)}</span>
           <span class="key-meta">客戶 ${m.customerChars} 字</span>

@@ -16,6 +16,9 @@ describe('rules analysis', () => {
     expect(result.stats.sQuestions).toBeGreaterThanOrEqual(1);
     expect(result.manualChecks.discovery).toBeTruthy();
     expect(result.manualChecks.amplification).toBeTruthy();
+    expect(result.manualChecks.trust).toBeTruthy();
+    expect(result.trust.criteria.length).toBeGreaterThanOrEqual(7);
+    expect(result.reportText).toContain('信任檢核');
     expect(result.purposeProfile).toBeTruthy();
   });
 

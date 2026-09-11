@@ -78,15 +78,23 @@ function topItems(items, n) {
   return (items || []).slice(0, n).map((x) => stripReportHtml(x).replace(/\s+/g, ' ').trim());
 }
 
+function trustSummary(trust) {
+  if (!trust) return '';
+  const notes = [];
+  if (trust.trajectory?.breakthrough) notes.push('有信任突破');
+  if (trust.wavering?.detected) notes.push(trust.wavering.handled ? '搖擺型已試探' : '搖擺型未試探');
+  return `｜信任感：${trust.statusLabel}${notes.length ? `（${notes.join('、')}）` : ''}`;
+}
+
 /** 給 LINE／Slack 的短摘要：一眼看到這通電話的健康度與下一步。 */
 export function buildSummaryMessage(result, { source = '', date = new Date(), aiSummary = '' } = {}) {
-  const { stats, stepHit, deepest, purposeProfile, bad, sug } = result;
+  const { stats, stepHit, deepest, purposeProfile, trust, bad, sug } = result;
   const done = doneSteps(stepHit);
   const dom = purposeProfile?.dominant;
   const lines = [
     `【電訪複盤】${source ? `${source}　` : ''}${timeStamp(date)}`,
     `通話 ${fmt(stats.totalDur)}｜客戶說話 ${Math.round(stats.custRatio * 100)}%｜業務提問 ${stats.sQuestions} 句`,
-    `六步驟 ${done.length}/6${done.length ? `（${done.join('、')}）` : ''}｜五層挖到 L${deepest}｜目的分級：${dom ? dom.label : '未判斷'}`,
+    `六步驟 ${done.length}/6${done.length ? `（${done.join('、')}）` : ''}｜五層挖到 L${deepest}｜目的分級：${dom ? dom.label : '未判斷'}${trustSummary(trust)}`,
   ];
   if (aiSummary) lines.push(`AI 總評：${aiSummary}`);
   const badTop = topItems(bad, 2);

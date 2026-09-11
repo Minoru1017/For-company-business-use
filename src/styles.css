@@ -331,6 +331,9 @@ button:disabled { opacity:.4; cursor:not-allowed; }
               border:1px solid rgba(255,210,80,.35); background:rgba(255,210,80,.08); color:var(--text);
               font-size:.75rem; cursor:pointer; font-family:var(--sans); }
 .key-moment:hover { border-color:rgba(255,210,80,.7); background:rgba(255,210,80,.14); }
+.key-moment.trust { border-color:rgba(200,120,220,.6); background:rgba(200,120,220,.12); }
+.key-moment.trust:hover { border-color:rgba(200,120,220,.9); background:rgba(200,120,220,.2); }
+.key-moment.trust .key-time { color:#d79ae6; }
 .key-time { font-family:var(--mono); color:var(--warn); font-size:.68rem; }
 .key-label { font-weight:600; }
 .key-meta { color:var(--muted); font-size:.68rem; }

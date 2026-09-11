@@ -9,6 +9,23 @@ function bulletLines(items, strip) {
   return items.map((item, i) => `  ${i + 1}. ${strip(item)}`);
 }
 
+function trustLines(trust, fmt) {
+  const t = trust.trajectory || {};
+  const lines = [`  信任檢核：${trust.statusLabel}`];
+  if (t.levels?.length) {
+    const labels = ['敷衍', '事實', '困擾', '私人'];
+    lines.push(
+      `  客戶揭露層級：${labels[t.startLevel] || '—'} → ${labels[t.peak] || '—'}（敷衍→事實→困擾→私人）${
+        t.breakthrough ? `，信任突破於 ${fmt(t.breakthrough.start)}` : '，尚無信任突破'
+      }`
+    );
+  }
+  if (trust.wavering?.detected) {
+    lines.push(`  搖擺型客戶（需求可有可無、不缺錢時間）：${trust.wavering.handled ? '已用想／愛／爽試探或敢判 C [●]' : '未試探動機 [○]'}`);
+  }
+  return lines;
+}
+
 export function formatReportText({
   stats,
   stepHit,
@@ -47,6 +64,7 @@ export function formatReportText({
     `  主導類型：${purposeProfile.dominant ? purposeProfile.dominant.label : '未判斷'}`,
     `  挖掘檢核：${manualChecks.discovery.statusLabel}`,
     `  強化檢核：${manualChecks.amplification.statusLabel}`,
+    ...(manualChecks.trust ? trustLines(manualChecks.trust, fmt) : []),
     '',
     '■ 做得好',
     ...bulletLines(good, stripReportHtml),

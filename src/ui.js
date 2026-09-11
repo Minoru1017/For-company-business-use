@@ -129,7 +129,8 @@ export function renderAnalysisUI(result) {
     })
     .join('');
 
-  $('manualChecks').innerHTML = ['discovery', 'amplification']
+  $('manualChecks').innerHTML = ['discovery', 'amplification', 'trust']
+    .filter((key) => manualChecks[key])
     .map((key) => {
       const block = manualChecks[key];
       const criteria = block.criteria
