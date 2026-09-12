@@ -1,5 +1,6 @@
 import { RULES } from './rules.js';
 import { isQuestion } from './speaker.js';
+import { firstBreakthroughIdx } from './trust.js';
 
 const EXTENDED_PROBES = [
   { layer: 1, re: /為什麼想.{0,10}(增加|提高|賺|多).{0,4}收入|收入.{0,6}(目標|期望)/ },
@@ -18,7 +19,10 @@ const MOMENT_COLORS = {
   converge: 'rgba(80, 150, 220, 0.28)',
   amplify: 'rgba(255, 170, 60, 0.28)',
   discovery: 'rgba(90, 160, 120, 0.20)',
+  trust: 'rgba(200, 120, 220, 0.30)',
 };
+
+const TRUST_DETAIL = '信任突破：客戶第一次說出私人／動機層資訊——前一句就是打開他的問法';
 
 function substantialThreshold(segs) {
   const custChars = segs.filter((s) => s.spk === 'C').map((s) => s.chars);
@@ -51,6 +55,7 @@ function isAmplification(text) {
 export function detectKeyMoments(segs) {
   if (!segs.length) return [];
   const minChars = substantialThreshold(segs);
+  const breakIdx = firstBreakthroughIdx(segs);
   const moments = [];
   const used = new Set();
 
@@ -61,7 +66,8 @@ export function detectKeyMoments(segs) {
 
     const isConvergeQ = RULES.converge.test(sales.text);
     const isAmpQ = isAmplification(sales.text);
-    const requiredChars = isConvergeQ || isAmpQ ? 2 : minChars;
+    const isBreakthrough = i + 1 === breakIdx;
+    const requiredChars = isConvergeQ || isAmpQ || isBreakthrough ? 2 : minChars;
     if (customer.chars < requiredChars) continue;
 
     let type;
@@ -86,6 +92,10 @@ export function detectKeyMoments(segs) {
         type = 'discovery';
         label = '挖掘';
         detail = '業務提問後客戶深入回應';
+      } else if (isBreakthrough) {
+        type = 'trust';
+        label = '信任突破';
+        detail = TRUST_DETAIL;
       } else {
         continue;
       }
@@ -95,11 +105,17 @@ export function detectKeyMoments(segs) {
     if (used.has(key)) continue;
     used.add(key);
 
+    if (isBreakthrough && type !== 'trust') {
+      label = `${label} ★信任突破`;
+      detail = `${detail}｜${TRUST_DETAIL}`;
+    }
+
     moments.push({
       type,
       label,
       detail,
-      color: MOMENT_COLORS[type] || MOMENT_COLORS.discovery,
+      breakthrough: isBreakthrough,
+      color: isBreakthrough ? MOMENT_COLORS.trust : MOMENT_COLORS[type] || MOMENT_COLORS.discovery,
       startIdx: i,
       endIdx: i + 1,
       start: sales.start,

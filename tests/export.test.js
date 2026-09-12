@@ -76,6 +76,7 @@ describe('summary / checklist / markdown', () => {
     expect(msg).toContain('2026-09-10 09:05');
     expect(msg).toMatch(/客戶說話 \d+%/);
     expect(msg).toMatch(/六步驟 \d\/6/);
+    expect(msg).toMatch(/信任感：(通過|部分達標|未達標)/);
     expect(msg).toContain('AI 總評：整體節奏好');
     expect(msg).not.toMatch(/<[a-z]+[ >]/);
     expect(msg.split('\n').length).toBeLessThanOrEqual(12);

@@ -5,6 +5,7 @@ import { buildLayerHits, evaluateManualRules } from './manual-check.js';
 import { RULES } from './rules.js';
 import { formatReportText } from './report-format.js';
 import { isQuestion } from './speaker.js';
+import { evaluateTrust } from './trust.js';
 import { escapeHTML, fmt } from './utils.js';
 
 function ev(s) {
@@ -223,6 +224,11 @@ export function runAnalysis(segs) {
   }
 
   const manualChecks = evaluateManualRules(segs, { layerHits, convergeSeg, sQuestions, purposeProfile });
+  const trust = evaluateTrust(segs, { purposeProfile });
+  manualChecks.trust = trust;
+  good.push(...trust.good);
+  bad.push(...trust.bad);
+  sug.push(...trust.sug);
   const keyMoments = detectKeyMoments(segs);
 
   const reportText = formatReportText({
@@ -252,6 +258,7 @@ export function runAnalysis(segs) {
     deepest,
     convergeHint,
     manualChecks,
+    trust,
     purposeProfile,
     keyMoments,
     good,
