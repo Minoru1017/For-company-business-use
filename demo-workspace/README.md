@@ -24,6 +24,32 @@
 
 本機 WhisperX 仍可用（音訊完全不上雲），在轉錄模式選「標準／快速」即可，Azure 模式下它會收合為「進階」。
 
+### 最快路徑：遠端主機轉錄（借用自己的 GPU 電腦）
+
+公司電腦跑 CPU 太慢、又不想把音訊交給 Azure？把家裡（或任何地方）一台有 **NVIDIA 顯卡**的電腦變成 Worker，公司電腦只負責抽音軌、上傳、顯示進度、收回 SRT：
+
+- 48 分鐘 DEMO 在 **RTX 5070** 上約 **3～8 分鐘**（WhisperX `large-v3` float16 + 分軌），比本機 `medium` 快 10 倍以上且更準
+- 公司電腦**不需**安裝 WhisperX、**不需** HF Token；音訊只經過你的兩台電腦，遠端轉錄完即刪除
+- Worker 同時只跑一件工作，多人使用會排隊；一個 Token 就是一把鑰匙，請只分享給信任的人
+
+**家用主機（Worker）設定一次：**
+
+1. 下載 `demo-workspace`（或安裝精靈），在 `.env` 填 `HF_TOKEN`（分軌模型授權，同本機模式）
+2. 更新 NVIDIA 驅動到 **570 以上**（RTX 50 系列需 CUDA 12.8）
+3. 雙擊 **`start_worker.cmd`** — 首次會安裝 **CUDA 12.8 版 PyTorch + WhisperX**（約 4 GB，10～20 分鐘），之後直接啟動 Worker
+4. 視窗會列出 **網址**（`http://<IP>:8766`）與 **Token**（自動產生、存在 `.env`）。安裝精靈版可用 `CallCoachAssistant.exe --worker`
+5. 若顯示「未偵測到 GPU」：執行 `start_worker.cmd reinstall` 重新安裝 GPU 版
+
+**兩台電腦怎麼連（擇一）：**
+
+- **Tailscale**（推薦）：兩台都裝 [Tailscale](https://tailscale.com/download) 登入同一帳號，公司電腦直接填 Worker 視窗顯示的 `http://100.x.x.x:8766`。點對點加密，不需開路由器埠、不需固定 IP
+- **Cloudflare Tunnel**（公司電腦不能裝軟體時）：在家用主機安裝 `cloudflared`，執行 `cloudflared tunnel --url http://localhost:8766`（或設定具名 tunnel 綁自己的網域），公司電腦填它給的 `https://…` 網址（不加埠號）。Token 仍是唯一的門鎖，請勿再開其他公開埠
+- **請勿**直接在路由器做 port forwarding 把 8766 暴露到網際網路
+
+**公司電腦：** DEMO → 轉錄模式選 **遠端主機轉錄** → 貼上網址與 Token → **儲存並測試連線**（會顯示 GPU 型號與模型）→ 勾選知情同意 → 開始。管理者也可把網址與 Token 匯出成 `team-config.env` 給同事。
+
+進階設定（Worker 端 `.env` 或環境變數）：`CALL_COACH_WORKER_MODEL`（預設 GPU `large-v3`、CPU `medium`）、`CALL_COACH_WORKER_PORT`（預設 8766）、`CALL_COACH_WORKER_BIND`（預設 `0.0.0.0`）、`CALL_COACH_WORKER_NAME`（顯示名稱）。
+
 ### 團隊設定檔 `team-config.env`（管理者）
 
 讓同事不用各自申請 Azure 或 Hugging Face：
@@ -33,7 +59,7 @@
 3. 同事：放在 Setup.exe 旁一起安裝，或安裝後在 **團隊設定** 貼上／選擇檔案 **匯入**
 4. 助手每次啟動只會用它**填補 `.env` 空白或占位的欄位**，不會覆蓋同事自己填過的值
 
-支援欄位：`CALL_COACH_TEAM_NAME`、`AZURE_SPEECH_KEY`、`AZURE_SPEECH_REGION`、`AZURE_SPEECH_ENDPOINT`（選填）、`HF_TOKEN`（選填）、`CALL_COACH_DEFAULT_MODE`（`azure` / `standard` / `fast`）。其他欄位一律忽略。路徑可用環境變數 `CALL_COACH_TEAM_CONFIG` 覆寫。
+支援欄位：`CALL_COACH_TEAM_NAME`、`AZURE_SPEECH_KEY`、`AZURE_SPEECH_REGION`、`AZURE_SPEECH_ENDPOINT`（選填）、`HF_TOKEN`（選填）、`CALL_COACH_WORKER_URL` / `CALL_COACH_WORKER_TOKEN`（遠端主機，需成對）、`CALL_COACH_DEFAULT_MODE`（`remote` / `azure` / `standard` / `fast`）。其他欄位一律忽略。路徑可用環境變數 `CALL_COACH_TEAM_CONFIG` 覆寫。
 
 ### 沒有錄影也能試
 
@@ -112,5 +138,9 @@ demo-workspace/
 - **Azure：金鑰無效或無權限**：確認貼的是 Speech 資源的 **Key 1/2** 且區域與資源一致（Azure 入口網站 → 資源 → 金鑰與端點）
 - **Azure：區域沒有 Fast Transcription**：把 Speech 資源建立在 `southeastasia` 或 `japaneast`；或在 `.env` 填 `AZURE_SPEECH_ENDPOINT` 指向自訂端點
 - **Azure：音檔超過上限**：Fast Transcription 單檔上限 2 小時 / 250 MB；更長的錄影請先剪成兩段
+- **遠端主機：無法連線**：確認家用主機的 Worker 黑窗／視窗還開著、兩端 Tailscale 都已登入（或 cloudflared 在跑）、網址含埠號 `8766`（Cloudflare 網址則不加）。在公司電腦瀏覽器直接開 Worker 網址，看到「Call Coach Worker」字樣代表網路通了
+- **遠端主機：Worker Token 不正確**：在 Worker 視窗按「複製 Token」重新貼；Token 存在家用主機 `.env` 的 `CALL_COACH_WORKER_TOKEN`
+- **遠端主機：未偵測到 GPU**：RTX 50 系列需 CUDA 12.8 版 torch — 執行 `start_worker.cmd reinstall`；並確認 NVIDIA 驅動 ≥ 570。Worker 會退回 CPU 執行，不會比公司電腦快
+- **遠端主機：CUDA out of memory**：在 Worker 端 `.env` 改 `CALL_COACH_WORKER_MODEL=medium`（或 `large-v3-turbo`）後重啟 Worker
 - **一鍵安裝失敗**：在 Call Coach 按「複製日誌」或「下載日誌」，或開啟 `logs\` 資料夾將 `.log` 檔傳給技術支援
 - **解除安裝**：在 DEMO 模式按「解除安裝轉錄環境」

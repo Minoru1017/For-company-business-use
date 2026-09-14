@@ -507,17 +507,45 @@ def _run_with_window(server: ThreadingHTTPServer, state: WorkerState, port: int)
     threading.Thread(target=serve, daemon=True).start()
     root = tk.Tk()
     root.title("Call Coach 遠端轉錄 Worker")
-    root.geometry("560x420")
+    root.geometry("620x480")
     tk.Label(root, text="Call Coach 遠端轉錄 Worker", font=("", 13, "bold")).pack(pady=(14, 4))
-    text = tk.Text(root, height=16, width=70, wrap="word")
+    text = tk.Text(root, height=18, width=78, wrap="word")
     text.insert("1.0", "\n".join(_banner(state, port)))
     text.configure(state="disabled")
     text.pack(padx=12, pady=6)
+
+    def append(msg: str) -> None:
+        def _do() -> None:
+            text.configure(state="normal")
+            text.insert("end", "\n" + msg)
+            text.see("end")
+            text.configure(state="disabled")
+
+        root.after(0, _do)
 
     def copy_token() -> None:
         root.clipboard_clear()
         root.clipboard_append(state.token)
         messagebox.showinfo("已複製", "Worker Token 已複製，貼到公司電腦的「遠端主機設定」即可")
+
+    setup_running = {"on": False}
+
+    def install_gpu() -> None:
+        # Packaged build has no start_worker.cmd; offer the CUDA install from the window instead.
+        if setup_running["on"]:
+            return
+        if not messagebox.askokcancel("安裝 GPU 版 WhisperX", "將下載 CUDA 12.8 版 PyTorch + WhisperX（約 4 GB，10～20 分鐘）。安裝完成後請重新啟動 Worker。繼續？"):
+            return
+        setup_running["on"] = True
+        gpu_btn.configure(state="disabled")
+
+        def run() -> None:
+            code = demo_core.run_setup(log=append, gpu=True)
+            append("=== 安裝完成，請重新啟動 Worker ===" if code == 0 else f"=== 安裝失敗（exit code {code}）===")
+            setup_running["on"] = False
+            root.after(0, lambda: gpu_btn.configure(state="normal"))
+
+        threading.Thread(target=run, daemon=True).start()
 
     def on_quit() -> None:
         if messagebox.askokcancel("結束", "確定要停止 Worker 嗎？進行中的轉錄會中斷"):
@@ -526,8 +554,10 @@ def _run_with_window(server: ThreadingHTTPServer, state: WorkerState, port: int)
 
     row = tk.Frame(root)
     row.pack(pady=6)
-    tk.Button(row, text="複製 Token", command=copy_token, width=18).pack(side="left", padx=6)
-    tk.Button(row, text="結束 Worker", command=on_quit, width=18).pack(side="left", padx=6)
+    tk.Button(row, text="複製 Token", command=copy_token, width=16).pack(side="left", padx=4)
+    gpu_btn = tk.Button(row, text="安裝／重裝 GPU 版", command=install_gpu, width=16)
+    gpu_btn.pack(side="left", padx=4)
+    tk.Button(row, text="結束 Worker", command=on_quit, width=16).pack(side="left", padx=4)
     root.protocol("WM_DELETE_WINDOW", on_quit)
     root.mainloop()
     server.server_close()

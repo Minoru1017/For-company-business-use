@@ -41,6 +41,7 @@ Source: "{src}\team-config.env"; DestDir: "{app}"; Flags: external skipifsourced
 
 [Icons]
 Name: "{group}\Call Coach 本機助手"; Filename: "{app}\CallCoachAssistant.exe"; Comment: "Call Coach DEMO 本機轉錄"
+Name: "{group}\Call Coach 遠端轉錄 Worker（GPU 主機用）"; Filename: "{app}\CallCoachAssistant.exe"; Parameters: "--worker"; Comment: "把這台電腦變成公司電腦可借用的 GPU 轉錄主機"
 Name: "{autodesktop}\Call Coach 本機助手"; Filename: "{app}\CallCoachAssistant.exe"; Tasks: desktopicon
 
 [Run]

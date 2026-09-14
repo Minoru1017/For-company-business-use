@@ -34,7 +34,9 @@ const HF_TOKEN_URL = 'https://huggingface.co/settings/tokens';
 const TOKEN_PAGE_KEY = 'call_coach_hf_token_opened';
 const TRANSCRIBE_MODE_KEY = 'callCoachTranscribeMode';
 const CLOUD_CONSENT_KEY = 'callCoachCloudConsent';
-const VALID_MODES = new Set(['fast', 'standard', 'azure']);
+const VALID_MODES = new Set(['fast', 'standard', 'azure', 'remote']);
+// Modes where the audio leaves this PC (Azure cloud, or the user's own remote GPU worker).
+const OFFSITE_MODES = new Set(['azure', 'remote']);
 const AZURE_FAST_REGIONS_HINT = 'southeastasia（新加坡）或 japaneast（東京）';
 // Mode is only "chosen" once the user clicks a radio; until then we follow the
 // assistant's default_mode (Azure when the team config / .env provides a key).
@@ -42,7 +44,16 @@ let modeChosenByUser = VALID_MODES.has(localStorage.getItem(TRANSCRIBE_MODE_KEY)
 let transcribeMode = modeChosenByUser ? localStorage.getItem(TRANSCRIBE_MODE_KEY) : 'standard';
 let cloudConsent = localStorage.getItem(CLOUD_CONSENT_KEY) === '1';
 let azureFormOpen = false;
+let workerFormOpen = false;
+// Result of the last "測試連線" probe (assistant → worker); null until tested.
+let workerHealth = null;
+let workerTesting = false;
+let workerAutoTested = false;
 let teamPanelOpen = false;
+
+function isOffsite(mode = transcribeMode) {
+  return OFFSITE_MODES.has(mode);
+}
 const REPO_ZIP_URL = 'https://github.com/Minoru1017/For-company-business-use/archive/refs/heads/main.zip';
 const ASSISTANT_SETUP_URL =
   'https://github.com/Minoru1017/For-company-business-use/releases/latest/download/CallCoachAssistant-Setup.exe';
@@ -73,7 +84,7 @@ async function openTokenPage(showToast, url = HF_TOKEN_URL) {
 }
 
 function maybeAutoOpenTokenPage(st, showToast) {
-  if (transcribeMode === 'azure') return;
+  if (isOffsite()) return;
   if (st.token_ok || !st.venv_ok || !st.whisperx_ok) return;
   if (sessionStorage.getItem(TOKEN_PAGE_KEY)) return;
   sessionStorage.setItem(TOKEN_PAGE_KEY, '1');
@@ -222,6 +233,31 @@ function checklistItems(st) {
       label: '知情同意（音訊上傳至 Azure）',
       fix: cloudConsent ? null : { action: 'consent', text: '勾選同意' },
     });
+  } else if (transcribeMode === 'remote') {
+    items.push({
+      ok: !!st.worker_ok,
+      label: st.worker_ok ? `遠端主機（${shortWorkerUrl(st.worker_url)}）` : '遠端主機網址與 Worker Token',
+      detail: st.team_config?.present && st.team_config?.provides_worker ? '由團隊設定提供' : '',
+      fix: st.worker_ok ? null : { action: 'worker', text: '填入網址／Token' },
+    });
+    if (st.worker_ok) {
+      const h = workerHealth;
+      items.push({
+        ok: !!h?.reachable,
+        label: h?.reachable
+          ? `已連上：${h.health?.gpu || 'CPU（未偵測到 GPU）'}｜${h.health?.model || ''}`
+          : h
+            ? '遠端主機連線失敗'
+            : '遠端主機連線（尚未測試）',
+        warn: h && !h.reachable ? h.message || '' : h?.reachable && !h.health?.gpu_available ? '遠端主機沒有可用 GPU，速度不會比公司電腦快' : '',
+        fix: h?.reachable ? null : { action: 'worker-test', text: workerTesting ? '測試中…' : '測試連線' },
+      });
+    }
+    items.push({
+      ok: cloudConsent,
+      label: '知情同意（音訊傳到你指定的主機）',
+      fix: cloudConsent ? null : { action: 'consent', text: '勾選同意' },
+    });
   } else {
     items.push({
       ok: !!(st.venv_ok && st.whisperx_ok),
@@ -279,17 +315,22 @@ function renderChecklist(st) {
 
 function modeShortLabel() {
   if (transcribeMode === 'azure') return 'Azure 雲端';
+  if (transcribeMode === 'remote') return '遠端主機 GPU';
   if (transcribeMode === 'fast') return '本機 · 快速';
   return '本機 · 標準';
 }
 
+function shortWorkerUrl(url) {
+  return String(url || '').replace(/^https?:\/\//, '');
+}
+
 function renderTeamPanel(st) {
   const info = st.team_config || {};
-  const canExport = !!st.azure_ok || !!st.token_ok;
+  const canExport = !!st.azure_ok || !!st.token_ok || !!st.worker_ok;
   return `
     <details class="bridge-team" id="bridgeTeamPanel" ${teamPanelOpen ? 'open' : ''}>
       <summary>團隊設定（同事匯入 / 管理者匯出）</summary>
-      <p class="hint">管理者把 Azure 金鑰與區域匯出成 <code>team-config.env</code> 私下分享；同事在此匯入，或放在 Setup.exe 旁一起安裝，就不需各自申請 Azure 或 Hugging Face。</p>
+      <p class="hint">管理者把 Azure 金鑰與區域（或遠端主機網址與 Token）匯出成 <code>team-config.env</code> 私下分享；同事在此匯入，或放在 Setup.exe 旁一起安裝，就不需各自申請 Azure 或 Hugging Face。</p>
       ${info.present ? `<p class="hint">目前已套用：<code>${escapeHTML(info.path || 'team-config.env')}</code></p>` : ''}
       <textarea id="bridgeTeamText" class="bridge-team-text" rows="4" placeholder="貼上 team-config.env 內容，或用下方按鈕選擇檔案&#10;AZURE_SPEECH_KEY=...&#10;AZURE_SPEECH_REGION=southeastasia"></textarea>
       <input type="file" id="bridgeTeamFile" accept=".env,.txt,text/plain" hidden>
@@ -323,6 +364,41 @@ function renderAzureConfig(st) {
       <div class="bridge-actions">
         <button type="button" class="btn primary" id="bridgeSaveAzure">儲存 Azure 設定</button>
         <button type="button" class="btn" id="bridgeAzureFromTeam">改用團隊設定檔匯入</button>
+      </div>
+    </div>`;
+}
+
+function workerHealthLine() {
+  if (workerTesting) return '<p class="hint bridge-worker-status">正在連線遠端主機…</p>';
+  const h = workerHealth;
+  if (!h) return '';
+  if (!h.reachable) return `<p class="bridge-check-warn">▲ ${escapeHTML(h.message || '無法連線遠端主機')}</p>`;
+  const info = h.health || {};
+  const gpu = info.gpu_available ? `GPU：${escapeHTML(info.gpu)}` : 'GPU：未偵測到（將以 CPU 執行，速度不會比公司電腦快）';
+  const busy = info.busy ? `｜目前忙碌中（排隊 ${info.queued || 0} 件）` : '｜閒置';
+  return `<p class="hint bridge-worker-status bridge-worker-ok">✓ 已連上 ${escapeHTML(info.name || '遠端主機')}｜${gpu}｜模型 ${escapeHTML(info.model || '')}${busy}${
+    info.hf_token_ok === false ? '｜▲ 遠端尚未填 HF_TOKEN' : ''
+  }</p>`;
+}
+
+function renderWorkerConfig(st) {
+  if (transcribeMode !== 'remote') return '';
+  const show = !st.worker_ok || workerFormOpen;
+  const toggle = st.worker_ok
+    ? `<p class="hint bridge-azure-ok">遠端主機：<code>${escapeHTML(st.worker_url)}</code>
+        <button type="button" class="btn bridge-inline-btn" id="bridgeTestWorker" ${workerTesting ? 'disabled' : ''}>${workerTesting ? '測試中…' : '測試連線'}</button>
+        <button type="button" class="btn bridge-inline-btn" id="bridgeWorkerToggle">${workerFormOpen ? '收合' : '更改'}</button></p>`
+    : '';
+  return `
+    ${toggle}
+    ${workerHealthLine()}
+    <div class="bridge-azure-config ${show ? '' : 'hidden'}" id="bridgeWorkerConfig">
+      <input type="text" id="bridgeWorkerUrl" placeholder="遠端主機網址（例：http://100.64.0.2:8766 或 https://worker.example.com）" class="bridge-token" value="${escapeHTML(st.worker_url || '')}" autocomplete="off">
+      <input type="password" id="bridgeWorkerToken" placeholder="Worker Token（家用主機的 Worker 視窗會顯示，按「複製 Token」）" class="bridge-token" autocomplete="off">
+      <p class="hint">家用主機執行 <code>start_worker.cmd</code>（首次會安裝 GPU 版 WhisperX），視窗會顯示網址與 Token。兩台電腦都裝 <a href="https://tailscale.com/download" target="_blank" rel="noopener">Tailscale</a> 並登入同一帳號，就能直接填 <code>http://100.x.x.x:8766</code>；公司電腦不能裝軟體時，改在家用主機跑 Cloudflare Tunnel，填它給的 https 網址。Token 只存在本機 <code>.env</code>。</p>
+      <div class="bridge-actions">
+        <button type="button" class="btn primary" id="bridgeSaveWorker">儲存並測試連線</button>
+        <button type="button" class="btn" id="bridgeWorkerFromTeam">改用團隊設定檔匯入</button>
       </div>
     </div>`;
 }
@@ -369,6 +445,12 @@ export function initLocalTranscribe({ onTranscriptReady, showToast, getMode }) {
     panel.hidden = false;
     applyDefaultMode(st);
     if (!uploadBusy && !transcribeBusy) renderPanel(st);
+    // First time the remote mode shows up with a saved worker, probe it silently so the
+    // checklist says "connected / GPU: RTX…" without an extra click.
+    if (transcribeMode === 'remote' && st.worker_ok && !workerHealth && !workerTesting && !workerAutoTested) {
+      workerAutoTested = true;
+      testWorker(() => {}, refreshStatus);
+    }
     return st;
   }
 
@@ -394,11 +476,11 @@ export function initLocalTranscribe({ onTranscriptReady, showToast, getMode }) {
 
     const localNeedsSetup = needsFullSetup(st);
     const advancedLocal =
-      transcribeMode === 'azure' && localNeedsSetup
+      isOffsite() && localNeedsSetup
         ? `
       <details class="bridge-advanced">
         <summary>進階：安裝本機 WhisperX（音訊完全不上雲）</summary>
-        <p class="hint">需下載約 1～3 GB、首次 5～15 分鐘，且需 Hugging Face Token。Azure 模式不需要這一步。</p>
+        <p class="hint">需下載約 1～3 GB、首次 5～15 分鐘，且需 Hugging Face Token。Azure／遠端主機模式不需要這一步。</p>
         <div class="bridge-actions">
           <button type="button" class="btn" data-fix="full-setup">完整環境安裝</button>
           ${!st.venv_ok || !st.whisperx_ok ? '<button type="button" class="btn" id="bridgeSetup">僅安裝 WhisperX</button>' : ''}
@@ -440,6 +522,10 @@ export function initLocalTranscribe({ onTranscriptReady, showToast, getMode }) {
           Azure 雲端轉錄（zh-TW，48 分鐘約 2～5 分鐘完成；免安裝、不需 Token）${st.default_mode === 'azure' ? ' <span class="bridge-mode-default">團隊預設</span>' : ''}
         </label>
         <label class="bridge-mode-option">
+          <input type="radio" name="bridgeMode" value="remote" ${transcribeMode === 'remote' ? 'checked' : ''}>
+          遠端主機轉錄（你自己的 GPU 電腦，例如家用 RTX 主機；48 分鐘約 3～8 分鐘、Whisper large 最準；音訊只傳到你指定的主機）${st.default_mode === 'remote' ? ' <span class="bridge-mode-default">預設</span>' : ''}
+        </label>
+        <label class="bridge-mode-option">
           <input type="radio" name="bridgeMode" value="standard" ${transcribeMode === 'standard' ? 'checked' : ''}>
           標準模式（Faster-Whisper medium，本機、不上雲）
         </label>
@@ -447,12 +533,17 @@ export function initLocalTranscribe({ onTranscriptReady, showToast, getMode }) {
           <input type="radio" name="bridgeMode" value="fast" ${transcribeMode === 'fast' ? 'checked' : ''}>
           快速模式（Faster-Whisper small，本機、不上雲）
         </label>
-        <label class="bridge-consent ${transcribeMode === 'azure' ? '' : 'hidden'}" id="bridgeCloudConsentWrap">
+        <label class="bridge-consent ${isOffsite() ? '' : 'hidden'}" id="bridgeCloudConsentWrap">
           <input type="checkbox" id="bridgeCloudConsent" ${cloudConsent ? 'checked' : ''}>
-          我了解 DEMO 音訊將上傳至 <strong>Microsoft Azure Speech</strong> 進行轉錄（僅用於產生逐字稿，Azure 處理完不保留，不會存入 Call Coach 網站）
+          ${
+            transcribeMode === 'remote'
+              ? '我了解 DEMO 音訊將透過網路傳送到<strong>我自己指定的遠端主機</strong>進行轉錄（僅用於產生逐字稿，遠端轉錄完即刪除音訊，不會存入 Call Coach 網站；請確保該主機只有自己能使用）'
+              : '我了解 DEMO 音訊將上傳至 <strong>Microsoft Azure Speech</strong> 進行轉錄（僅用於產生逐字稿，Azure 處理完不保留，不會存入 Call Coach 網站）'
+          }
         </label>
         ${renderAzureConfig(st)}
-        <div class="bridge-token-wrap ${transcribeMode !== 'azure' && !st.token_ok ? '' : 'hidden'}">
+        ${renderWorkerConfig(st)}
+        <div class="bridge-token-wrap ${!isOffsite() && !st.token_ok ? '' : 'hidden'}">
           <input type="password" id="bridgeToken" placeholder="HF_TOKEN（hf_...，本機轉錄分軌模型授權）" class="bridge-token" autocomplete="off">
           <div class="bridge-actions">
             <button type="button" class="btn" id="bridgeOpenToken">前往取得 Token</button>
@@ -488,7 +579,7 @@ export function initLocalTranscribe({ onTranscriptReady, showToast, getMode }) {
         <p class="bridge-log-hint hidden" id="bridgeLogHint">安裝失敗時，請複製或下載日誌傳給技術支援。</p>
         <pre class="bridge-log" id="bridgeLog"></pre>
       </div>
-      <p class="hint">Azure 雲端模式免安裝、數分鐘完成，需勾選同意；本機模式使用 Faster-Whisper（WhisperX），音訊不上雲但較慢。轉錄期間請保持助手視窗開啟。</p>
+      <p class="hint">Azure 雲端模式免安裝、數分鐘完成，需勾選同意；遠端主機模式借用你自己的 GPU 電腦，最快也最準，音訊不經第三方；本機模式使用 Faster-Whisper（WhisperX），音訊不上雲但較慢。轉錄期間請保持助手視窗開啟。</p>
     `;
 
     panel.querySelectorAll('.bridge-file').forEach((el) => {
@@ -561,6 +652,18 @@ export function initLocalTranscribe({ onTranscriptReady, showToast, getMode }) {
       refreshStatus();
     });
     panel.querySelector('#bridgeAzureFromTeam')?.addEventListener('click', () => {
+      teamPanelOpen = true;
+      refreshStatus().then(() => document.getElementById('bridgeTeamText')?.focus());
+    });
+    panel.querySelector('#bridgeSaveWorker')?.addEventListener('click', () =>
+      saveWorkerConfig(showToast, refreshStatus)
+    );
+    panel.querySelector('#bridgeTestWorker')?.addEventListener('click', () => testWorker(showToast, refreshStatus));
+    panel.querySelector('#bridgeWorkerToggle')?.addEventListener('click', () => {
+      workerFormOpen = !workerFormOpen;
+      refreshStatus();
+    });
+    panel.querySelector('#bridgeWorkerFromTeam')?.addEventListener('click', () => {
       teamPanelOpen = true;
       refreshStatus().then(() => document.getElementById('bridgeTeamText')?.focus());
     });
@@ -915,9 +1018,18 @@ async function runFix(action, { st, showToast, refreshStatus, panel }) {
       await refreshStatus();
       document.getElementById('bridgeAzureKey')?.focus();
       return undefined;
+    case 'worker':
+      workerFormOpen = true;
+      await refreshStatus();
+      document.getElementById('bridgeWorkerUrl')?.focus();
+      return undefined;
+    case 'worker-test':
+      return testWorker(showToast, refreshStatus);
     case 'consent':
       setCloudConsent(true);
-      showToast('已勾選知情同意 — 音訊僅用於 Azure 轉錄');
+      showToast(
+        transcribeMode === 'remote' ? '已勾選知情同意 — 音訊只會傳到你指定的主機' : '已勾選知情同意 — 音訊僅用於 Azure 轉錄'
+      );
       return refreshStatus();
     case 'token':
       await openTokenPage(showToast);
@@ -938,7 +1050,9 @@ async function importTeamConfig(text, showToast, refreshStatus) {
     const r = await api('/api/team-config/import', { method: 'POST', body: JSON.stringify({ text }) });
     if (!r.ok) return showToast(r.message || '匯入失敗');
     const applied = (r.applied || []).join('、');
-    if (r.applied?.includes('AZURE_SPEECH_KEY') && !modeChosenByUser) transcribeMode = 'azure';
+    if (r.applied?.includes('CALL_COACH_WORKER_URL') && !modeChosenByUser) transcribeMode = 'remote';
+    else if (r.applied?.includes('AZURE_SPEECH_KEY') && !modeChosenByUser) transcribeMode = 'azure';
+    if (r.applied?.includes('CALL_COACH_WORKER_URL')) workerHealth = null;
     showToast(`已匯入團隊設定：${applied}`);
     teamPanelOpen = false;
     const ta = document.getElementById('bridgeTeamText');
@@ -979,6 +1093,11 @@ function transcribeBlockReason(st) {
     if (!cloudConsent) return '使用 Azure 雲端轉錄前，請勾選知情同意';
     return '';
   }
+  if (transcribeMode === 'remote') {
+    if (!st?.worker_ok) return '請先填入遠端主機網址與 Worker Token（家用主機的 Worker 視窗會顯示）';
+    if (!cloudConsent) return '使用遠端主機轉錄前，請勾選知情同意';
+    return '';
+  }
   if (!st?.venv_ok || !st?.whisperx_ok) return '本機模式請先按「完整環境安裝」；或改選 Azure 雲端轉錄（免安裝）';
   if (!st?.token_ok) return '本機模式請先設定 HF_TOKEN；或改選 Azure 雲端轉錄（不需 Token）';
   return '';
@@ -986,6 +1105,7 @@ function transcribeBlockReason(st) {
 
 function transcribeButtonLabel() {
   if (transcribeMode === 'azure') return '開始 Azure 雲端轉錄';
+  if (transcribeMode === 'remote') return '開始遠端主機轉錄';
   if (transcribeMode === 'fast') return '開始本機轉錄（快速）';
   return '開始本機轉錄（標準）';
 }
@@ -993,6 +1113,9 @@ function transcribeButtonLabel() {
 function modeHintText() {
   if (transcribeMode === 'azure') {
     return 'Azure 雲端模式：ffmpeg 先在本機抽出音軌，再整檔上傳 Azure Speech Fast Transcription（zh-TW，含發言者辨識），48 分鐘 DEMO 通常 2～5 分鐘完成。不需安裝 WhisperX、不需 Hugging Face Token，Smart App Control 也不受影響。';
+  }
+  if (transcribeMode === 'remote') {
+    return '遠端主機模式：ffmpeg 先在本機抽出音軌（約 90 MB／48 分鐘），上傳到你自己的 GPU 主機跑 WhisperX large-v3（含發言者分軌），48 分鐘 DEMO 在 RTX 5070 上通常 3～8 分鐘完成，並比本機 medium 更準。公司電腦不需安裝 WhisperX、不需 HF Token；音訊只經過你的兩台電腦。';
   }
   if (transcribeMode === 'fast') {
     return '快速模式：Faster-Whisper small，本機 CPU 轉錄，速度較快、準確度略降。48 分鐘 DEMO 常需 35～60 分鐘。';
@@ -1223,6 +1346,45 @@ async function saveAzureConfig(showToast, refreshStatus) {
   refreshStatus();
 }
 
+async function saveWorkerConfig(showToast, refreshStatus) {
+  const url = document.getElementById('bridgeWorkerUrl')?.value?.trim();
+  const token = document.getElementById('bridgeWorkerToken')?.value?.trim();
+  if (!url || !token) return showToast('請填入遠端主機網址與 Worker Token');
+  try {
+    const r = await api('/api/worker-config', { method: 'POST', body: JSON.stringify({ url, token }) });
+    if (!r.ok) return showToast(r.message || '儲存失敗');
+  } catch (err) {
+    return showToast(err?.status === 404 ? '助手版本較舊，不支援遠端主機模式，請更新助手' : err?.message || '儲存失敗');
+  }
+  workerFormOpen = false;
+  workerHealth = null;
+  showToast('遠端主機設定已儲存，正在測試連線…');
+  return testWorker(showToast, refreshStatus);
+}
+
+async function testWorker(showToast, refreshStatus) {
+  if (workerTesting) return undefined;
+  workerTesting = true;
+  await refreshStatus();
+  try {
+    const r = await api('/api/worker/test', { method: 'POST', body: JSON.stringify({}) });
+    workerHealth = r;
+    if (r.reachable) {
+      const h = r.health || {};
+      showToast(h.gpu_available ? `已連上遠端主機：${h.gpu}（${h.model}）` : '已連上遠端主機，但未偵測到 GPU（會以 CPU 執行）');
+    } else {
+      showToast(r.message || '無法連線遠端主機');
+    }
+  } catch (err) {
+    workerHealth = { reachable: false, message: err?.message || '無法連線遠端主機' };
+    showToast(workerHealth.message);
+  } finally {
+    workerTesting = false;
+    await refreshStatus();
+  }
+  return undefined;
+}
+
 async function runTranscribe(onTranscriptReady, showToast, refreshStatus) {
   if (!selectedMp4) return showToast('請先選擇 MP4');
   const reason = transcribeBlockReason(await checkLocalBridge());
@@ -1239,11 +1401,19 @@ async function runTranscribe(onTranscriptReady, showToast, refreshStatus) {
     if (!r.ok) return showToast(r.message || '無法開始轉錄');
     transcribeBusy = true;
     setTranscribeUI({ active: true, message: '正在啟動轉錄…' });
-    showLog([transcribeMode === 'azure' ? '正在啟動 Azure 雲端轉錄，請稍候…' : '正在啟動本機轉錄，請稍候…']);
+    showLog([
+      transcribeMode === 'azure'
+        ? '正在啟動 Azure 雲端轉錄，請稍候…'
+        : transcribeMode === 'remote'
+          ? '正在連線遠端主機並啟動轉錄，請稍候…'
+          : '正在啟動本機轉錄，請稍候…',
+    ]);
     showToast(
       transcribeMode === 'azure'
         ? 'Azure 雲端轉錄中…下方會顯示階段與預計完成時間'
-        : '本機轉錄中…下方會顯示階段、百分比與預計完成時間'
+        : transcribeMode === 'remote'
+          ? '遠端主機轉錄中…下方會顯示上傳進度、遠端階段與預計完成時間'
+          : '本機轉錄中…下方會顯示階段、百分比與預計完成時間'
     );
     pollJob(async (ok, j) => {
       await refreshStatus();
