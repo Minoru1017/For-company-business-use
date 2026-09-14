@@ -40,9 +40,9 @@ Source: "..\dist\installer-payload\*"; DestDir: "{app}"; Flags: ignoreversion re
 Source: "{src}\team-config.env"; DestDir: "{app}"; Flags: external skipifsourcedoesntexist ignoreversion
 
 [Icons]
-Name: "{group}\Call Coach 本機助手"; Filename: "{app}\CallCoachAssistant.exe"; Comment: "Call Coach DEMO 本機轉錄"
-Name: "{group}\Call Coach 遠端轉錄 Worker（GPU 主機用）"; Filename: "{app}\CallCoachAssistant.exe"; Parameters: "--worker"; Comment: "把這台電腦變成公司電腦可借用的 GPU 轉錄主機"
-Name: "{autodesktop}\Call Coach 本機助手"; Filename: "{app}\CallCoachAssistant.exe"; Tasks: desktopicon
+Name: "{group}\Call Coach 本機助手"; Filename: "{app}\CallCoachAssistant.exe"; Parameters: "--assistant"; Comment: "Call Coach DEMO 本機轉錄"
+Name: "{group}\Call Coach 遠端轉錄 Worker（GPU 主機用）"; Filename: "{app}\CallCoachAssistant.exe"; Parameters: "--worker"; Comment: "把這台電腦變成公司電腦可借用的 GPU 轉錄主機（網址與 Token 在視窗內）"
+Name: "{autodesktop}\Call Coach 本機助手"; Filename: "{app}\CallCoachAssistant.exe"; Parameters: "--assistant"; Tasks: desktopicon
 
 [Run]
 Filename: "{app}\runtime\python\python.exe"; Parameters: """{app}\installer\setup_env.py"""; StatusMsg: "正在安裝 WhisperX 轉錄環境（約 5～15 分鐘，請保持網路連線）..."; Flags: waituntilterminated; Description: "準備轉錄環境（WhisperX）"; Tasks: whisperx

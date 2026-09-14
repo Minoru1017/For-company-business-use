@@ -552,12 +552,38 @@ def _run_with_window(server: ThreadingHTTPServer, state: WorkerState, port: int)
             server.shutdown()
             root.destroy()
 
+    def on_assistant() -> None:
+        import subprocess
+
+        subprocess.Popen([sys.executable, "--assistant"], cwd=str(demo_core.ROOT))
+
+    def on_full_uninstall() -> None:
+        import desktop_ui
+
+        proceed, remove_models, remove_logs = desktop_ui.confirm_full_uninstall(root)
+        if not proceed:
+            return
+        server.shutdown()
+        root.destroy()
+        server.server_close()
+        code = demo_core.run_full_uninstall(
+            log=print,
+            remove_models=remove_models,
+            remove_logs=remove_logs,
+            launch_setup_uninstaller=True,
+        )
+        raise SystemExit(0 if code == 0 else code)
+
     row = tk.Frame(root)
     row.pack(pady=6)
     tk.Button(row, text="複製 Token", command=copy_token, width=16).pack(side="left", padx=4)
     gpu_btn = tk.Button(row, text="安裝／重裝 GPU 版", command=install_gpu, width=16)
     gpu_btn.pack(side="left", padx=4)
     tk.Button(row, text="結束 Worker", command=on_quit, width=16).pack(side="left", padx=4)
+    row2 = tk.Frame(root)
+    row2.pack(pady=(0, 6))
+    tk.Button(row2, text="另開本機助手視窗", command=on_assistant, width=24).pack(side="left", padx=4)
+    tk.Button(row2, text="完整解除安裝…", command=on_full_uninstall, width=24).pack(side="left", padx=4)
     root.protocol("WM_DELETE_WINDOW", on_quit)
     root.mainloop()
     server.server_close()

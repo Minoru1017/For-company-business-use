@@ -567,6 +567,8 @@ def _run_with_window(server: ThreadingHTTPServer, host: str, url: str) -> int:
     import tkinter as tk
     from tkinter import messagebox
 
+    import desktop_ui
+
     def open_browser() -> None:
         webbrowser.open(url)
 
@@ -574,6 +576,12 @@ def _run_with_window(server: ThreadingHTTPServer, host: str, url: str) -> int:
         if messagebox.askokcancel("結束", "確定要停止本機轉錄助手嗎？"):
             server.shutdown()
             root.destroy()
+
+    def on_worker() -> None:
+        desktop_ui.switch_exe_to_worker(server, root)
+
+    def on_full_uninstall() -> None:
+        desktop_ui.launch_full_uninstall_dialog(root)
 
     def serve() -> None:
         server.serve_forever()
@@ -583,13 +591,15 @@ def _run_with_window(server: ThreadingHTTPServer, host: str, url: str) -> int:
 
     root = tk.Tk()
     root.title("Call Coach 本機助手")
-    root.geometry("380x210")
+    root.geometry("400x300")
     root.resizable(False, False)
-    tk.Label(root, text="Call Coach 本機助手", font=("", 13, "bold")).pack(pady=(18, 6))
+    tk.Label(root, text="Call Coach 本機助手", font=("", 13, "bold")).pack(pady=(14, 4))
     tk.Label(root, text=f"本機 API：http://{host}:{PORT}/").pack()
-    tk.Label(root, text="請保持此視窗開啟，關閉即停止服務", fg="#555").pack(pady=(8, 12))
-    tk.Button(root, text="開啟 Call Coach", command=open_browser, width=28).pack(pady=4)
-    tk.Button(root, text="結束助手", command=on_quit, width=28).pack(pady=4)
+    tk.Label(root, text="請保持此視窗開啟，關閉即停止服務", fg="#555").pack(pady=(6, 10))
+    tk.Button(root, text="開啟 Call Coach", command=open_browser, width=32).pack(pady=3)
+    tk.Button(root, text="啟動遠端轉錄 Worker（家用 GPU）", command=on_worker, width=32).pack(pady=3)
+    tk.Button(root, text="完整解除安裝…", command=on_full_uninstall, width=32).pack(pady=3)
+    tk.Button(root, text="結束助手", command=on_quit, width=32).pack(pady=3)
     root.protocol("WM_DELETE_WINDOW", on_quit)
     root.mainloop()
     server.server_close()
@@ -597,7 +607,7 @@ def _run_with_window(server: ThreadingHTTPServer, host: str, url: str) -> int:
 
 
 def main(argv: list[str] | None = None) -> int:
-    argv = sys.argv[1:] if argv is None else argv
+    argv = list(sys.argv[1:] if argv is None else argv)
     if "--setup-gpu" in argv:
         # Home-PC path: install WhisperX with CUDA 12.8 torch, then exit (start_worker.cmd chains this).
         return demo_core.run_setup(log=print, gpu=True)
@@ -605,6 +615,18 @@ def main(argv: list[str] | None = None) -> int:
         import worker_server
 
         return worker_server.main(argv)
+
+    if demo_core.is_frozen() and "--assistant" not in argv and "--worker" not in argv and "--console" not in argv:
+        # Double-click CallCoachAssistant.exe → mode picker; 開始選單「本機助手」捷徑帶 --assistant 略過此步。
+        import desktop_ui
+
+        choice = desktop_ui.run_launcher()
+        if choice == "worker":
+            import worker_server
+
+            return worker_server.main([])
+        if choice != "assistant":
+            return 0
 
     demo_core.ensure_workspace_files()
     try:
