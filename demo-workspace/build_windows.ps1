@@ -116,6 +116,10 @@ $AppFiles = @(
     "upload_parse.py",
     "job_log.py",
     "app_paths.py",
+    "progress_tracker.py",
+    "remote_transcribe.py",
+    "worker_server.py",
+    "desktop_ui.py",
     ".env.example",
     "START_HERE.txt",
     "README.md"
