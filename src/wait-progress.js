@@ -80,7 +80,13 @@ export function renderProgressHtml(progress, { now = Date.now(), cancelRequested
   let etaLine;
   if (progress.done) etaLine = progress.ok ? '已完成' : '已停止';
   else if (cancelRequested) etaLine = '正在停止…';
-  else if (progress.overdue) etaLine = '已超過預估時間，仍在處理中（大檔或電腦忙碌時常見，不必重來）';
+  else if (progress.overdue) {
+    const diarizeTail =
+      (progress.detail || '').includes('發言者分軌') || (progress.detail || '').includes('分軌');
+    etaLine = diarizeTail
+      ? '發言者分軌後仍在寫入字幕（GPU 常再跑 1～10 分鐘、進度條可能停在 97%，請勿重來）'
+      : '已超過預估時間，仍在處理中（大檔或電腦忙碌時常見，不必重來）';
+  }
   else if (eta) etaLine = `還需${eta}${fin ? `　${fin}` : ''}`;
   else etaLine = '正在估算所需時間…';
   const detail = progress.detail ? `<span class="wait-detail">${escapeHTML(progress.detail)}</span>` : '';

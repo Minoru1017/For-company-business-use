@@ -950,8 +950,11 @@ function setTranscribeUI({ active, message = '轉錄進行中…請保持助手�
   } else {
     wait.classList.add('hidden');
     status.classList.remove('busy');
+    status.textContent = '';
     if (prog) prog.innerHTML = '';
     cancel?.classList.add('hidden');
+    // active:true sets start.disabled=true; panel is not re-rendered while transcribeBusy, so reset here.
+    if (start) start.disabled = !selectedMp4;
   }
 }
 
@@ -1226,7 +1229,11 @@ async function pollJob(onDone, { trackTranscribe = false, trackSetup = false } =
             notifyJobDone({ title: 'Call Coach：轉錄失敗', body: transcribeFailToast(j.logs), ok: false });
           }
         }
-        onDone(j.exit_code === 0, j);
+        try {
+          onDone(j.exit_code === 0, j);
+        } finally {
+          if (trackTranscribe) window.__refreshBridge?.();
+        }
       }
     } catch {
       clearInterval(pollTimer);
@@ -1234,6 +1241,7 @@ async function pollJob(onDone, { trackTranscribe = false, trackSetup = false } =
         transcribeBusy = false;
         setTranscribeUI({ active: false });
         restoreTitle();
+        window.__refreshBridge?.();
       }
       onDone(false, { logs: ['[錯誤] 無法連線本機轉錄助手'] });
     }

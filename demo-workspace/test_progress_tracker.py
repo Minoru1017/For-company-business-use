@@ -102,8 +102,11 @@ class TrackerEmitTest(unittest.TestCase):
         wrapped(">>Performing diarization...")
         self.assertEqual(last_progress(lines)["parts"][0]["step"], "diarize")
         self.assertIsNone(last_progress(lines)["parts"][0]["percent"])
+        wrapped("Diarization completed")
+        self.assertEqual(last_progress(lines)["parts"][0]["step"], "write")
         tracker.part_done(0)
         self.assertTrue(last_progress(lines)["parts"][0]["done"])
+        self.assertEqual(last_progress(lines)["parts"][0]["step"], "write")
 
     def test_throttle_but_force_on_phase(self):
         tracker, lines, clock = make(plan="local")
