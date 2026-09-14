@@ -403,6 +403,39 @@ function renderWorkerConfig(st) {
     </div>`;
 }
 
+const TEXT_FIELDS = 'input[type="text"], input[type="password"], textarea';
+
+function captureFormState(panel) {
+  const values = {};
+  panel.querySelectorAll(TEXT_FIELDS).forEach((el) => {
+    if (el.id && el.value) values[el.id] = el.value;
+  });
+  const active = document.activeElement;
+  const focusId =
+    active && active.id && panel.contains(active) && /^(INPUT|TEXTAREA)$/.test(active.tagName) ? active.id : null;
+  const selection =
+    focusId && typeof active.selectionStart === 'number' ? [active.selectionStart, active.selectionEnd] : null;
+  return { values, focusId, selection };
+}
+
+function restoreFormState(panel, state) {
+  for (const [id, value] of Object.entries(state.values)) {
+    const el = panel.querySelector(`#${id}`);
+    if (el && el.value !== value) el.value = value;
+  }
+  if (!state.focusId) return;
+  const el = panel.querySelector(`#${state.focusId}`);
+  if (!el) return;
+  el.focus({ preventScroll: true });
+  if (state.selection && typeof el.setSelectionRange === 'function') {
+    try {
+      el.setSelectionRange(state.selection[0], state.selection[1]);
+    } catch {
+      /* number/email inputs reject setSelectionRange */
+    }
+  }
+}
+
 function scheduleOfflinePoll(refreshStatus) {
   if (offlinePollTimer) clearInterval(offlinePollTimer);
   offlinePollTimer = setInterval(async () => {
@@ -455,6 +488,13 @@ export function initLocalTranscribe({ onTranscriptReady, showToast, getMode }) {
   }
 
   function renderPanel(st) {
+    // The panel is re-rendered every 8 s by the status poll; keep whatever the user is typing.
+    const formState = captureFormState(panel);
+    renderPanelHtml(st);
+    restoreFormState(panel, formState);
+  }
+
+  function renderPanelHtml(st) {
     const pythonWarn = st.python_warning
       ? `<p class="bridge-python-warn">${escapeHTML(st.python_warning)}</p>`
       : '';
@@ -1329,6 +1369,8 @@ async function saveToken(showToast, refreshStatus) {
   }
   const r = await api('/api/token', { method: 'POST', body: JSON.stringify({ token }) });
   if (!r.ok) return showToast(r.message || '儲存失敗');
+  const tokenInput = document.getElementById('bridgeToken');
+  if (tokenInput) tokenInput.value = '';
   showToast('Token 已儲存');
   refreshStatus();
 }
@@ -1342,6 +1384,9 @@ async function saveAzureConfig(showToast, refreshStatus) {
     body: JSON.stringify({ key, region }),
   });
   if (!r.ok) return showToast(r.message || '儲存失敗');
+  const keyInput = document.getElementById('bridgeAzureKey');
+  if (keyInput) keyInput.value = '';
+  azureFormOpen = false;
   showToast('Azure 設定已儲存');
   refreshStatus();
 }
@@ -1356,6 +1401,8 @@ async function saveWorkerConfig(showToast, refreshStatus) {
   } catch (err) {
     return showToast(err?.status === 404 ? '助手版本較舊，不支援遠端主機模式，請更新助手' : err?.message || '儲存失敗');
   }
+  const tokenInput = document.getElementById('bridgeWorkerToken');
+  if (tokenInput) tokenInput.value = '';
   workerFormOpen = false;
   workerHealth = null;
   showToast('遠端主機設定已儲存，正在測試連線…');
