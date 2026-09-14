@@ -13,6 +13,15 @@
 
 不需 `.cmd`、不需 winget、不需自行安裝 Python。適合公司電腦封鎖腳本的情況。
 
+**同一個 `CallCoachAssistant.exe` 內建兩種模式**（不需另外下載 `start_worker.cmd`）：
+
+| 用途 | 怎麼開 |
+|------|--------|
+| 公司電腦 · 本機轉錄 API | 開始選單 → **Call Coach 本機助手**（或助手視窗已開著） |
+| 家用 GPU · 遠端 Worker | 開始選單 → **Call Coach 遠端轉錄 Worker**；視窗內有 **網址、Token、「複製 Token」、安裝 GPU 版** |
+| 不確定 | 在安裝資料夾雙擊 `CallCoachAssistant.exe` → 會跳出模式選擇 |
+| 完整移除 | 助手或 Worker 視窗 → **完整解除安裝…**（清 `.venv`／`worker`／可選 `models`，並啟動 Windows 解除安裝精靈） |
+
 ### 零門檻路徑：Azure 雲端轉錄（團隊預設）
 
 有 `team-config.env`（或自行填入 Azure 金鑰）時，DEMO 轉錄預設走 **Azure Speech Fast Transcription**：

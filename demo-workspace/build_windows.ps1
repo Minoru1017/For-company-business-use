@@ -149,6 +149,7 @@ if (Test-Path $ZipDist) { Remove-Item $ZipDist -Recurse -Force }
 Copy-Item $Payload $ZipDist -Recurse -Force
 Copy-Item "啟動 Call Coach.cmd" $ZipDist -Force
 Copy-Item "CallCoachAssistant.cmd" $ZipDist -Force
+Copy-Item "start_worker.cmd" $ZipDist -Force
 
 $Zip = "dist\CallCoachAssistant-Windows.zip"
 if (Test-Path $Zip) { Remove-Item $Zip -Force }

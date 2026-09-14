@@ -23,6 +23,7 @@ a = Analysis(
         "azure_transcribe",
         "remote_transcribe",
         "worker_server",
+        "desktop_ui",
         "team_config",
         "srt_utils",
         "proc_utils",

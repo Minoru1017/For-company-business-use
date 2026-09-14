@@ -914,6 +914,52 @@ def run_uninstall(remove_models: bool = False, log: LogFn = default_log) -> int:
     return 0
 
 
+def windows_uninstaller_exe() -> Path | None:
+    """Inno Setup uninstaller next to CallCoachAssistant.exe (unins000.exe / unins001.exe)."""
+    if not is_frozen():
+        return None
+    for name in ("unins000.exe", "unins001.exe"):
+        path = ROOT / name
+        if path.is_file():
+            return path
+    return None
+
+
+def run_full_uninstall(
+    log: LogFn = default_log,
+    *,
+    remove_models: bool = True,
+    remove_logs: bool = True,
+    launch_setup_uninstaller: bool = True,
+) -> int:
+    """Remove transcription env + worker cache, then start the Windows uninstaller when installed via Setup.exe."""
+    log("=== 完整解除安裝 ===")
+    code = run_uninstall(remove_models=remove_models, log=log)
+    worker_dir = ROOT / "worker"
+    if worker_dir.exists():
+        log("刪除 worker 暫存（遠端轉錄工作資料）...")
+        shutil.rmtree(worker_dir, ignore_errors=True)
+    if remove_logs:
+        logs = ROOT / "logs"
+        if logs.is_dir():
+            log("刪除 logs 日誌...")
+            shutil.rmtree(logs, ignore_errors=True)
+            logs.mkdir(exist_ok=True)
+    unins = windows_uninstaller_exe()
+    if launch_setup_uninstaller and unins:
+        log(f"啟動 Windows 解除安裝程式（{unins.name}）…")
+        log("請在精靈中完成移除；關閉本視窗後程式會一併卸載。")
+        try:
+            subprocess.Popen([str(unins)], cwd=str(ROOT), **no_window_kwargs())
+        except OSError as e:
+            log(f"[錯誤] 無法啟動解除安裝程式：{e}")
+            return 1
+    elif launch_setup_uninstaller:
+        log("[提醒] 找不到安裝精靈的解除安裝程式（可攜版請直接刪除整個資料夾）。")
+    log("=== 完整解除安裝（轉錄環境部分）完成 ===")
+    return code
+
+
 def run_transcribe(
     mp4_name: str | None = None,
     log: LogFn = default_log,
