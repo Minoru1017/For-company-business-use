@@ -67,6 +67,12 @@ MODE_PHASES: dict[str, list[tuple[str, str, int]]] = {
         ("transcribe", "分段平行辨識", 92),
         ("save", "合併並寫入逐字稿", 2),
     ],
+    "remote": [
+        ("extract", "抽出音軌", 8),
+        ("upload", "上傳到遠端主機", 10),
+        ("transcribe", "遠端 GPU 辨識與分軌", 80),
+        ("save", "取回並寫入逐字稿", 2),
+    ],
 }
 
 EMIT_MIN_INTERVAL_S = 0.8
@@ -77,6 +83,22 @@ def estimate_azure_minutes(duration_s: float) -> tuple[int, int]:
     minutes = max(0.0, duration_s) / 60
     low = max(1, int(round(minutes * 0.04 + 1)))
     high = max(low + 2, int(round(minutes * 0.08 + 2)))
+    return low, high
+
+
+def estimate_remote_minutes(duration_s: float, *, gpu: bool) -> tuple[int, int]:
+    """Upload + remote WhisperX wall-clock.
+
+    A consumer GPU (RTX 40/50 series, large-v3 float16 with diarization) runs at roughly
+    8–15 % of audio length; a CPU-only worker is no faster than the local standard mode.
+    """
+    minutes = max(0.0, duration_s) / 60
+    if gpu:
+        low = max(1, int(round(minutes * 0.08 + 1)))
+        high = max(low + 2, int(round(minutes * 0.15 + 2)))
+    else:
+        low = max(2, int(round(minutes * 1.0 + 1)))
+        high = max(low + 5, int(round(minutes * 1.8 + 2)))
     return low, high
 
 

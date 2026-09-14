@@ -68,6 +68,18 @@ class ValidateTest(unittest.TestCase):
             {"AZURE_SPEECH_KEY": "k", "AZURE_SPEECH_REGION": "japaneast", "CALL_COACH_DEFAULT_MODE": "azure"}
         )
 
+    def test_worker_pair_and_url(self):
+        with self.assertRaises(TeamConfigError):
+            validate_team_config({"CALL_COACH_WORKER_URL": "http://100.64.0.2:8766"})
+        with self.assertRaises(TeamConfigError):
+            validate_team_config({"CALL_COACH_WORKER_URL": "100.64.0.2:8766", "CALL_COACH_WORKER_TOKEN": "t" * 20})
+        validate_team_config(
+            {"CALL_COACH_WORKER_URL": "http://100.64.0.2:8766", "CALL_COACH_WORKER_TOKEN": "t" * 20, "CALL_COACH_DEFAULT_MODE": "remote"}
+        )
+        values, _ = parse_env_text("CALL_COACH_WORKER_URL=https://worker.example.com/\nCALL_COACH_WORKER_TOKEN=abcdefghijklmnopqrstu\n")
+        self.assertEqual(values["CALL_COACH_WORKER_URL"], "https://worker.example.com")
+        self.assertEqual(redact(values)["CALL_COACH_WORKER_TOKEN"], "abcd…tu")
+
 
 class MergeRenderTest(unittest.TestCase):
     def test_merge_only_fills_placeholders(self):

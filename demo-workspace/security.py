@@ -8,6 +8,22 @@ API_TOKEN = secrets.token_urlsafe(32)
 MAX_UPLOAD_BYTES = 6 * 1024 * 1024 * 1024  # 6 GB
 TOKEN_HEADER = "X-Call-Coach-Token"
 
+# Remote worker (your own GPU machine): shared secret carried on every request.
+WORKER_TOKEN_HEADER = "X-Call-Coach-Worker-Token"
+WORKER_TOKEN_MIN_LEN = 16
+# 2 h of 16 kHz mono PCM is ~230 MB; leave headroom for stereo / longer recordings.
+WORKER_MAX_AUDIO_BYTES = 1024 * 1024 * 1024
+
+
+def new_worker_token() -> str:
+    return secrets.token_urlsafe(32)
+
+
+def worker_token_matches(expected: str, provided: str) -> bool:
+    if not expected or len(expected) < WORKER_TOKEN_MIN_LEN:
+        return False
+    return secrets.compare_digest(expected, provided or "")
+
 ALLOWED_ORIGINS = frozenset(
     {
         "https://minoru1017.github.io",
