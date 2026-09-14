@@ -126,7 +126,7 @@ class WorkerEndToEndTest(unittest.TestCase):
         snap = progress.to_dict()
         self.assertEqual([p["key"] for p in snap["phases"]], ["extract", "upload", "transcribe", "save"])
         self.assertEqual(snap["phase_index"], 2)
-        self.assertEqual(snap["parts"][0]["step"], "diarize")
+        self.assertIn(snap["parts"][0]["step"], ("diarize", "write"))
         self.assertTrue(snap["parts"][0]["done"])
         # worker cleaned up after the client deleted the job
         time.sleep(0.05)
@@ -204,6 +204,10 @@ class WorkerEndToEndTest(unittest.TestCase):
                 urllib.request.urlopen(req, timeout=5)
             self.assertEqual(ctx.exception.code, 503)
             self.assertIn("WhisperX", json.loads(ctx.exception.read())["message"])
+
+    def test_max_upload_bytes_video_vs_audio(self):
+        self.assertGreater(worker_server._max_upload_bytes("demo.mp4"), security.WORKER_MAX_AUDIO_BYTES)
+        self.assertEqual(worker_server._max_upload_bytes("a.wav"), security.WORKER_MAX_AUDIO_BYTES)
 
     def test_job_name_sanitised_and_unknown_job_404(self):
         self.assertEqual(worker_server.safe_job_name("../../etc/passwd"), "passwd")

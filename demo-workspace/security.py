@@ -13,6 +13,8 @@ WORKER_TOKEN_HEADER = "X-Call-Coach-Worker-Token"
 WORKER_TOKEN_MIN_LEN = 16
 # 2 h of 16 kHz mono PCM is ~230 MB; leave headroom for stereo / longer recordings.
 WORKER_MAX_AUDIO_BYTES = 1024 * 1024 * 1024
+# Browser uploads from company PCs may send MP4 directly (Worker runs ffmpeg).
+WORKER_MAX_VIDEO_BYTES = 2 * 1024 * 1024 * 1024
 
 
 def new_worker_token() -> str:

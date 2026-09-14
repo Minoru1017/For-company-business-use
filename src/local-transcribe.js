@@ -2,6 +2,7 @@
  * Bridge Call Coach (GitHub Pages) ↔ local demo_app.py (127.0.0.1:8765).
  * DEMO audio never leaves the machine; only finished SRT is loaded into Call Coach.
  */
+import { mountBrowserWorkerUI } from './browser-worker-transcribe.js';
 import { escapeHTML } from './utils.js';
 import {
   enableNotifications,
@@ -169,13 +170,17 @@ function needsFullSetup(st) {
   return !st.ffmpeg_ok || !st.venv_ok || !st.whisperx_ok;
 }
 
-function renderOfflineWizard(offlineEl) {
+function renderOfflineWizard(offlineEl, { onTranscriptReady, showToast } = {}) {
   offlineEl.innerHTML = `
     <p><strong>尚未連線本機轉錄助手</strong></p>
-    <p class="hint">首次使用請依下列步驟；助手啟動後此區會自動消失。</p>
+    <p class="hint">公司電腦若無法安裝 .exe，請直接用下方「瀏覽器直連遠端 GPU」；若能裝助手，助手啟動後此區會自動消失。</p>
     <ol class="setup-wizard-steps">
       <li>
-        <strong>① 公司電腦 — 安裝精靈（推薦）</strong>
+        <strong>① 無法安裝助手 — 瀏覽器直連新竹 GPU（推薦）</strong>
+        <div id="browserWorkerMount"></div>
+      </li>
+      <li>
+        <strong>② 公司電腦 — 安裝精靈</strong>
         <p class="hint">下載 <code>CallCoachAssistant-Setup.exe</code>，執行安裝精靈（建議安裝到 <code>C:\\CallCoachAssistant</code>）。若主管有給你 <code>team-config.env</code>，把它放在 Setup.exe 旁邊再執行，安裝後即可直接用 Azure 雲端轉錄（不需下載 WhisperX、不需 Token）。完成後從開始選單啟動「Call Coach 本機助手」。</p>
         <div class="bridge-actions">
           <a class="btn primary" href="${ASSISTANT_SETUP_URL}" target="_blank" rel="noopener noreferrer">下載安裝精靈（Setup.exe）</a>
@@ -183,19 +188,20 @@ function renderOfflineWizard(offlineEl) {
         </div>
       </li>
       <li>
-        <strong>② 或 ZIP 免安裝版</strong>
+        <strong>③ 或 ZIP 免安裝版</strong>
         <p class="hint">下載 <code>CallCoachAssistant-Windows.zip</code>，解壓後雙擊 <code>啟動 Call Coach.cmd</code>（部分公司電腦會封鎖 .cmd）。</p>
         <div class="bridge-actions">
           <a class="btn" href="${ASSISTANT_ZIP_URL}" target="_blank" rel="noopener noreferrer">下載 ZIP 版</a>
         </div>
       </li>
       <li>
-        <strong>③ 等待連線</strong>
+        <strong>④ 等待本機助手連線</strong>
         <p class="hint"><span id="bridgeConnectStatus">正在偵測本機助手…</span></p>
       </li>
     </ol>
-    <p class="hint">助手連線後會出現「首次啟動檢查」清單，缺什麼就按旁邊的按鈕補齊；沒有助手也可先按上方「載入範例逐字稿」試用分析。</p>
+    <p class="hint">助手連線後會出現「首次啟動檢查」清單；沒有助手也可先按「載入範例逐字稿」試用分析。</p>
   `;
+  mountBrowserWorkerUI(offlineEl.querySelector('#browserWorkerMount'), { onTranscriptReady, showToast });
 }
 
 function applyDefaultMode(st) {
@@ -464,7 +470,7 @@ export function initLocalTranscribe({ onTranscriptReady, showToast, getMode }) {
       if (offline) {
         offline.hidden = !inDemo;
         if (inDemo) {
-          renderOfflineWizard(offline);
+          renderOfflineWizard(offline, { onTranscriptReady, showToast });
           scheduleOfflinePoll(refreshStatus);
         }
       }
@@ -1180,11 +1186,21 @@ function transcribeFailToast(logs) {
   return `轉錄失敗：${err.replace(/^\[錯誤\]\s*/, '')}`;
 }
 
+// Consecutive /api/job failures tolerated before giving up. While several
+// WhisperX processes saturate the CPU the assistant can miss a poll or two;
+// one hiccup must not make the UI drop a job that is still running.
+const POLL_MAX_FAILURES = 20;
+
 async function pollJob(onDone, { trackTranscribe = false, trackSetup = false } = {}) {
   clearInterval(pollTimer);
+  let failures = 0;
+  let inFlight = false;
   const tick = async () => {
+    if (inFlight) return;
+    inFlight = true;
     try {
       const j = await api('/api/job');
+      failures = 0;
       const setupKinds = new Set(['setup', 'full-setup', 'install-ffmpeg', 'uninstall']);
       const isSetup = setupKinds.has(j.kind);
       if (isSetup || trackSetup) {
@@ -1235,7 +1251,17 @@ async function pollJob(onDone, { trackTranscribe = false, trackSetup = false } =
           if (trackTranscribe) window.__refreshBridge?.();
         }
       }
-    } catch {
+    } catch (err) {
+      failures += 1;
+      if (failures < POLL_MAX_FAILURES) {
+        if (trackTranscribe && failures >= 3) {
+          setTranscribeUI({
+            active: true,
+            message: `本機轉錄進行中…（助手暫時沒有回應，正在重試 ${failures}/${POLL_MAX_FAILURES}）`,
+          });
+        }
+        return;
+      }
       clearInterval(pollTimer);
       if (trackTranscribe) {
         transcribeBusy = false;
@@ -1243,7 +1269,17 @@ async function pollJob(onDone, { trackTranscribe = false, trackSetup = false } =
         restoreTitle();
         window.__refreshBridge?.();
       }
-      onDone(false, { logs: ['[錯誤] 無法連線本機轉錄助手'] });
+      const detail = err?.status ? `HTTP ${err.status}` : '連線中斷';
+      const logs = [
+        `[錯誤] 無法連線本機轉錄助手（${detail}）`,
+        '助手視窗可能已關閉或當機。請重新啟動「Call Coach 本機助手」；',
+        '若轉錄仍在背景進行，重新整理網頁即可繼續追蹤，完成後按「載入最新 SRT」。',
+        '詳細原因請看 logs 資料夾中最新的 transcribe-*.log。',
+      ];
+      if (trackTranscribe) showLog(logs, { failed: true, title: '與助手失去連線' });
+      onDone(false, { logs });
+    } finally {
+      inFlight = false;
     }
   };
   await tick();

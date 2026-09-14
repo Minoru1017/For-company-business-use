@@ -55,7 +55,11 @@
 - **Cloudflare Tunnel**（公司電腦不能裝軟體時）：在家用主機安裝 `cloudflared`，執行 `cloudflared tunnel --url http://localhost:8766`（或設定具名 tunnel 綁自己的網域），公司電腦填它給的 `https://…` 網址（不加埠號）。Token 仍是唯一的門鎖，請勿再開其他公開埠
 - **請勿**直接在路由器做 port forwarding 把 8766 暴露到網際網路
 
-**公司電腦：** DEMO → 轉錄模式選 **遠端主機轉錄** → 貼上網址與 Token → **儲存並測試連線**（會顯示 GPU 型號與模型）→ 勾選知情同意 → 開始。管理者也可把網址與 Token 匯出成 `team-config.env` 給同事。
+**公司電腦（已安裝助手）：** DEMO → 轉錄模式選 **遠端主機轉錄** → 貼上網址與 Token → **儲存並測試連線** → 勾選知情同意 → 開始。
+
+**公司電腦（無法安裝／執行 .exe）：** 開 Call Coach **DEMO**，在「尚未連線本機轉錄助手」區使用 **瀏覽器直連新竹 GPU**：填 Worker 網址與 Token → 選擇 MP4 → 開始遠端轉錄。影片直傳你的 Worker（上限 2 GB），新竹主機用 ffmpeg 抽音軌後跑 WhisperX；完成後逐字稿自動載入網頁，報告在「把結果帶走」下載。**不需**本機助手。注意：GitHub Pages 為 https，若填 `http://100.x.x.x` 可能被瀏覽器當混合內容封鎖，請用 **Cloudflare Tunnel 的 https 網址** 或允許該站混合內容。
+
+管理者也可把網址與 Token 匯出成 `team-config.env` 給同事（有助手時會自動帶入）。
 
 進階設定（Worker 端 `.env` 或環境變數）：`CALL_COACH_WORKER_MODEL`（預設 GPU `large-v3`、CPU `medium`）、`CALL_COACH_WORKER_PORT`（預設 8766）、`CALL_COACH_WORKER_BIND`（預設 `0.0.0.0`）、`CALL_COACH_WORKER_NAME`（顯示名稱）。
 
@@ -144,6 +148,8 @@ demo-workspace/
 - **Call Coach 顯示未連線**：確認助手黑窗仍開啟；若使用 **Python 3.13/3.14**，請執行 **`setup_portable.cmd`** 安裝內建 Python 3.12
 - **大檔 MP4 很慢**：建議手動複製到 `input\`，再按「重新掃描」
 - **轉錄失敗**：查看 Call Coach 下方日誌；常見為 Token 未設定或 ffmpeg 未安裝（`winget install Gyan.FFmpeg`）
+- **長 DEMO 轉錄快結束時中斷、`output\.chunks\...\part_000` 是空的、沒有 .srt**：分段平行轉錄時某段 WhisperX 在對齊／辨識發言者階段被記憶體壓力擠掉。v11.3.3 起會依實體記憶體決定同時跑幾段（16 GB 標準模式為 2 段）、失敗的段會單獨重試一次，並在 `logs\transcribe-*.log` 記錄結束碼與原因。若仍失敗，可先改用「快速模式」或設定環境變數 `CALL_COACH_MAX_PARALLEL=1`
+- **進階調校（環境變數）**：`CALL_COACH_MAX_PARALLEL`（同時轉錄段數上限，1～5）、`CALL_COACH_THREADS`（每段執行緒）、`CALL_COACH_BATCH`（batch size，1～16）、`CALL_COACH_RAM_GB`（覆寫記憶體偵測）
 - **Azure：金鑰無效或無權限**：確認貼的是 Speech 資源的 **Key 1/2** 且區域與資源一致（Azure 入口網站 → 資源 → 金鑰與端點）
 - **Azure：區域沒有 Fast Transcription**：把 Speech 資源建立在 `southeastasia` 或 `japaneast`；或在 `.env` 填 `AZURE_SPEECH_ENDPOINT` 指向自訂端點
 - **Azure：音檔超過上限**：Fast Transcription 單檔上限 2 小時 / 250 MB；更長的錄影請先剪成兩段
