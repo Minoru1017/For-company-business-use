@@ -1,6 +1,7 @@
 """Shared DEMO transcription logic for CLI scripts and demo_app."""
 from __future__ import annotations
 
+import json
 import os
 import re
 import shutil
@@ -181,6 +182,94 @@ def azure_fast_supported() -> bool:
     return bool(azure_endpoint()) or region_supports_fast(region)
 
 
+# ----- remote worker (your own GPU machine) ---------------------------------------------------
+
+WORKER_URL_RE = re.compile(r"^https?://[A-Za-z0-9.\-_\[\]:]+(?::\d{2,5})?/?$")
+
+
+def normalize_worker_url(url: str) -> str:
+    """Validate ``http(s)://host[:port]`` and strip the trailing slash."""
+    url = url.strip().rstrip("/")
+    if not url:
+        raise ValueError("請填入遠端主機網址（例：http://100.64.0.2:8766 或 https://worker.example.com）")
+    if not WORKER_URL_RE.match(url + "/"):
+        raise ValueError("遠端主機網址格式不正確：需為 http(s)://主機[:埠]，不含路徑")
+    return url
+
+
+def worker_config() -> tuple[str, str]:
+    env = load_env()
+    return env.get("CALL_COACH_WORKER_URL", "").strip().rstrip("/"), env.get("CALL_COACH_WORKER_TOKEN", "").strip()
+
+
+def has_worker_config() -> bool:
+    url, token = worker_config()
+    return bool(url) and bool(token) and "在這裡" not in token and "在這裡" not in url
+
+
+def save_worker_config(url: str, token: str) -> None:
+    from security import WORKER_TOKEN_MIN_LEN
+
+    url = normalize_worker_url(url)
+    token = token.strip()
+    if len(token) < WORKER_TOKEN_MIN_LEN:
+        raise ValueError("Worker Token 過短：請貼上家用主機 Worker 視窗顯示的完整 Token")
+    update_env_values({"CALL_COACH_WORKER_URL": url, "CALL_COACH_WORKER_TOKEN": token})
+
+
+def ensure_worker_token(log: LogFn = default_log) -> str:
+    """Token the Worker accepts; generated once and persisted in .env on the worker machine."""
+    from security import WORKER_TOKEN_MIN_LEN, new_worker_token
+
+    token = load_env().get("CALL_COACH_WORKER_TOKEN", "").strip()
+    if token and len(token) >= WORKER_TOKEN_MIN_LEN and "在這裡" not in token:
+        return token
+    token = new_worker_token()
+    update_env_values({"CALL_COACH_WORKER_TOKEN": token})
+    log("已產生新的 Worker Token 並寫入 .env（公司電腦需填入同一組 Token）")
+    return token
+
+
+def detect_gpu() -> dict:
+    """Ask the WhisperX venv whether torch can see a CUDA device (spawns python; cache the result)."""
+    if not VENV_PY.exists():
+        return {"available": False, "name": None, "reason": "尚未安裝 WhisperX 環境（.venv）"}
+    code = (
+        "import json,torch;"
+        "ok=torch.cuda.is_available();"
+        "print(json.dumps({'available':ok,'name':torch.cuda.get_device_name(0) if ok else None,"
+        "'torch':torch.__version__,'cuda':torch.version.cuda}))"
+    )
+    try:
+        proc = quiet_run(
+            [str(VENV_PY), "-c", code],
+            cwd=ROOT,
+            env=shell_env(cache_env()),
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=120,
+        )
+    except (OSError, subprocess.TimeoutExpired) as e:
+        return {"available": False, "name": None, "reason": f"無法執行 torch 偵測：{e}"}
+    for line in reversed((proc.stdout or "").splitlines()):
+        line = line.strip()
+        if line.startswith("{"):
+            try:
+                data = json.loads(line)
+            except ValueError:
+                break
+            if not data.get("available"):
+                data["reason"] = (
+                    f"torch {data.get('torch')} 未偵測到 CUDA（torch.version.cuda={data.get('cuda')}）。"
+                    "RTX 50 系列需 CUDA 12.8 版 torch：請執行 start_worker.cmd 的「重新安裝 GPU 版」"
+                )
+            return data
+    err = (proc.stderr or proc.stdout or "").strip().splitlines()
+    return {"available": False, "name": None, "reason": err[-1] if err else "torch 偵測失敗"}
+
+
 def team_config_file() -> Path:
     from team_config import team_config_path
 
@@ -198,6 +287,7 @@ def team_config_info() -> dict:
         "team_name": values.get("CALL_COACH_TEAM_NAME", "") or load_env().get("CALL_COACH_TEAM_NAME", ""),
         "provides_azure": "AZURE_SPEECH_KEY" in values,
         "provides_hf_token": "HF_TOKEN" in values,
+        "provides_worker": "CALL_COACH_WORKER_URL" in values,
     }
 
 
@@ -243,20 +333,25 @@ def export_team_config_text(*, include_hf_token: bool = False, team_name: str = 
     values.pop("CALL_COACH_TEAM_NAME", None)
     if not include_hf_token:
         values.pop("HF_TOKEN", None)
-    if "AZURE_SPEECH_KEY" not in values and "HF_TOKEN" not in values:
-        raise TeamConfigError("目前沒有可匯出的設定：請先填好 Azure 金鑰與區域")
+    if not any(k in values for k in ("AZURE_SPEECH_KEY", "HF_TOKEN", "CALL_COACH_WORKER_URL")):
+        raise TeamConfigError("目前沒有可匯出的設定：請先填好 Azure 金鑰與區域，或遠端主機網址與 Token")
     return render_team_config(values, team_name=team_name.strip() or env.get("CALL_COACH_TEAM_NAME", ""))
 
 
 def default_transcribe_mode() -> str:
-    """Mode the UI should preselect: team/admin choice, else Azure when configured, else local."""
-    from transcribe_modes import MODE_AZURE, MODE_STANDARD, VALID_MODES
+    """Mode the UI should preselect: team/admin choice, else remote worker / Azure when configured, else local."""
+    from transcribe_modes import MODE_AZURE, MODE_REMOTE, MODE_STANDARD, VALID_MODES
 
     configured = load_env().get("CALL_COACH_DEFAULT_MODE", "").strip().lower()
     if configured in VALID_MODES:
         if configured == MODE_AZURE and not has_azure_config():
             return MODE_STANDARD
+        if configured == MODE_REMOTE and not has_worker_config():
+            return MODE_STANDARD
         return configured
+    # A worker the user set up themselves is faster than Azure and keeps audio in-house.
+    if has_worker_config():
+        return MODE_REMOTE
     if has_azure_config():
         return MODE_AZURE
     return MODE_STANDARD
@@ -447,6 +542,8 @@ class EnvStatus:
     azure_endpoint: str = ""
     default_mode: str = "standard"
     team_config: dict = field(default_factory=dict)
+    worker_ok: bool = False
+    worker_url: str = ""
 
     @property
     def local_ready(self) -> bool:
@@ -455,6 +552,10 @@ class EnvStatus:
     @property
     def azure_ready(self) -> bool:
         return self.azure_ok and self.ffmpeg_ok
+
+    @property
+    def worker_ready(self) -> bool:
+        return self.worker_ok and self.ffmpeg_ok
 
     def to_dict(self) -> dict:
         return {
@@ -479,6 +580,9 @@ class EnvStatus:
             "azure_ready": self.azure_ready,
             "azure_fast_ok": self.azure_fast_ok,
             "azure_endpoint": self.azure_endpoint,
+            "worker_ok": self.worker_ok,
+            "worker_url": self.worker_url,
+            "worker_ready": self.worker_ready,
             "default_mode": self.default_mode,
             "team_config": self.team_config,
             "root": str(ROOT),
@@ -495,10 +599,11 @@ class EnvStatus:
                 "azure-fast",
                 "progress",
                 "report-save",
+                "remote-worker",
             ],
             "call_coach_url": CALL_COACH_URL,
             "hf_links": HF_LINKS,
-            "transcribe_modes": ["fast", "standard", "azure"],
+            "transcribe_modes": ["fast", "standard", "azure", "remote"],
             "smart_app_control": smart_app_control_state(),
         }
 
@@ -533,9 +638,13 @@ def get_status() -> EnvStatus:
     if output_dir.exists():
         srts = [p.name for p in sorted(output_dir.glob("*.srt"), key=lambda p: p.stat().st_mtime, reverse=True)]
 
+    worker_url, _worker_token = worker_config()
+    worker_ok = has_worker_config()
+
     local_ready = python_ok and venv_ok and whisperx_ok and token_ok
     azure_ready = azure_ok and ffmpeg_ok
-    ready = (local_ready or azure_ready) and bool(mp4s)
+    worker_ready = worker_ok and ffmpeg_ok
+    ready = (local_ready or azure_ready or worker_ready) and bool(mp4s)
 
     portable_ok = PORTABLE_PY.is_file()
     if portable_ok and python_warning and "過新" in python_warning:
@@ -566,6 +675,8 @@ def get_status() -> EnvStatus:
         azure_endpoint=azure_endpoint(),
         default_mode=default_transcribe_mode(),
         team_config=team_config_info(),
+        worker_ok=worker_ok,
+        worker_url=worker_url if worker_ok else "",
     )
 
 
@@ -637,8 +748,12 @@ def create_venv(log: LogFn = default_log) -> int:
     return code
 
 
-def run_setup(log: LogFn = default_log) -> int:
-    log("=== 開始安裝轉錄工具 ===")
+TORCH_CUDA_INDEX = "https://download.pytorch.org/whl/cu128"
+
+
+def run_setup(log: LogFn = default_log, *, gpu: bool = False) -> int:
+    """Install the WhisperX venv. ``gpu=True`` pins CUDA 12.8 torch first (RTX 50 series needs it)."""
+    log("=== 開始安裝轉錄工具 ===" + ("（GPU 版，CUDA 12.8）" if gpu else ""))
     if is_frozen() and not PORTABLE_PY.is_file():
         log("[錯誤] 找不到內建 Python（runtime\\python\\python.exe）")
         log("請重新下載完整 CallCoachAssistant-Windows.zip 並解壓。")
@@ -660,6 +775,17 @@ def run_setup(log: LogFn = default_log) -> int:
         log("[提示] 詳細日誌已儲存至 logs/ 資料夾，請複製給技術支援")
         return code
 
+    if gpu:
+        log("安裝 CUDA 12.8 版 PyTorch（約 2.5 GB；RTX 50 系列 Blackwell 需要此版本）...")
+        code = run_command(
+            [str(VENV_PY), "-m", "pip", "install", "--force-reinstall", "torch", "torchaudio", "--index-url", TORCH_CUDA_INDEX],
+            log=log,
+        )
+        if code != 0:
+            log(f"[錯誤] CUDA 版 PyTorch 安裝失敗（exit code {code}）")
+            log("[常見原因] 網路中斷、磁碟空間不足（需約 6 GB）")
+            return code
+
     log("安裝 whisperx、faster-whisper、azure 語音 SDK（首次約 5～15 分鐘，請保持網路連線）...")
     code = run_command(
         [
@@ -679,6 +805,23 @@ def run_setup(log: LogFn = default_log) -> int:
         log("[常見原因] 公司網路封鎖 PyPI、Python 版本過新（請用 3.10～3.12）、磁碟空間不足")
         log("[提示] 詳細日誌已儲存至 logs/ 資料夾，請按「複製日誌」傳給技術支援")
         return code
+
+    if gpu:
+        # pip may have swapped torch for the CPU wheel while resolving whisperx; pin it back.
+        log("確認 CUDA 版 PyTorch 未被覆蓋...")
+        code = run_command(
+            [str(VENV_PY), "-m", "pip", "install", "torch", "torchaudio", "--index-url", TORCH_CUDA_INDEX],
+            log=log,
+        )
+        if code != 0:
+            log(f"[錯誤] 重新固定 CUDA 版 PyTorch 失敗（exit code {code}）")
+            return code
+        gpu_info = detect_gpu()
+        if gpu_info.get("available"):
+            log(f"GPU 就緒：{gpu_info.get('name')}（torch {gpu_info.get('torch')}, CUDA {gpu_info.get('cuda')}）")
+        else:
+            log(f"[提醒] 尚未偵測到可用 GPU：{gpu_info.get('reason')}")
+            log("[提醒] 請確認 NVIDIA 驅動為 570 以上（GeForce Experience / NVIDIA App 更新），重開機後再試")
 
     env_file = ROOT / ".env"
     if not env_file.exists():
@@ -780,7 +923,16 @@ def run_transcribe(
 ) -> int:
     from azure_transcribe import run_azure_transcribe
     from progress_tracker import ProgressTracker, estimate_azure_minutes
-    from transcribe_modes import MODE_AZURE, MODE_LABELS, model_for_mode, normalize_mode, validate_transcribe_request
+    from remote_transcribe import run_remote_transcribe
+    from transcribe_modes import (
+        MODE_AZURE,
+        MODE_LABELS,
+        MODE_REMOTE,
+        OFFSITE_MODES,
+        model_for_mode,
+        normalize_mode,
+        validate_transcribe_request,
+    )
     from transcribe_parallel import (
         chunk_count_for_duration,
         estimate_transcribe_minutes,
@@ -802,12 +954,12 @@ def run_transcribe(
         log("[已取消] 轉錄已停止")
         return fail(CANCEL_EXIT)
 
-    err = validate_transcribe_request(mode, cloud_consent, has_azure_config())
+    err = validate_transcribe_request(mode, cloud_consent, has_azure_config(), has_worker_config())
     if err:
         log(f"[錯誤] {err}")
         return fail(1)
 
-    if mode != MODE_AZURE:
+    if mode not in OFFSITE_MODES:
         if not VENV_PY.exists():
             log("[錯誤] 本機轉錄環境尚未安裝，請先按「一鍵安裝」；或改用 Azure 雲端轉錄（免安裝）")
             return fail(1)
@@ -838,12 +990,49 @@ def run_transcribe(
     stem = Path(mp4.name).stem
     final_srt = ROOT / "output" / f"{stem}.srt"
 
-    # ffprobe hints about parallel mode are irrelevant for Azure, keep that path quiet
-    probe_log: LogFn = log if mode != MODE_AZURE else (lambda _m: None)
+    # ffprobe hints about parallel mode are irrelevant for offsite modes, keep that path quiet
+    probe_log: LogFn = log if mode not in OFFSITE_MODES else (lambda _m: None)
     duration = probe_duration_seconds(mp4, ffmpeg, probe_log) if ffmpeg else 0.0
     if duration > 0:
         progress.set_duration(duration)
         log(f"音訊長度：約 {int(duration // 60)} 分 {int(duration % 60)} 秒")
+
+    if mode == MODE_REMOTE:
+        if not ffmpeg:
+            log("[錯誤] 遠端主機轉錄需要 ffmpeg 抽出音軌")
+            return fail(1)
+        progress.use_plan("remote")
+        code = extract_wav_from_mp4(mp4, wav, ffmpeg, log, env_vars, hooks, progress=progress)
+        if code == CANCEL_EXIT:
+            return fail(code)
+        if code != 0:
+            log("[錯誤] 音軌抽取失敗")
+            return fail(code)
+        worker_url, worker_token = worker_config()
+        try:
+            code = run_remote_transcribe(
+                wav,
+                final_srt,
+                worker_url=worker_url,
+                token=worker_token,
+                duration_s=duration,
+                log=log,
+                cancel_check=lambda: bool(hooks and hooks.is_cancelled()),
+                progress=progress,
+            )
+        finally:
+            try:
+                wav.unlink()
+            except OSError:
+                pass
+        if code == 0:
+            progress.phase("save", final_srt.name)
+            log("=== 轉錄完成 ===")
+            log(f"逐字稿: {final_srt.name}")
+            log(f"請上傳至 Call Coach: {CALL_COACH_URL}")
+            progress.finish(ok=True)
+            return 0
+        return fail(code)
 
     if mode == MODE_AZURE:
         if not ffmpeg:
@@ -999,8 +1188,17 @@ def run_transcribe(
     return 0
 
 
-def whisperx_args(audio: Path, *, model: str, threads: int, batch: int, output_dir: Path) -> list[str]:
-    """CLI arguments shared by single-file and per-chunk WhisperX runs."""
+def whisperx_args(
+    audio: Path,
+    *,
+    model: str,
+    threads: int,
+    batch: int,
+    output_dir: Path,
+    device: str = "cpu",
+    compute_type: str = "int8",
+) -> list[str]:
+    """CLI arguments shared by single-file, per-chunk and remote-worker WhisperX runs."""
     return [
         str(audio),
         "--model",
@@ -1008,9 +1206,9 @@ def whisperx_args(audio: Path, *, model: str, threads: int, batch: int, output_d
         "--language",
         "zh",
         "--device",
-        "cpu",
+        device,
         "--compute_type",
-        "int8",
+        compute_type,
         "--threads",
         str(threads),
         "--batch_size",

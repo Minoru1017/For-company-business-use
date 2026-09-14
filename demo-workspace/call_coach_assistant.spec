@@ -21,6 +21,8 @@ a = Analysis(
         "progress_tracker",
         "job_log",
         "azure_transcribe",
+        "remote_transcribe",
+        "worker_server",
         "team_config",
         "srt_utils",
         "proc_utils",

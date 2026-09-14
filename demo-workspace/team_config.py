@@ -27,8 +27,10 @@ ALLOWED_KEYS = (
     "AZURE_SPEECH_REGION",
     "AZURE_SPEECH_ENDPOINT",
     "HF_TOKEN",
+    "CALL_COACH_WORKER_URL",
+    "CALL_COACH_WORKER_TOKEN",
 )
-SECRET_KEYS = frozenset({"AZURE_SPEECH_KEY", "HF_TOKEN"})
+SECRET_KEYS = frozenset({"AZURE_SPEECH_KEY", "HF_TOKEN", "CALL_COACH_WORKER_TOKEN"})
 PLACEHOLDER_MARKER = "在這裡"
 KEY_RE = re.compile(r"^[A-Z][A-Z0-9_]{2,63}$")
 MAX_TEXT_BYTES = 64 * 1024
@@ -81,6 +83,8 @@ def parse_env_text(text: str) -> tuple[dict[str, str], list[str]]:
         values["AZURE_SPEECH_REGION"] = values["AZURE_SPEECH_REGION"].lower()
     if "CALL_COACH_DEFAULT_MODE" in values:
         values["CALL_COACH_DEFAULT_MODE"] = values["CALL_COACH_DEFAULT_MODE"].lower()
+    if "CALL_COACH_WORKER_URL" in values:
+        values["CALL_COACH_WORKER_URL"] = values["CALL_COACH_WORKER_URL"].rstrip("/")
     return values, ignored
 
 
@@ -89,11 +93,19 @@ def validate_team_config(values: dict[str, str]) -> None:
     from transcribe_modes import VALID_MODES
 
     if not values:
-        raise TeamConfigError("設定檔沒有任何可用的設定（需要 AZURE_SPEECH_KEY / AZURE_SPEECH_REGION 或 HF_TOKEN）")
+        raise TeamConfigError(
+            "設定檔沒有任何可用的設定（需要 AZURE_SPEECH_KEY / AZURE_SPEECH_REGION、HF_TOKEN，或 CALL_COACH_WORKER_URL / CALL_COACH_WORKER_TOKEN）"
+        )
     key = values.get("AZURE_SPEECH_KEY")
     region = values.get("AZURE_SPEECH_REGION")
     if bool(key) != bool(region):
         raise TeamConfigError("AZURE_SPEECH_KEY 與 AZURE_SPEECH_REGION 需同時提供")
+    worker_url = values.get("CALL_COACH_WORKER_URL")
+    worker_token = values.get("CALL_COACH_WORKER_TOKEN")
+    if bool(worker_url) != bool(worker_token):
+        raise TeamConfigError("CALL_COACH_WORKER_URL 與 CALL_COACH_WORKER_TOKEN 需同時提供")
+    if worker_url and not re.match(r"^https?://[^/\s]+/?$", worker_url):
+        raise TeamConfigError("CALL_COACH_WORKER_URL 需為 http(s)://主機[:埠]（不含路徑）")
     if region and not REGION_RE.match(region):
         raise TeamConfigError(f"AZURE_SPEECH_REGION 格式不正確：{region!r}（例：southeastasia）")
     endpoint = values.get("AZURE_SPEECH_ENDPOINT")

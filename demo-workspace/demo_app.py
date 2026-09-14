@@ -7,6 +7,10 @@ Call Coach 本機助手 — 整合 DEMO 轉錄與電訪分析
   或雙擊 start_call_coach.pyw / start_call_coach.cmd
 
 會在瀏覽器開啟 Call Coach，並在本機提供轉錄 API（127.0.0.1:8765）。
+
+家用 GPU 主機（遠端轉錄 Worker）:
+  python demo_app.py --setup-gpu   安裝 CUDA 12.8 版 WhisperX（RTX 50 系列需要）
+  python demo_app.py --worker      啟動 Worker（0.0.0.0:8766），或雙擊 start_worker.cmd
 """
 from __future__ import annotations
 
@@ -371,6 +375,36 @@ class Handler(BaseHTTPRequestHandler):
                 return self._send_json({"ok": False, "message": str(e)}, 400)
             return self._send_json({"ok": True, "status": demo_core.get_status().to_dict()})
 
+        if path == "/api/worker-config":
+            data = self._parse_json(body)
+            if data is None:
+                return self._reject(400, "JSON 格式錯誤")
+            try:
+                demo_core.save_worker_config(str(data.get("url", "")), str(data.get("token", "")))
+            except ValueError as e:
+                return self._send_json({"ok": False, "message": str(e)}, 400)
+            return self._send_json({"ok": True, "status": demo_core.get_status().to_dict()})
+
+        if path == "/api/worker/test":
+            # Probe the worker from the assistant (not the browser) so the token never reaches the page
+            # and CORS/mixed-content rules on the GitHub Pages origin don't get in the way.
+            import remote_transcribe
+
+            data = self._parse_json(body)
+            if data is None:
+                return self._reject(400, "JSON 格式錯誤")
+            saved_url, saved_token = demo_core.worker_config()
+            url = str(data.get("url") or saved_url).strip()
+            token = str(data.get("token") or saved_token).strip()
+            if not url or not token:
+                return self._send_json({"ok": False, "message": "請先填入遠端主機網址與 Worker Token"}, 400)
+            try:
+                url = demo_core.normalize_worker_url(url)
+                health = remote_transcribe.fetch_health(url, token)
+            except (ValueError, remote_transcribe.WorkerError) as e:
+                return self._send_json({"ok": False, "reachable": False, "message": str(e)})
+            return self._send_json({"ok": True, "reachable": True, "health": health})
+
         if path == "/api/team-config/import":
             if JOB.running:
                 return self._send_json({"ok": False, "message": "轉錄或安裝進行中，請稍後再匯入"}, 409)
@@ -562,7 +596,16 @@ def _run_with_window(server: ThreadingHTTPServer, host: str, url: str) -> int:
     return 0
 
 
-def main() -> int:
+def main(argv: list[str] | None = None) -> int:
+    argv = sys.argv[1:] if argv is None else argv
+    if "--setup-gpu" in argv:
+        # Home-PC path: install WhisperX with CUDA 12.8 torch, then exit (start_worker.cmd chains this).
+        return demo_core.run_setup(log=print, gpu=True)
+    if "--worker" in argv:
+        import worker_server
+
+        return worker_server.main(argv)
+
     demo_core.ensure_workspace_files()
     try:
         demo_core.apply_team_config(log=print)
