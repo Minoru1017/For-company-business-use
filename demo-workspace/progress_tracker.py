@@ -44,7 +44,15 @@ WHISPERX_STEP_LABELS = {
 
 _WX_MARKER_RE = re.compile(r">>\s*Performing\s+(transcription|alignment|diarization)", re.IGNORECASE)
 _WX_PROGRESS_RE = re.compile(r"Progress:\s*([0-9]+(?:\.[0-9]+)?)%")
-_WX_WRITE_RE = re.compile(r"\.srt\b|Saving|writing", re.IGNORECASE)
+# WhisperX / pyannote log lines after diarization (version-dependent; often no ">>Performing write").
+_WX_WRITE_RE = re.compile(
+    r"\.srt\b|Saving|writing|Wrote|subtitle|export|max_line|assign.*speaker|speaker.*assign",
+    re.IGNORECASE,
+)
+_WX_DIARIZE_TAIL_RE = re.compile(
+    r"diariz.*(complete|completed|done|finished)|segmentation.*complete|speaker.*embedding",
+    re.IGNORECASE,
+)
 _FFMPEG_KV_RE = re.compile(
     r"^(frame|fps|stream_\d+_\d+_q|bitrate|total_size|out_time_us|out_time_ms|out_time|dup_frames|drop_frames|speed|progress)="
 )
@@ -246,11 +254,14 @@ class ProgressTracker:
             part = self._part(idx)
             part["done"] = True
             part["percent"] = 100.0
+            if part.get("step") != "write":
+                part["step"] = "write"
         self._emit(force=True)
 
     def feed_whisperx(self, idx: int, line: str) -> bool:
         """Parse one line of WhisperX output for part ``idx``. Returns True if it changed state."""
         changed = False
+        force_emit = False
         with self._lock:
             part = self._part(idx)
             m = _WX_MARKER_RE.search(line)
@@ -258,18 +269,22 @@ class ProgressTracker:
                 step = {"transcription": "transcribe", "alignment": "align", "diarization": "diarize"}[m.group(1).lower()]
                 self._set_part_step(part, step)
                 changed = True
+                force_emit = True
             else:
                 m = _WX_PROGRESS_RE.search(line)
                 if m:
                     part["percent"] = max(0.0, min(100.0, float(m.group(1))))
                     changed = True
-                elif part["step"] == "diarize" and _WX_WRITE_RE.search(line):
+                elif part["step"] == "diarize" and (
+                    _WX_WRITE_RE.search(line) or _WX_DIARIZE_TAIL_RE.search(line)
+                ):
                     self._set_part_step(part, "write")
                     changed = True
+                    force_emit = True
             if changed:
                 self.detail = self._parts_detail()
         if changed:
-            self._emit(force=_WX_MARKER_RE.search(line) is not None)
+            self._emit(force=force_emit)
         return changed
 
     def _set_part_step(self, part: dict, step: str) -> None:
