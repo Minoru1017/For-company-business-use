@@ -152,6 +152,45 @@ class _JobHooks(demo_core.JobHooks):
 
 Runner = Callable[[WorkerJob, LogFn, demo_core.JobHooks, "WorkerState"], int]
 
+_VIDEO_SUFFIXES = frozenset({".mp4", ".mov", ".mkv", ".webm", ".m4v"})
+
+
+def _max_upload_bytes(job_name: str) -> int:
+    ext = Path(job_name or "").suffix.lower()
+    if ext in _VIDEO_SUFFIXES:
+        return security.WORKER_MAX_VIDEO_BYTES
+    return security.WORKER_MAX_AUDIO_BYTES
+
+
+def prepare_job_media(job: WorkerJob, log: LogFn, hooks: demo_core.JobHooks) -> int:
+    """If the upload is a video container, extract 16 kHz mono WAV with ffmpeg first."""
+    ext = job.audio.suffix.lower()
+    if ext not in _VIDEO_SUFFIXES:
+        return 0
+    ffmpeg = demo_core.ffmpeg_exe()
+    if not ffmpeg:
+        log("[錯誤] Worker 需要 ffmpeg 才能處理 MP4／影片（請確認安裝目錄含 runtime\\ffmpeg）")
+        return 1
+    wav = job.dir / "audio.wav"
+    log(f"[Worker] 從 {job.name} 抽出音軌（瀏覽器直傳影片）…")
+    code = demo_core.extract_wav_from_mp4(
+        job.audio,
+        wav,
+        ffmpeg,
+        log,
+        demo_core.cache_env(),
+        hooks,
+    )
+    if code != 0:
+        return code
+    try:
+        job.audio.unlink()
+    except OSError:
+        pass
+    job.audio = wav
+    job.name = wav.name
+    return 0
+
 
 def whisperx_runner(job: WorkerJob, log: LogFn, hooks: demo_core.JobHooks, state: "WorkerState") -> int:
     """Run WhisperX on the uploaded audio; the SRT lands next to it inside the job folder."""
@@ -294,7 +333,9 @@ class WorkerState:
         hooks = _JobHooks(job, self.lock)
         code = 1
         try:
-            code = self.runner(job, log, hooks, self)
+            code = prepare_job_media(job, log, hooks)
+            if code == 0:
+                code = self.runner(job, log, hooks, self)
         except Exception as e:  # noqa: BLE001
             log(f"[錯誤] Worker 例外：{e}")
             code = 1
@@ -331,16 +372,34 @@ class WorkerHandler(BaseHTTPRequestHandler):
 
     # ----- helpers ----------------------------------------------------------------------------
 
+    def _apply_cors(self) -> None:
+        origin = self.headers.get("Origin", "")
+        if security.is_allowed_origin(origin):
+            self.send_header("Access-Control-Allow-Origin", origin)
+            self.send_header("Vary", "Origin")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header(
+            "Access-Control-Allow-Headers",
+            f"Content-Type, X-Job-Name, {security.WORKER_TOKEN_HEADER}",
+        )
+
     def _send(self, status: int, body: bytes, ctype: str) -> None:
         self.send_response(status)
         self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Cache-Control", "no-store")
+        self._apply_cors()
         self.end_headers()
         self.wfile.write(body)
 
     def _json(self, data: dict, status: int = 200) -> None:
         self._send(status, json.dumps(data, ensure_ascii=False).encode("utf-8"), "application/json; charset=utf-8")
+
+    def do_OPTIONS(self) -> None:
+        self.send_response(204)
+        self._apply_cors()
+        self.send_header("Access-Control-Max-Age", "86400")
+        self.end_headers()
 
     def _reject(self, status: int, message: str) -> None:
         self._json({"ok": False, "message": message}, status)
@@ -433,9 +492,11 @@ class WorkerHandler(BaseHTTPRequestHandler):
             length = 0
         if length <= 0:
             return self._reject(400, "缺少音訊內容")
-        if length > security.WORKER_MAX_AUDIO_BYTES:
+        job_name = self.headers.get("X-Job-Name", "audio.wav")
+        max_bytes = _max_upload_bytes(job_name)
+        if length > max_bytes:
             self._drain()
-            return self._reject(413, f"音訊過大（上限 {security.WORKER_MAX_AUDIO_BYTES // (1024**2)} MB）")
+            return self._reject(413, f"檔案過大（上限 {max_bytes // (1024**2)} MB）")
         if not (demo_core.WHISPERX.exists() or demo_core.VENV_PY.exists()):
             self._drain()
             return self._reject(503, "Worker 尚未安裝 WhisperX 環境，請在家用主機執行 start_worker.cmd 完成安裝")
@@ -443,7 +504,7 @@ class WorkerHandler(BaseHTTPRequestHandler):
             self._drain()
             return self._reject(503, "Worker 尚未設定 HF_TOKEN（分軌模型授權），請在家用主機的 .env 填入")
 
-        job = STATE.new_job(self.headers.get("X-Job-Name", "audio.wav"))
+        job = STATE.new_job(job_name)
         remaining = length
         try:
             with job.audio.open("wb") as f:

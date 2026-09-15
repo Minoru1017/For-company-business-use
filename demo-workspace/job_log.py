@@ -10,10 +10,43 @@ from demo_core import ROOT, get_status, is_frozen, PORTABLE_PY
 LOGS_DIR = ROOT / "logs"
 LATEST_LOG = LOGS_DIR / "latest-install.log"
 HF_RE = re.compile(r"hf_[A-Za-z0-9]+")
+# tqdm-style bar: "<label>:  45%|████▌     | 9/20 [01:00<01:10, 6.4s/it]"
+PROGRESS_RE = re.compile(r"^(?P<prefix>.*?)\s*\d{1,3}%\|")
+PROGRESS_LOOKBACK = 8
+MAX_LOG_LINES = 5000
+HEAD_KEEP = 200
+TRIM_MARKER = "……（中段記錄過長已省略）……"
 
 
 def sanitize_log_line(line: str) -> str:
     return HF_RE.sub("hf_***", line)
+
+
+def progress_key(line: str) -> str | None:
+    m = PROGRESS_RE.match(line)
+    return m.group("prefix") if m else None
+
+
+def append_compact(logs: list[str], msg: str) -> None:
+    """Append a job log line, collapsing progress-bar updates in place.
+
+    WhisperX / huggingface print tqdm bars with carriage returns; read in text
+    mode each update arrives as its own line, so a long transcription would
+    otherwise push tens of thousands of lines through /api/job every 0.8 s.
+    """
+    key = progress_key(msg)
+    if key is not None:
+        start = max(0, len(logs) - PROGRESS_LOOKBACK)
+        for i in range(len(logs) - 1, start - 1, -1):
+            if progress_key(logs[i]) == key:
+                logs[i] = msg
+                return
+    logs.append(msg)
+    if len(logs) > MAX_LOG_LINES:
+        excess = len(logs) - MAX_LOG_LINES
+        del logs[HEAD_KEEP : HEAD_KEEP + excess]
+        if logs[HEAD_KEEP] != TRIM_MARKER:
+            logs.insert(HEAD_KEEP, TRIM_MARKER)
 
 
 def collect_diagnostics(kind: str) -> list[str]:
