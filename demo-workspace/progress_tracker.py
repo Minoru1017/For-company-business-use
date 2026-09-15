@@ -42,7 +42,11 @@ WHISPERX_STEP_LABELS = {
     "write": "寫入 SRT",
 }
 
-_WX_MARKER_RE = re.compile(r">>\s*Performing\s+(transcription|alignment|diarization)", re.IGNORECASE)
+# WhisperX 3.x logs "INFO - Performing transcription..." (no ">>" prefix).
+_WX_MARKER_RE = re.compile(
+    r"(?:>>\s*|INFO\s+-\s*)Performing\s+(transcription|alignment|diarization)",
+    re.IGNORECASE,
+)
 _WX_PROGRESS_RE = re.compile(r"Progress:\s*([0-9]+(?:\.[0-9]+)?)%")
 # WhisperX / pyannote log lines after diarization (version-dependent; often no ">>Performing write").
 _WX_WRITE_RE = re.compile(

@@ -13,6 +13,29 @@ from typing import Callable
 from proc_utils import quiet_run
 from srt_utils import merge_srt_parts
 
+# Late import avoids a cycle: demo_core imports transcribe_parallel for run_parallel_transcribe.
+def _whisperx_chunk_args(
+    chunk_wav: Path,
+    *,
+    model: str,
+    threads: int,
+    batch_size: int,
+    out_sub: Path,
+    device: str,
+    compute_type: str,
+) -> list[str]:
+    from demo_core import whisperx_args
+
+    return whisperx_args(
+        chunk_wav,
+        model=model,
+        threads=threads,
+        batch=batch_size,
+        output_dir=out_sub,
+        device=device,
+        compute_type=compute_type,
+    )
+
 LogFn = Callable[[str], None]
 
 CANCEL_EXIT = 130
@@ -292,6 +315,8 @@ def run_parallel_transcribe(
     cancel_check: Callable[[], bool],
     parallel: int | None = None,
     progress=None,
+    device: str = "cpu",
+    compute_type: str = "int8",
 ) -> int:
     chunk_dir = work_root / ".chunks" / audio.stem
     if chunk_dir.exists():
@@ -341,32 +366,15 @@ def run_parallel_transcribe(
             part_log = progress.wrap_whisperx_log(part_log, idx)
         code = run_command(
             whisperx_cmd
-            + [
-                str(chunk_wav),
-                "--model",
-                model,
-                "--language",
-                "zh",
-                "--device",
-                "cpu",
-                "--compute_type",
-                "int8",
-                "--threads",
-                str(threads),
-                "--batch_size",
-                str(batch_size),
-                "--diarize",
-                "--min_speakers",
-                "2",
-                "--max_speakers",
-                "2",
-                "--output_format",
-                "srt",
-                "--print_progress",
-                "True",
-                "--output_dir",
-                str(out_sub),
-            ],
+            + _whisperx_chunk_args(
+                chunk_wav,
+                model=model,
+                threads=threads,
+                batch_size=batch_size,
+                out_sub=out_sub,
+                device=device,
+                compute_type=compute_type,
+            ),
             log=part_log,
             env=env_vars,
             hooks=hooks,
