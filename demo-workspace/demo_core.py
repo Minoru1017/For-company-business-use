@@ -429,18 +429,33 @@ def list_mp4_files() -> list[Path]:
     return sorted(input_dir.glob("*.mp4"), key=lambda p: p.stat().st_mtime, reverse=True)
 
 
+def _match_mp4_in_input(input_root: Path, name: str) -> Path | None:
+    """Resolve a basename under input/; on Windows also match DEMO.mp4 vs demo.mp4."""
+    direct = input_root / name
+    if direct.is_file():
+        return direct
+    if sys.platform == "win32":
+        want = name.lower()
+        for p in input_root.glob("*.mp4"):
+            if p.name.lower() == want:
+                return p
+    return None
+
+
 def find_mp4(arg: str | None = None) -> Path:
     input_root = (ROOT / "input").resolve()
+    input_root.mkdir(parents=True, exist_ok=True)
     if arg:
         name = safe_mp4_name(arg)
-        p = input_root / name
-        if p.is_file():
-            return p
-        raise FileNotFoundError(f"找不到: {name}")
+        found = _match_mp4_in_input(input_root, name)
+        if found is not None:
+            return found
+        raise FileNotFoundError(f"找不到: {name}（請確認檔案在 input 資料夾，檔名與清單一致）")
 
-    preferred = ROOT / "input" / "demo.mp4"
-    if preferred.exists():
-        return preferred
+    for preferred_name in ("demo.mp4", "DEMO.mp4"):
+        found = _match_mp4_in_input(input_root, preferred_name)
+        if found is not None:
+            return found
 
     mp4s = list_mp4_files()
     if mp4s:
@@ -1062,7 +1077,7 @@ def run_transcribe(
 
     try:
         if mp4_name:
-            mp4 = find_mp4(f"input/{mp4_name}")
+            mp4 = find_mp4(mp4_name)
         else:
             mp4 = find_mp4()
     except FileNotFoundError as e:

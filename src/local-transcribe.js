@@ -30,6 +30,29 @@ let uploadXhr = null;
 let uploadStartAt = 0;
 let bridgeApiToken = null;
 
+/** Match MP4 basenames (Windows paths are case-insensitive). */
+function mp4NameMatches(a, b) {
+  if (!a || !b) return false;
+  return String(a).toLowerCase() === String(b).toLowerCase();
+}
+
+function mp4InFileList(name, files) {
+  return (files || []).some((f) => mp4NameMatches(f, name));
+}
+
+function syncSelectedMp4(files) {
+  if (!files?.length) {
+    selectedMp4 = null;
+    return;
+  }
+  if (selectedMp4 && mp4InFileList(selectedMp4, files)) {
+    selectedMp4 = files.find((f) => mp4NameMatches(f, selectedMp4)) || files[0];
+    return;
+  }
+  const demo = files.find((f) => /^demo\.mp4$/i.test(f));
+  selectedMp4 = demo || files[0];
+}
+
 const LARGE_FILE_MB = 80;
 const HF_TOKEN_URL = 'https://huggingface.co/settings/tokens';
 const TOKEN_PAGE_KEY = 'call_coach_hf_token_opened';
@@ -507,7 +530,7 @@ export function initLocalTranscribe({ onTranscriptReady, showToast, getMode }) {
     const sacWarn = sacBanner(st.smart_app_control);
 
     const files = st.mp4_files || [];
-    if (!selectedMp4 || !files.includes(selectedMp4)) selectedMp4 = files[0] || null;
+    syncSelectedMp4(files);
 
     const fileHtml = files.length
       ? files
@@ -633,6 +656,14 @@ export function initLocalTranscribe({ onTranscriptReady, showToast, getMode }) {
         selectedMp4 = el.querySelector('input').value;
         refreshStatus();
       };
+    });
+    panel.querySelectorAll('input[name="bridgeMp4"]').forEach((el) => {
+      el.addEventListener('change', () => {
+        if (el.checked) {
+          selectedMp4 = el.value;
+          refreshStatus();
+        }
+      });
     });
 
     const drop = panel.querySelector('#bridgeDrop');
@@ -1135,6 +1166,10 @@ async function exportTeamConfig(showToast) {
 
 function transcribeBlockReason(st) {
   if (!selectedMp4) return '請先選擇或放入 MP4';
+  const files = st?.mp4_files || [];
+  if (files.length && !mp4InFileList(selectedMp4, files)) {
+    return `找不到 ${selectedMp4}（請按「重新掃描」或確認檔案在 input 資料夾）`;
+  }
   if (!st?.python_ok) return '需要 Python 3.10+（請確認轉錄助手視窗已啟動）';
   if (!st?.ffmpeg_ok) return '需要 ffmpeg 抽出音軌，請按「完整環境安裝」或「安裝 ffmpeg」';
   if (transcribeMode === 'azure') {
@@ -1143,8 +1178,14 @@ function transcribeBlockReason(st) {
     return '';
   }
   if (transcribeMode === 'remote') {
+    if (!bridgeSupports('remote-worker')) {
+      return '本機助手版本較舊，不支援遠端主機轉錄，請至 GitHub Releases 更新 Call Coach 助手';
+    }
     if (!st?.worker_ok) return '請先填入遠端主機網址與 Worker Token（家用主機的 Worker 視窗會顯示）';
     if (!cloudConsent) return '使用遠端主機轉錄前，請勾選知情同意';
+    if (workerHealth && workerHealth.reachable === false) {
+      return workerHealth.message || '無法連線遠端 Worker，請先按「測試連線」並確認新竹主機 Worker 視窗已開啟';
+    }
     return '';
   }
   if (!st?.venv_ok || !st?.whisperx_ok) return '本機模式請先按「完整環境安裝」；或改選 Azure 雲端轉錄（免安裝）';
@@ -1478,7 +1519,11 @@ async function testWorker(showToast, refreshStatus) {
 
 async function runTranscribe(onTranscriptReady, showToast, refreshStatus) {
   if (!selectedMp4) return showToast('請先選擇 MP4');
-  const reason = transcribeBlockReason(await checkLocalBridge());
+  const st = await checkLocalBridge();
+  if (transcribeMode === 'remote' && st?.worker_ok && (!workerHealth || workerHealth.reachable === undefined)) {
+    await testWorker(() => {}, refreshStatus);
+  }
+  const reason = transcribeBlockReason(st || (await checkLocalBridge()));
   if (reason) return showToast(reason);
   try {
     const r = await api('/api/transcribe', {
