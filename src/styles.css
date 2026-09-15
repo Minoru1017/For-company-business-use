@@ -210,6 +210,8 @@ h2 { font-family:var(--disp); font-size:.98rem; margin-bottom:12px; color:var(--
 .bridge-mode-panel strong { display: block; margin-bottom: 8px; font-size: .88rem; }
 .bridge-mode-option { display: block; margin: 6px 0; font-size: .82rem; color: var(--text); cursor: pointer; }
 .bridge-mode-option input { margin-right: 8px; }
+.bridge-mode-highlight { border: 1px solid #2f5d43; border-radius: 8px; padding: 8px 10px; margin: 10px 0 4px; background: #121a14; }
+.bridge-mode-subhint { margin: 0 0 10px 4px; font-size: .78rem; line-height: 1.5; }
 .bridge-consent { display: block; margin-top: 10px; padding: 10px 12px; background: #1f1a10; border: 1px solid #5d4d1e; border-radius: 8px; font-size: .78rem; line-height: 1.5; color: var(--warn); cursor: pointer; }
 .bridge-consent input { margin-right: 8px; vertical-align: top; margin-top: 2px; }
 .bridge-azure-config { margin-top: 10px; }

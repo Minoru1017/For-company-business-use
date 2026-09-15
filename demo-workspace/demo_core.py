@@ -7,6 +7,7 @@ import re
 import shutil
 import subprocess
 import sys
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable
@@ -280,6 +281,30 @@ def detect_gpu() -> dict:
     return {"available": False, "name": None, "reason": err[-1] if err else "torch 偵測失敗"}
 
 
+_GPU_CACHE: tuple[float, dict] | None = None
+_GPU_CACHE_TTL_S = 90.0
+
+
+def detect_gpu_cached() -> dict:
+    """Cached ``detect_gpu`` so /api/status polling does not spawn torch every few seconds."""
+    global _GPU_CACHE
+    now = time.monotonic()
+    if _GPU_CACHE is not None and now - _GPU_CACHE[0] < _GPU_CACHE_TTL_S:
+        return dict(_GPU_CACHE[1])
+    data = detect_gpu()
+    _GPU_CACHE = (now, data)
+    return dict(data)
+
+
+def gpu_whisper_model() -> str:
+    env = load_env()
+    for key in ("CALL_COACH_GPU_MODEL", "CALL_COACH_WORKER_MODEL"):
+        value = env.get(key, "").strip()
+        if value:
+            return value
+    return "large-v3"
+
+
 def team_config_file() -> Path:
     from team_config import team_config_path
 
@@ -350,7 +375,7 @@ def export_team_config_text(*, include_hf_token: bool = False, team_name: str = 
 
 def default_transcribe_mode() -> str:
     """Mode the UI should preselect: team/admin choice, else remote worker / Azure when configured, else local."""
-    from transcribe_modes import MODE_AZURE, MODE_REMOTE, MODE_STANDARD, VALID_MODES
+    from transcribe_modes import MODE_AZURE, MODE_LOCAL_GPU, MODE_REMOTE, MODE_STANDARD, VALID_MODES
 
     configured = load_env().get("CALL_COACH_DEFAULT_MODE", "").strip().lower()
     if configured in VALID_MODES:
@@ -358,7 +383,11 @@ def default_transcribe_mode() -> str:
             return MODE_STANDARD
         if configured == MODE_REMOTE and not has_worker_config():
             return MODE_STANDARD
+        if configured == MODE_LOCAL_GPU and not detect_gpu_cached().get("available"):
+            return MODE_STANDARD
         return configured
+    if detect_gpu_cached().get("available") and VENV_PY.exists() and has_valid_token():
+        return MODE_LOCAL_GPU
     # A worker the user set up themselves is faster than Azure and keeps audio in-house.
     if has_worker_config():
         return MODE_REMOTE
@@ -578,6 +607,9 @@ class EnvStatus:
     team_config: dict = field(default_factory=dict)
     worker_ok: bool = False
     worker_url: str = ""
+    gpu_available: bool = False
+    gpu_name: str | None = None
+    gpu_reason: str | None = None
 
     @property
     def local_ready(self) -> bool:
@@ -590,6 +622,10 @@ class EnvStatus:
     @property
     def worker_ready(self) -> bool:
         return self.worker_ok and self.ffmpeg_ok
+
+    @property
+    def local_gpu_ready(self) -> bool:
+        return self.local_ready and self.ffmpeg_ok and self.gpu_available
 
     def to_dict(self) -> dict:
         return {
@@ -617,6 +653,10 @@ class EnvStatus:
             "worker_ok": self.worker_ok,
             "worker_url": self.worker_url,
             "worker_ready": self.worker_ready,
+            "gpu_available": self.gpu_available,
+            "gpu_name": self.gpu_name,
+            "gpu_reason": self.gpu_reason,
+            "local_gpu_ready": self.local_gpu_ready,
             "default_mode": self.default_mode,
             "team_config": self.team_config,
             "root": str(ROOT),
@@ -637,7 +677,7 @@ class EnvStatus:
             ],
             "call_coach_url": CALL_COACH_URL,
             "hf_links": HF_LINKS,
-            "transcribe_modes": ["fast", "standard", "azure", "remote"],
+            "transcribe_modes": ["fast", "standard", "local_gpu", "azure", "remote"],
             "smart_app_control": smart_app_control_state(),
         }
 
@@ -674,11 +714,16 @@ def get_status() -> EnvStatus:
 
     worker_url, _worker_token = worker_config()
     worker_ok = has_worker_config()
+    gpu_info = detect_gpu_cached() if venv_ok else {"available": False, "reason": None}
+    gpu_available = bool(gpu_info.get("available"))
+    gpu_name = gpu_info.get("name") if gpu_available else None
+    gpu_reason = gpu_info.get("reason") if not gpu_available else None
 
     local_ready = python_ok and venv_ok and whisperx_ok and token_ok
     azure_ready = azure_ok and ffmpeg_ok
     worker_ready = worker_ok and ffmpeg_ok
-    ready = (local_ready or azure_ready or worker_ready) and bool(mp4s)
+    local_gpu_ready = local_ready and ffmpeg_ok and gpu_available
+    ready = (local_ready or azure_ready or worker_ready or local_gpu_ready) and bool(mp4s)
 
     portable_ok = PORTABLE_PY.is_file()
     if portable_ok and python_warning and "過新" in python_warning:
@@ -711,6 +756,9 @@ def get_status() -> EnvStatus:
         team_config=team_config_info(),
         worker_ok=worker_ok,
         worker_url=worker_url if worker_ok else "",
+        gpu_available=gpu_available,
+        gpu_name=gpu_name,
+        gpu_reason=gpu_reason,
     )
 
 
@@ -872,6 +920,8 @@ def run_setup(log: LogFn = default_log, *, gpu: bool = False) -> int:
         if code != 0:
             log(f"[錯誤] 重新固定 CUDA 版 PyTorch 失敗（exit code {code}）")
             return code
+        global _GPU_CACHE
+        _GPU_CACHE = None
         gpu_info = detect_gpu()
         if gpu_info.get("available"):
             log(f"GPU 就緒：{gpu_info.get('name')}（torch {gpu_info.get('torch')}, CUDA {gpu_info.get('cuda')}）")
@@ -1024,13 +1074,15 @@ def run_transcribe(
     cloud_consent: bool = False,
 ) -> int:
     from azure_transcribe import run_azure_transcribe
-    from progress_tracker import ProgressTracker, estimate_azure_minutes
+    from progress_tracker import ProgressTracker, estimate_azure_minutes, estimate_remote_minutes
     from remote_transcribe import run_remote_transcribe
     from transcribe_modes import (
         MODE_AZURE,
         MODE_LABELS,
+        MODE_LOCAL_GPU,
         MODE_REMOTE,
         OFFSITE_MODES,
+        is_local_gpu_mode,
         model_for_mode,
         normalize_mode,
         validate_transcribe_request,
@@ -1090,6 +1142,17 @@ def run_transcribe(
     whisper_model = model_for_mode(mode)
     threads = transcribe_threads()
     batch = transcribe_batch()
+    wx_device, wx_compute, wx_batch = "cpu", "int8", batch
+    if is_local_gpu_mode(mode):
+        gpu_info = detect_gpu_cached()
+        if not gpu_info.get("available"):
+            log(f"[錯誤] 本機 GPU 模式需要可用的 NVIDIA GPU：{gpu_info.get('reason')}")
+            return fail(1)
+        whisper_model = gpu_whisper_model()
+        wx_device, wx_compute, wx_batch = "cuda", "float16", 16
+        log(
+            f"本機 GPU：{gpu_info.get('name')}｜WhisperX {whisper_model}（cuda / float16，音訊不離開本機、不需遠端 Worker）"
+        )
     stem = Path(mp4.name).stem
     final_srt = ROOT / "output" / f"{stem}.srt"
 
@@ -1179,7 +1242,7 @@ def run_transcribe(
 
     parallel = max_parallel_workers(MAX_CHUNKS, whisper_model) if duration > 0 else 1
     chunk_count = chunk_count_for_duration(duration, parallel) if duration > 0 else 1
-    use_parallel = chunk_count > 1 and bool(ffmpeg)
+    use_parallel = chunk_count > 1 and bool(ffmpeg) and not is_local_gpu_mode(mode)
     code = 0
 
     if use_parallel:
@@ -1193,7 +1256,10 @@ def run_transcribe(
         )
     elif ffmpeg:
         progress.use_plan("local")
-        eta_low, eta_high = estimate_transcribe_minutes(duration, 1, 1)
+        if is_local_gpu_mode(mode):
+            eta_low, eta_high = estimate_remote_minutes(duration, gpu=True)
+        else:
+            eta_low, eta_high = estimate_transcribe_minutes(duration, 1, 1)
         progress.set_eta_minutes(eta_low, eta_high)
         code = extract_wav_from_mp4(mp4, wav, ffmpeg, log, env_vars, hooks, progress=progress)
         if code == CANCEL_EXIT:
@@ -1226,7 +1292,7 @@ def run_transcribe(
             whisperx_cmd=whisperx_cmd(),
             model=whisper_model,
             default_threads=threads,
-            batch=batch,
+            batch=wx_batch,
             env_vars=env_vars,
             run_command=run_command,
             log=log,
@@ -1234,6 +1300,8 @@ def run_transcribe(
             cancel_check=lambda: bool(hooks and hooks.is_cancelled()),
             parallel=parallel,
             progress=progress,
+            device=wx_device,
+            compute_type=wx_compute,
         )
         if code == CANCEL_EXIT:
             return fail(code)
@@ -1268,8 +1336,10 @@ def run_transcribe(
                 audio,
                 model=whisper_model,
                 threads=threads,
-                batch=batch,
+                batch=wx_batch,
                 output_dir=ROOT / "output",
+                device=wx_device,
+                compute_type=wx_compute,
             ),
             log=progress.wrap_whisperx_log(log, 0),
             env=env_vars,

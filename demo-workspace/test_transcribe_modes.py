@@ -22,7 +22,9 @@ from azure_transcribe import (
 from transcribe_modes import (
     MODE_AZURE,
     MODE_FAST,
+    MODE_LOCAL_GPU,
     MODE_STANDARD,
+    is_local_gpu_mode,
     model_for_mode,
     normalize_mode,
     validate_transcribe_request,
@@ -39,6 +41,9 @@ class TranscribeModesTest(unittest.TestCase):
         self.assertEqual(model_for_mode(MODE_STANDARD), "medium")
         # Azure mode has no local model; must not raise (run_transcribe calls this for every mode).
         self.assertEqual(model_for_mode(MODE_AZURE), "medium")
+        self.assertEqual(model_for_mode(MODE_LOCAL_GPU), "large-v3")
+        self.assertTrue(is_local_gpu_mode(MODE_LOCAL_GPU))
+        self.assertFalse(is_local_gpu_mode(MODE_FAST))
 
     def test_validate_azure_consent(self):
         self.assertIsNotNone(validate_transcribe_request(MODE_AZURE, False, True))
