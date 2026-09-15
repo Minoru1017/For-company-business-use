@@ -95,7 +95,9 @@ class TrackerEmitTest(unittest.TestCase):
         part = data["parts"][0]
         self.assertEqual(part["step"], "transcribe")
         self.assertEqual(part["percent"], 50.0)
-        self.assertEqual(len(forwarded), 3)
+        wrapped("2026-01-01 00:00:00 - whisperx.transcribe - INFO - Performing alignment...")
+        self.assertEqual(last_progress(lines)["parts"][0]["step"], "align")
+        self.assertEqual(len(forwarded), 4)
         clock.tick(5)
         wrapped(">>Performing alignment...")
         clock.tick(5)

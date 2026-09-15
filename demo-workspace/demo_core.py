@@ -388,12 +388,15 @@ def extract_wav_from_mp4(
 
 
 def whisperx_cmd() -> list[str]:
+    """Prefer ``python -X utf8 -m whisperx`` so Transcript: lines do not crash on cp950 Windows consoles."""
+    if VENV_PY.is_file():
+        return [str(VENV_PY), "-X", "utf8", "-m", "whisperx"]
     if WHISPERX.exists():
         return [str(WHISPERX)]
     alt = ROOT / ".venv" / "Scripts" / "whisperx.cmd"
     if alt.exists():
         return ["cmd", "/c", str(alt)]
-    return [str(VENV_PY), "-m", "whisperx"]
+    return [str(VENV_PY), "-X", "utf8", "-m", "whisperx"]
 
 
 SAFE_MP4_RE = re.compile(r"^[A-Za-z0-9._ -]+\.mp4$", re.IGNORECASE)
@@ -455,6 +458,7 @@ def cache_env() -> dict[str, str]:
     token = load_env().get("HF_TOKEN", "").strip()
     if token:
         env["HF_TOKEN"] = token
+        env["HUGGING_FACE_HUB_TOKEN"] = token
     return env
 
 
@@ -1274,6 +1278,13 @@ def run_transcribe(
     return 0
 
 
+def whisperx_hf_cli_args() -> list[str]:
+    token = load_env().get("HF_TOKEN", "").strip()
+    if token.startswith("hf_"):
+        return ["--hf_token", token]
+    return []
+
+
 def whisperx_args(
     audio: Path,
     *,
@@ -1311,7 +1322,7 @@ def whisperx_args(
         "True",
         "--output_dir",
         str(output_dir),
-    ]
+    ] + whisperx_hf_cli_args()
 
 
 REPORT_EXTS = (".md", ".txt", ".srt")
