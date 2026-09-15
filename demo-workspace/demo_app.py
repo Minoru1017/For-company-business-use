@@ -287,6 +287,9 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/status":
             return self._send_json(demo_core.get_status().to_dict())
 
+        if path == "/api/gpu-diagnose":
+            return self._send_json({"ok": True, "diagnose": demo_core.gpu_environment_diagnose()})
+
         if path == "/api/job":
             snap = JOB.snapshot()
             snap["status"] = demo_core.get_status().to_dict()
@@ -356,6 +359,14 @@ class Handler(BaseHTTPRequestHandler):
 
         if path == "/api/full-setup":
             ok, msg = run_job("full-setup", demo_core.run_full_setup)
+            return self._send_json({"ok": ok, "message": msg})
+
+        if path == "/api/setup-gpu":
+            ok, msg = run_job("setup-gpu", demo_core.run_setup_gpu)
+            return self._send_json({"ok": ok, "message": msg})
+
+        if path == "/api/full-setup-gpu":
+            ok, msg = run_job("full-setup-gpu", demo_core.run_full_setup_gpu)
             return self._send_json({"ok": ok, "message": msg})
 
         if path == "/api/transcribe":
