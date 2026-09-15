@@ -555,6 +555,9 @@ def _banner(state: WorkerState, port: int) -> list[str]:
     lines.append("")
     lines.append("走 Cloudflare Tunnel 時，網址改填 tunnel 的 https 網址（不加埠號）。")
     lines.append("關閉此視窗即停止 Worker。")
+    lines.append("")
+    lines.append("若你就在這台 GPU 電腦前操作：不必用遠端 Worker。")
+    lines.append("請按「開啟本機助手」或執行 start_hsinchu_gpu.cmd，網頁選「新竹本機 GPU 轉錄」。")
     return lines
 
 

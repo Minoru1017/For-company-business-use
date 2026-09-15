@@ -5,14 +5,17 @@ MODE_FAST = "fast"
 MODE_STANDARD = "standard"
 MODE_AZURE = "azure"
 MODE_REMOTE = "remote"
+# Same machine as the GPU (e.g. Hsinchu desk): WhisperX large-v3 on CUDA — no Worker URL / no upload.
+MODE_LOCAL_GPU = "local_gpu"
 
-VALID_MODES = {MODE_FAST, MODE_STANDARD, MODE_AZURE, MODE_REMOTE}
+VALID_MODES = {MODE_FAST, MODE_STANDARD, MODE_AZURE, MODE_REMOTE, MODE_LOCAL_GPU}
 
 MODE_LABELS = {
     MODE_FAST: "快速模式（Faster-Whisper small）",
     MODE_STANDARD: "標準模式（Faster-Whisper medium）",
     MODE_AZURE: "Azure 雲端轉錄（zh-TW，較快）",
     MODE_REMOTE: "遠端主機轉錄（自己的 GPU 電腦）",
+    MODE_LOCAL_GPU: "本機 GPU 轉錄（large-v3，音訊不上傳、不需遠端模式）",
 }
 
 # Modes where the audio leaves this computer and the user must acknowledge it first.
@@ -22,6 +25,7 @@ OFFSITE_MODES = {MODE_AZURE, MODE_REMOTE}
 MODE_MODELS = {
     MODE_FAST: "small",
     MODE_STANDARD: "medium",
+    MODE_LOCAL_GPU: "large-v3",
 }
 
 
@@ -32,8 +36,15 @@ def normalize_mode(mode: str | None) -> str:
 
 
 def model_for_mode(mode: str) -> str:
-    """Local Whisper model for a mode; Azure has no local model, so fall back to standard."""
-    return MODE_MODELS.get(normalize_mode(mode), MODE_MODELS[MODE_STANDARD])
+    """Local Whisper model for a mode; Azure / remote have no local model, so fall back to standard."""
+    m = normalize_mode(mode)
+    if m in (MODE_AZURE, MODE_REMOTE):
+        return MODE_MODELS[MODE_STANDARD]
+    return MODE_MODELS.get(m, MODE_MODELS[MODE_STANDARD])
+
+
+def is_local_gpu_mode(mode: str) -> bool:
+    return normalize_mode(mode) == MODE_LOCAL_GPU
 
 
 def requires_cloud_consent(mode: str) -> bool:

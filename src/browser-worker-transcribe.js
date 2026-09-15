@@ -187,7 +187,15 @@ export function mountBrowserWorkerUI(container, { onTranscriptReady, showToast }
 
   const refreshStart = () => {
     if (!startBtn) return;
-    startBtn.disabled = busy || !picked || !consentEl?.checked || !urlEl?.value?.trim() || !tokenEl?.value?.trim();
+    const blocked =
+      busy || !picked || !consentEl?.checked || !urlEl?.value?.trim() || !tokenEl?.value?.trim();
+    startBtn.disabled = blocked;
+    if (startBtn.title) startBtn.removeAttribute('title');
+    if (blocked && !busy) {
+      if (!picked) startBtn.title = '請先選擇 MP4';
+      else if (!urlEl?.value?.trim() || !tokenEl?.value?.trim()) startBtn.title = '請填 Worker 網址與 Token';
+      else if (!consentEl?.checked) startBtn.title = '請勾選知情同意';
+    }
   };
 
   urlEl?.addEventListener('input', () => {

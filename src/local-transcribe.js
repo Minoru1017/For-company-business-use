@@ -30,12 +30,35 @@ let uploadXhr = null;
 let uploadStartAt = 0;
 let bridgeApiToken = null;
 
+/** Match MP4 basenames (Windows paths are case-insensitive). */
+function mp4NameMatches(a, b) {
+  if (!a || !b) return false;
+  return String(a).toLowerCase() === String(b).toLowerCase();
+}
+
+function mp4InFileList(name, files) {
+  return (files || []).some((f) => mp4NameMatches(f, name));
+}
+
+function syncSelectedMp4(files) {
+  if (!files?.length) {
+    selectedMp4 = null;
+    return;
+  }
+  if (selectedMp4 && mp4InFileList(selectedMp4, files)) {
+    selectedMp4 = files.find((f) => mp4NameMatches(f, selectedMp4)) || files[0];
+    return;
+  }
+  const demo = files.find((f) => /^demo\.mp4$/i.test(f));
+  selectedMp4 = demo || files[0];
+}
+
 const LARGE_FILE_MB = 80;
 const HF_TOKEN_URL = 'https://huggingface.co/settings/tokens';
 const TOKEN_PAGE_KEY = 'call_coach_hf_token_opened';
 const TRANSCRIBE_MODE_KEY = 'callCoachTranscribeMode';
 const CLOUD_CONSENT_KEY = 'callCoachCloudConsent';
-const VALID_MODES = new Set(['fast', 'standard', 'azure', 'remote']);
+const VALID_MODES = new Set(['fast', 'standard', 'local_gpu', 'azure', 'remote']);
 // Modes where the audio leaves this PC (Azure cloud, or the user's own remote GPU worker).
 const OFFSITE_MODES = new Set(['azure', 'remote']);
 const AZURE_FAST_REGIONS_HINT = 'southeastasia（新加坡）或 japaneast（東京）';
@@ -239,6 +262,24 @@ function checklistItems(st) {
       label: '知情同意（音訊上傳至 Azure）',
       fix: cloudConsent ? null : { action: 'consent', text: '勾選同意' },
     });
+  } else if (transcribeMode === 'local_gpu') {
+    items.push({
+      ok: !!(st.venv_ok && st.whisperx_ok),
+      label: 'WhisperX GPU 版環境',
+      detail: st.venv_ok && st.whisperx_ok ? '' : '新竹主機請執行 start_worker.cmd 的「安裝 GPU 版」或完整環境安裝',
+      fix: st.venv_ok && st.whisperx_ok ? null : { action: 'full-setup', text: '完整環境安裝' },
+    });
+    items.push({
+      ok: !!st.token_ok,
+      label: 'Hugging Face Token（分軌模型授權）',
+      fix: st.token_ok ? null : { action: 'token', text: '取得並貼上 Token' },
+    });
+    items.push({
+      ok: !!st.gpu_available,
+      label: st.gpu_available ? `NVIDIA GPU（${st.gpu_name || '已偵測'}）` : 'NVIDIA GPU（本機 CUDA）',
+      warn: st.gpu_available ? '' : st.gpu_reason || '請安裝 GPU 版 WhisperX（CUDA 12.8）',
+      fix: st.gpu_available ? null : { action: 'full-setup', text: '安裝 GPU 版環境' },
+    });
   } else if (transcribeMode === 'remote') {
     items.push({
       ok: !!st.worker_ok,
@@ -321,6 +362,7 @@ function renderChecklist(st) {
 
 function modeShortLabel() {
   if (transcribeMode === 'azure') return 'Azure 雲端';
+  if (transcribeMode === 'local_gpu') return '本機 GPU（新竹）';
   if (transcribeMode === 'remote') return '遠端主機 GPU';
   if (transcribeMode === 'fast') return '本機 · 快速';
   return '本機 · 標準';
@@ -507,7 +549,7 @@ export function initLocalTranscribe({ onTranscriptReady, showToast, getMode }) {
     const sacWarn = sacBanner(st.smart_app_control);
 
     const files = st.mp4_files || [];
-    if (!selectedMp4 || !files.includes(selectedMp4)) selectedMp4 = files[0] || null;
+    syncSelectedMp4(files);
 
     const fileHtml = files.length
       ? files
@@ -567,9 +609,16 @@ export function initLocalTranscribe({ onTranscriptReady, showToast, getMode }) {
           <input type="radio" name="bridgeMode" value="azure" ${transcribeMode === 'azure' ? 'checked' : ''}>
           Azure 雲端轉錄（zh-TW，48 分鐘約 2～5 分鐘完成；免安裝、不需 Token）${st.default_mode === 'azure' ? ' <span class="bridge-mode-default">團隊預設</span>' : ''}
         </label>
+        <label class="bridge-mode-option bridge-mode-highlight">
+          <input type="radio" name="bridgeMode" value="local_gpu" ${transcribeMode === 'local_gpu' ? 'checked' : ''}>
+          新竹本機 GPU 轉錄（在 GPU 電腦上直接跑 large-v3；<strong>不需遠端 Worker、不上傳網路</strong>；48 分鐘約 3～8 分鐘）${st.default_mode === 'local_gpu' ? ' <span class="bridge-mode-default">預設</span>' : ''}
+        </label>
+        <p class="hint bridge-mode-subhint" id="bridgeLocalGpuHint" ${transcribeMode === 'local_gpu' ? '' : 'hidden'}>
+          請在新竹電腦執行 <code>start_hsinchu_gpu.cmd</code>（或助手 + 選此模式）。MP4 放在 <code>input\\</code>，需 HF_TOKEN 與 GPU 版 WhisperX；<strong>不要</strong>開 Worker 遠端模式。
+        </p>
         <label class="bridge-mode-option">
           <input type="radio" name="bridgeMode" value="remote" ${transcribeMode === 'remote' ? 'checked' : ''}>
-          遠端主機轉錄（你自己的 GPU 電腦，例如家用 RTX 主機；48 分鐘約 3～8 分鐘、Whisper large 最準；音訊只傳到你指定的主機）${st.default_mode === 'remote' ? ' <span class="bridge-mode-default">預設</span>' : ''}
+          遠端主機轉錄（公司電腦 → 上傳到新竹 GPU；需 Worker 視窗 + 網址／Token）${st.default_mode === 'remote' ? ' <span class="bridge-mode-default">預設</span>' : ''}
         </label>
         <label class="bridge-mode-option">
           <input type="radio" name="bridgeMode" value="standard" ${transcribeMode === 'standard' ? 'checked' : ''}>
@@ -634,6 +683,14 @@ export function initLocalTranscribe({ onTranscriptReady, showToast, getMode }) {
         refreshStatus();
       };
     });
+    panel.querySelectorAll('input[name="bridgeMp4"]').forEach((el) => {
+      el.addEventListener('change', () => {
+        if (el.checked) {
+          selectedMp4 = el.value;
+          refreshStatus();
+        }
+      });
+    });
 
     const drop = panel.querySelector('#bridgeDrop');
     const fileInput = panel.querySelector('#bridgeFileInput');
@@ -683,6 +740,8 @@ export function initLocalTranscribe({ onTranscriptReady, showToast, getMode }) {
         transcribeMode = el.value;
         modeChosenByUser = true;
         localStorage.setItem(TRANSCRIBE_MODE_KEY, transcribeMode);
+        const gpuHint = panel.querySelector('#bridgeLocalGpuHint');
+        if (gpuHint) gpuHint.hidden = transcribeMode !== 'local_gpu';
         refreshStatus();
       });
     });
@@ -1099,7 +1158,9 @@ async function importTeamConfig(text, showToast, refreshStatus) {
     const r = await api('/api/team-config/import', { method: 'POST', body: JSON.stringify({ text }) });
     if (!r.ok) return showToast(r.message || '匯入失敗');
     const applied = (r.applied || []).join('、');
-    if (r.applied?.includes('CALL_COACH_WORKER_URL') && !modeChosenByUser) transcribeMode = 'remote';
+    if (!modeChosenByUser && r.status?.default_mode && VALID_MODES.has(r.status.default_mode)) {
+      transcribeMode = r.status.default_mode;
+    } else if (r.applied?.includes('CALL_COACH_WORKER_URL') && !modeChosenByUser) transcribeMode = 'remote';
     else if (r.applied?.includes('AZURE_SPEECH_KEY') && !modeChosenByUser) transcribeMode = 'azure';
     if (r.applied?.includes('CALL_COACH_WORKER_URL')) workerHealth = null;
     showToast(`已匯入團隊設定：${applied}`);
@@ -1135,6 +1196,10 @@ async function exportTeamConfig(showToast) {
 
 function transcribeBlockReason(st) {
   if (!selectedMp4) return '請先選擇或放入 MP4';
+  const files = st?.mp4_files || [];
+  if (files.length && !mp4InFileList(selectedMp4, files)) {
+    return `找不到 ${selectedMp4}（請按「重新掃描」或確認檔案在 input 資料夾）`;
+  }
   if (!st?.python_ok) return '需要 Python 3.10+（請確認轉錄助手視窗已啟動）';
   if (!st?.ffmpeg_ok) return '需要 ffmpeg 抽出音軌，請按「完整環境安裝」或「安裝 ffmpeg」';
   if (transcribeMode === 'azure') {
@@ -1142,9 +1207,25 @@ function transcribeBlockReason(st) {
     if (!cloudConsent) return '使用 Azure 雲端轉錄前，請勾選知情同意';
     return '';
   }
+  if (transcribeMode === 'local_gpu') {
+    if (!st?.venv_ok || !st?.whisperx_ok) {
+      return '請先安裝 GPU 版 WhisperX（新竹可執行 start_worker.cmd → 安裝 GPU 版，或按「完整環境安裝」）';
+    }
+    if (!st?.token_ok) return '本機 GPU 模式請先設定 HF_TOKEN（.env 或下方貼上）';
+    if (!st?.gpu_available) {
+      return st?.gpu_reason || '未偵測到可用 GPU，請安裝 CUDA 12.8 版 PyTorch（RTX 50 系列）';
+    }
+    return '';
+  }
   if (transcribeMode === 'remote') {
+    if (!bridgeSupports('remote-worker')) {
+      return '本機助手版本較舊，不支援遠端主機轉錄，請至 GitHub Releases 更新 Call Coach 助手';
+    }
     if (!st?.worker_ok) return '請先填入遠端主機網址與 Worker Token（家用主機的 Worker 視窗會顯示）';
     if (!cloudConsent) return '使用遠端主機轉錄前，請勾選知情同意';
+    if (workerHealth && workerHealth.reachable === false) {
+      return workerHealth.message || '無法連線遠端 Worker，請先按「測試連線」並確認新竹主機 Worker 視窗已開啟';
+    }
     return '';
   }
   if (!st?.venv_ok || !st?.whisperx_ok) return '本機模式請先按「完整環境安裝」；或改選 Azure 雲端轉錄（免安裝）';
@@ -1155,6 +1236,7 @@ function transcribeBlockReason(st) {
 function transcribeButtonLabel() {
   if (transcribeMode === 'azure') return '開始 Azure 雲端轉錄';
   if (transcribeMode === 'remote') return '開始遠端主機轉錄';
+  if (transcribeMode === 'local_gpu') return '開始本機 GPU 轉錄';
   if (transcribeMode === 'fast') return '開始本機轉錄（快速）';
   return '開始本機轉錄（標準）';
 }
@@ -1163,8 +1245,11 @@ function modeHintText() {
   if (transcribeMode === 'azure') {
     return 'Azure 雲端模式：ffmpeg 先在本機抽出音軌，再整檔上傳 Azure Speech Fast Transcription（zh-TW，含發言者辨識），48 分鐘 DEMO 通常 2～5 分鐘完成。不需安裝 WhisperX、不需 Hugging Face Token，Smart App Control 也不受影響。';
   }
+  if (transcribeMode === 'local_gpu') {
+    return '新竹本機 GPU：在同一台 GPU 電腦上執行助手，MP4 放 input 資料夾，選此模式即可。使用 WhisperX large-v3 + CUDA（與遠端 Worker 相同品質），音訊不經網路、不需 Worker 網址／Token。長影片以單檔 GPU 轉錄（不分段平行）。';
+  }
   if (transcribeMode === 'remote') {
-    return '遠端主機模式：ffmpeg 先在本機抽出音軌（約 90 MB／48 分鐘），上傳到你自己的 GPU 主機跑 WhisperX large-v3（含發言者分軌），48 分鐘 DEMO 在 RTX 5070 上通常 3～8 分鐘完成，並比本機 medium 更準。公司電腦不需安裝 WhisperX、不需 HF Token；音訊只經過你的兩台電腦。';
+    return '遠端主機模式（公司電腦用）：ffmpeg 在本機抽出音軌後，上傳到新竹 Worker。新竹若你親自操作，請改用上方「新竹本機 GPU 轉錄」。';
   }
   if (transcribeMode === 'fast') {
     return '快速模式：Faster-Whisper small，本機 CPU 轉錄，速度較快、準確度略降。48 分鐘 DEMO 常需 35～60 分鐘。';
@@ -1478,7 +1563,11 @@ async function testWorker(showToast, refreshStatus) {
 
 async function runTranscribe(onTranscriptReady, showToast, refreshStatus) {
   if (!selectedMp4) return showToast('請先選擇 MP4');
-  const reason = transcribeBlockReason(await checkLocalBridge());
+  const st = await checkLocalBridge();
+  if (transcribeMode === 'remote' && st?.worker_ok && (!workerHealth || workerHealth.reachable === undefined)) {
+    await testWorker(() => {}, refreshStatus);
+  }
+  const reason = transcribeBlockReason(st || (await checkLocalBridge()));
   if (reason) return showToast(reason);
   try {
     const r = await api('/api/transcribe', {
@@ -1495,16 +1584,20 @@ async function runTranscribe(onTranscriptReady, showToast, refreshStatus) {
     showLog([
       transcribeMode === 'azure'
         ? '正在啟動 Azure 雲端轉錄，請稍候…'
-        : transcribeMode === 'remote'
+        :         transcribeMode === 'remote'
           ? '正在連線遠端主機並啟動轉錄，請稍候…'
-          : '正在啟動本機轉錄，請稍候…',
+          : transcribeMode === 'local_gpu'
+            ? '正在啟動本機 GPU 轉錄，請稍候…'
+            : '正在啟動本機轉錄，請稍候…',
     ]);
     showToast(
       transcribeMode === 'azure'
         ? 'Azure 雲端轉錄中…下方會顯示階段與預計完成時間'
         : transcribeMode === 'remote'
           ? '遠端主機轉錄中…下方會顯示上傳進度、遠端階段與預計完成時間'
-          : '本機轉錄中…下方會顯示階段、百分比與預計完成時間'
+          : transcribeMode === 'local_gpu'
+            ? '本機 GPU 轉錄中…下方會顯示階段、百分比與預計完成時間'
+            : '本機轉錄中…下方會顯示階段、百分比與預計完成時間'
     );
     pollJob(async (ok, j) => {
       await refreshStatus();
