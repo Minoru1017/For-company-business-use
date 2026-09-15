@@ -38,6 +38,13 @@ def transcribe_batch() -> int:
         return max(1, min(int(os.environ.get("CALL_COACH_BATCH", "8")), 16))
     except ValueError:
         return 8
+
+
+def gpu_transcribe_batch() -> int:
+    try:
+        return max(1, min(int(os.environ.get("CALL_COACH_GPU_BATCH", "8")), 16))
+    except ValueError:
+        return 8
 CALL_COACH_URL = "https://minoru1017.github.io/For-company-business-use/"
 
 HF_LINKS = {
@@ -294,6 +301,125 @@ def detect_gpu_cached() -> dict:
     data = detect_gpu()
     _GPU_CACHE = (now, data)
     return dict(data)
+
+
+def invalidate_gpu_cache() -> None:
+    global _GPU_CACHE
+    _GPU_CACHE = None
+
+
+def venv_torch_info() -> dict:
+    """Whether .venv torch is a CUDA build (may still fail if drivers are missing)."""
+    if not VENV_PY.exists():
+        return {"installed": False, "version": None, "cuda_build": None, "cuda_available": False}
+    code = (
+        "import json,torch;"
+        "print(json.dumps({'installed':True,'version':torch.__version__,"
+        "'cuda_build':torch.version.cuda,'cuda_available':torch.cuda.is_available()}))"
+    )
+    try:
+        proc = quiet_run(
+            [str(VENV_PY), "-c", code],
+            cwd=ROOT,
+            env=shell_env(cache_env()),
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=120,
+        )
+    except (OSError, subprocess.TimeoutExpired) as e:
+        return {"installed": False, "version": None, "cuda_build": None, "cuda_available": False, "error": str(e)}
+    for line in reversed((proc.stdout or "").splitlines()):
+        line = line.strip()
+        if line.startswith("{"):
+            try:
+                return json.loads(line)
+            except ValueError:
+                break
+    return {"installed": False, "version": None, "cuda_build": None, "cuda_available": False}
+
+
+def prefer_gpu_setup() -> bool:
+    """True when installs should pin CUDA torch (Hsinchu desk / explicit env)."""
+    from transcribe_modes import MODE_LOCAL_GPU
+
+    env = load_env()
+    mode = env.get("CALL_COACH_DEFAULT_MODE", "").strip().lower()
+    if mode == MODE_LOCAL_GPU:
+        return True
+    flag = env.get("CALL_COACH_PREFER_GPU", "").strip().lower()
+    return flag in ("1", "true", "yes", "on")
+
+
+def gpu_setup_hint(torch_info: dict | None, gpu_info: dict | None) -> str | None:
+    """User-facing hint when GPU mode is blocked after a CPU-only pip install."""
+    torch_info = torch_info or {}
+    gpu_info = gpu_info or {}
+    if not torch_info.get("installed"):
+        return None
+    if torch_info.get("cuda_build"):
+        if not gpu_info.get("available"):
+            return gpu_info.get("reason") or "CUDA 版 torch 已安裝但目前無法使用 GPU（請更新 NVIDIA 驅動後重開機）"
+        return None
+    ver = torch_info.get("version") or "?"
+    return (
+        f"目前 .venv 為 CPU 版 PyTorch（{ver}），無法做本機 GPU 轉錄。"
+        "請按「安裝 GPU 版 WhisperX」或在新竹執行 start_hsinchu_gpu.cmd reinstall；"
+        "勿用「完整環境安裝」（會裝回 CPU 版）。"
+    )
+
+
+def gpu_environment_diagnose() -> dict:
+    """Detailed GPU / WhisperX checks for troubleshooting (clears GPU cache first)."""
+    invalidate_gpu_cache()
+    torch_info = venv_torch_info()
+    gpu_info = detect_gpu()
+    whisperx_import_ok = False
+    whisperx_error: str | None = None
+    if VENV_PY.exists():
+        code = (
+            "import whisperx,json;"
+            "print(json.dumps({'ok':True,'whisperx':getattr(whisperx,'__version__',None)}))"
+        )
+        try:
+            proc = quiet_run(
+                [str(VENV_PY), "-c", code],
+                cwd=ROOT,
+                env=shell_env(cache_env()),
+                capture_output=True,
+                text=True,
+                encoding="utf-8",
+                errors="replace",
+                timeout=180,
+            )
+            if proc.returncode == 0:
+                for line in reversed((proc.stdout or "").splitlines()):
+                    if line.strip().startswith("{"):
+                        whisperx_import_ok = True
+                        break
+            else:
+                tail = (proc.stdout or proc.stderr or "").strip().splitlines()
+                whisperx_error = tail[-1] if tail else f"exit {proc.returncode}"
+        except (OSError, subprocess.TimeoutExpired) as e:
+            whisperx_error = str(e)
+
+    hint = gpu_setup_hint(torch_info, gpu_info)
+    return {
+        "venv_ok": VENV_PY.exists(),
+        "whisperx_cli_ok": WHISPERX.exists() or (ROOT / ".venv" / "Scripts" / "whisperx.cmd").exists(),
+        "whisperx_import_ok": whisperx_import_ok,
+        "whisperx_import_error": whisperx_error,
+        "torch": torch_info,
+        "gpu": gpu_info,
+        "hf_token_ok": has_valid_token(),
+        "ffmpeg_ok": ffmpeg_exe() is not None,
+        "hint": hint,
+        "assistant_not_worker": (
+            "本機 GPU 轉錄需執行 start_call_coach.cmd 或 start_hsinchu_gpu.cmd 開啟「本機助手」，"
+            "不是 start_worker.cmd（Worker 僅供公司電腦遠端上傳）。"
+        ),
+    }
 
 
 def gpu_whisper_model() -> str:
@@ -610,6 +736,7 @@ class EnvStatus:
     gpu_available: bool = False
     gpu_name: str | None = None
     gpu_reason: str | None = None
+    cuda_torch_build: bool = False
 
     @property
     def local_ready(self) -> bool:
@@ -656,6 +783,7 @@ class EnvStatus:
             "gpu_available": self.gpu_available,
             "gpu_name": self.gpu_name,
             "gpu_reason": self.gpu_reason,
+            "cuda_torch_build": getattr(self, "cuda_torch_build", False),
             "local_gpu_ready": self.local_gpu_ready,
             "default_mode": self.default_mode,
             "team_config": self.team_config,
@@ -667,13 +795,16 @@ class EnvStatus:
             "can_uninstall": self.venv_ok,
             "api_capabilities": [
                 "setup",
+                "setup-gpu",
                 "full-setup",
+                "full-setup-gpu",
                 "install-ffmpeg",
                 "team-config",
                 "azure-fast",
                 "progress",
                 "report-save",
                 "remote-worker",
+                "gpu-diagnose",
             ],
             "call_coach_url": CALL_COACH_URL,
             "hf_links": HF_LINKS,
@@ -718,6 +849,13 @@ def get_status() -> EnvStatus:
     gpu_available = bool(gpu_info.get("available"))
     gpu_name = gpu_info.get("name") if gpu_available else None
     gpu_reason = gpu_info.get("reason") if not gpu_available else None
+    cuda_torch_build = False
+    if venv_ok and not gpu_available:
+        ti = venv_torch_info()
+        cuda_torch_build = bool(ti.get("cuda_build"))
+        hint = gpu_setup_hint(ti, gpu_info)
+        if hint:
+            gpu_reason = hint
 
     local_ready = python_ok and venv_ok and whisperx_ok and token_ok
     azure_ready = azure_ok and ffmpeg_ok
@@ -759,6 +897,7 @@ def get_status() -> EnvStatus:
         gpu_available=gpu_available,
         gpu_name=gpu_name,
         gpu_reason=gpu_reason,
+        cuda_torch_build=cuda_torch_build if venv_ok else False,
     )
 
 
@@ -920,8 +1059,7 @@ def run_setup(log: LogFn = default_log, *, gpu: bool = False) -> int:
         if code != 0:
             log(f"[錯誤] 重新固定 CUDA 版 PyTorch 失敗（exit code {code}）")
             return code
-        global _GPU_CACHE
-        _GPU_CACHE = None
+        invalidate_gpu_cache()
         gpu_info = detect_gpu()
         if gpu_info.get("available"):
             log(f"GPU 就緒：{gpu_info.get('name')}（torch {gpu_info.get('torch')}, CUDA {gpu_info.get('cuda')}）")
@@ -986,13 +1124,26 @@ def run_install_ffmpeg(log: LogFn = default_log) -> int:
     return 0
 
 
-def run_full_setup(log: LogFn = default_log) -> int:
-    log("=== 完整環境安裝（ffmpeg + 轉錄工具）===")
+def run_full_setup(log: LogFn = default_log, *, gpu: bool | None = None) -> int:
+    if gpu is None:
+        gpu = prefer_gpu_setup()
+    label = "（GPU 版 CUDA 12.8）" if gpu else ""
+    log(f"=== 完整環境安裝（ffmpeg + 轉錄工具）{label} ===")
+    if gpu:
+        log("[提示] 新竹本機 GPU 模式：將安裝 CUDA 版 PyTorch，請勿在安裝完成後再按「完整環境安裝（CPU）」覆蓋。")
     if not ffmpeg_exe():
         code = run_install_ffmpeg(log=log)
         if code != 0:
             return code
-    return run_setup(log=log)
+    return run_setup(log=log, gpu=gpu)
+
+
+def run_setup_gpu(log: LogFn = default_log) -> int:
+    return run_setup(log=log, gpu=True)
+
+
+def run_full_setup_gpu(log: LogFn = default_log) -> int:
+    return run_full_setup(log=log, gpu=True)
 
 
 def run_uninstall(remove_models: bool = False, log: LogFn = default_log) -> int:
@@ -1149,7 +1300,7 @@ def run_transcribe(
             log(f"[錯誤] 本機 GPU 模式需要可用的 NVIDIA GPU：{gpu_info.get('reason')}")
             return fail(1)
         whisper_model = gpu_whisper_model()
-        wx_device, wx_compute, wx_batch = "cuda", "float16", 16
+        wx_device, wx_compute, wx_batch = "cuda", "float16", gpu_transcribe_batch()
         log(
             f"本機 GPU：{gpu_info.get('name')}｜WhisperX {whisper_model}（cuda / float16，音訊不離開本機、不需遠端 Worker）"
         )
@@ -1321,11 +1472,18 @@ def run_transcribe(
                     return fail(code)
             audio = wav if ffmpeg else mp4
         elif duration > 0 and chunk_count == 1:
-            eta_low, eta_high = estimate_transcribe_minutes(duration, 1, 1)
-            log(
-                f"[2/2] Faster-Whisper {whisper_model}，音檔約 {int(duration // 60)} 分鐘"
-                f"（預估約 {eta_low}～{eta_high} 分鐘）…"
-            )
+            if is_local_gpu_mode(mode):
+                eta_low, eta_high = estimate_remote_minutes(duration, gpu=True)
+                log(
+                    f"[2/2] WhisperX {whisper_model}（GPU），音檔約 {int(duration // 60)} 分鐘"
+                    f"（預估約 {eta_low}～{eta_high} 分鐘）…"
+                )
+            else:
+                eta_low, eta_high = estimate_transcribe_minutes(duration, 1, 1)
+                log(
+                    f"[2/2] Faster-Whisper {whisper_model}，音檔約 {int(duration // 60)} 分鐘"
+                    f"（預估約 {eta_low}～{eta_high} 分鐘）…"
+                )
         else:
             log(f"[2/2] Faster-Whisper {whisper_model} 轉錄（2 小時 DEMO 約 1.5～3 小時，請接電源）…")
         progress.phase("transcribe", "載入模型")
@@ -1350,6 +1508,12 @@ def run_transcribe(
             return fail(code)
         if code != 0:
             log("[錯誤] 轉錄失敗")
+            if is_local_gpu_mode(mode):
+                ti = venv_torch_info()
+                if not ti.get("cuda_build"):
+                    log("[提示] 若剛按過「完整環境安裝」，可能已覆蓋成 CPU 版 PyTorch — 請執行「安裝 GPU 版」或 start_hsinchu_gpu.cmd reinstall")
+                elif code in (137, -9) or (code & 0xFFFFFFFF) in (0xC0000005, 0xC000012D):
+                    log("[提示] GPU 記憶體可能不足 — 可在 .env 設定 CALL_COACH_GPU_BATCH=4 後重試，或關閉其他佔用顯存的程式")
             return fail(code)
         progress.part_done(0)
 

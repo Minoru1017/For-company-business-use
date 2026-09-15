@@ -266,8 +266,8 @@ function checklistItems(st) {
     items.push({
       ok: !!(st.venv_ok && st.whisperx_ok),
       label: 'WhisperX GPU 版環境',
-      detail: st.venv_ok && st.whisperx_ok ? '' : '新竹主機請執行 start_worker.cmd 的「安裝 GPU 版」或完整環境安裝',
-      fix: st.venv_ok && st.whisperx_ok ? null : { action: 'full-setup', text: '完整環境安裝' },
+      detail: st.venv_ok && st.whisperx_ok ? '' : '新竹請執行 start_hsinchu_gpu.cmd reinstall 或下方「安裝 GPU 版」',
+      fix: st.venv_ok && st.whisperx_ok ? null : { action: 'setup-gpu', text: '安裝 GPU 版 WhisperX' },
     });
     items.push({
       ok: !!st.token_ok,
@@ -278,7 +278,7 @@ function checklistItems(st) {
       ok: !!st.gpu_available,
       label: st.gpu_available ? `NVIDIA GPU（${st.gpu_name || '已偵測'}）` : 'NVIDIA GPU（本機 CUDA）',
       warn: st.gpu_available ? '' : st.gpu_reason || '請安裝 GPU 版 WhisperX（CUDA 12.8）',
-      fix: st.gpu_available ? null : { action: 'full-setup', text: '安裝 GPU 版環境' },
+      fix: st.gpu_available ? null : { action: 'setup-gpu', text: '安裝／修復 GPU 版 PyTorch' },
     });
   } else if (transcribeMode === 'remote') {
     items.push({
@@ -614,7 +614,7 @@ export function initLocalTranscribe({ onTranscriptReady, showToast, getMode }) {
           新竹本機 GPU 轉錄（在 GPU 電腦上直接跑 large-v3；<strong>不需遠端 Worker、不上傳網路</strong>；48 分鐘約 3～8 分鐘）${st.default_mode === 'local_gpu' ? ' <span class="bridge-mode-default">預設</span>' : ''}
         </label>
         <p class="hint bridge-mode-subhint" id="bridgeLocalGpuHint" ${transcribeMode === 'local_gpu' ? '' : 'hidden'}>
-          請在新竹電腦執行 <code>start_hsinchu_gpu.cmd</code>（或助手 + 選此模式）。MP4 放在 <code>input\\</code>，需 HF_TOKEN 與 GPU 版 WhisperX；<strong>不要</strong>開 Worker 遠端模式。
+          請在新竹雙擊 <code>start_hsinchu_gpu.cmd</code>（會開<strong>本機助手</strong>，不是 Worker）。GPU 異常請執行 <code>start_hsinchu_gpu.cmd reinstall</code>；<strong>勿</strong>用「完整環境安裝」覆蓋成 CPU 版 PyTorch。
         </p>
         <label class="bridge-mode-option">
           <input type="radio" name="bridgeMode" value="remote" ${transcribeMode === 'remote' ? 'checked' : ''}>
@@ -1119,6 +1119,10 @@ async function runFix(action, { st, showToast, refreshStatus, panel }) {
   switch (action) {
     case 'full-setup':
       return runFullSetup(showToast, refreshStatus);
+    case 'setup-gpu':
+      return runGpuSetup(showToast, refreshStatus);
+    case 'full-setup-gpu':
+      return runFullGpuSetup(showToast, refreshStatus);
     case 'install-ffmpeg':
       return runInstallFfmpeg(showToast, refreshStatus);
     case 'azure':
@@ -1286,7 +1290,7 @@ async function pollJob(onDone, { trackTranscribe = false, trackSetup = false } =
     try {
       const j = await api('/api/job');
       failures = 0;
-      const setupKinds = new Set(['setup', 'full-setup', 'install-ffmpeg', 'uninstall']);
+      const setupKinds = new Set(['setup', 'setup-gpu', 'full-setup', 'full-setup-gpu', 'install-ffmpeg', 'uninstall']);
       const isSetup = setupKinds.has(j.kind);
       if (isSetup || trackSetup) {
         showLog(j.logs, {
@@ -1398,7 +1402,23 @@ async function runSetupJob(endpoint, startMsg, doneMsg, showToast, refreshStatus
 }
 
 async function runSetup(showToast, refreshStatus) {
-  return runSetupJob('/api/setup', '開始安裝 WhisperX…', 'WhisperX 安裝完成', showToast, refreshStatus);
+  const endpoint = transcribeMode === 'local_gpu' ? '/api/setup-gpu' : '/api/setup';
+  const label = transcribeMode === 'local_gpu' ? 'GPU 版 WhisperX' : 'WhisperX';
+  return runSetupJob(endpoint, `開始安裝 ${label}…`, `${label} 安裝完成`, showToast, refreshStatus);
+}
+
+async function runGpuSetup(showToast, refreshStatus) {
+  return runSetupJob('/api/setup-gpu', '開始安裝 GPU 版 WhisperX（CUDA 12.8）…', 'GPU 版 WhisperX 安裝完成', showToast, refreshStatus);
+}
+
+async function runFullGpuSetup(showToast, refreshStatus) {
+  return runSetupJob(
+    '/api/full-setup-gpu',
+    '開始完整環境安裝（ffmpeg + GPU 版 WhisperX）…',
+    'GPU 完整環境安裝完成',
+    showToast,
+    refreshStatus
+  );
 }
 
 async function runInstallFfmpeg(showToast, refreshStatus) {
@@ -1406,6 +1426,9 @@ async function runInstallFfmpeg(showToast, refreshStatus) {
 }
 
 async function runFullSetup(showToast, refreshStatus) {
+  if (transcribeMode === 'local_gpu') {
+    return runFullGpuSetup(showToast, refreshStatus);
+  }
   try {
     const r = await api('/api/full-setup', { method: 'POST' });
     if (!r.ok) return showToast(r.message || '無法開始安裝');
