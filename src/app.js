@@ -37,6 +37,7 @@ import { applyBuiltinSpeakerLabels, enrichSegments, parse, parseVibeJson } from 
 import { bumpUsage, checkQuotaBefore, getLimit, getUsage, quotaPercent, saveUsage } from './quota.js';
 import { labeledRatio } from './speaker-labels.js';
 import { appendAIReportSection } from './report-format.js';
+import { buildDevNotesAI, buildDevNotesLocal, formatDevNotesText } from './dev-notes.js';
 import { SAMPLE_TRANSCRIPT_NAME, SAMPLE_TRANSCRIPT_SRT } from './sample-transcript.js';
 import { autoGuess } from './speaker.js';
 import { animateStats, bindUI, renderAnalysisUI, showQuotaModal, showToast } from './ui.js';
@@ -230,6 +231,101 @@ function refreshExportBar() {
   if (group) group.hidden = !bridgeSupports('report-save');
 }
 
+function devNotesAgentName() {
+  const el = $('devNotesAgentName');
+  const v = (el?.value || localStorage.getItem('dev_notes_agent_name') || '').trim();
+  if (el && v) el.value = v;
+  return v;
+}
+
+function openDevNotesModal(text) {
+  const modal = $('devNotesModal');
+  if (!modal) return;
+  $('devNotesOut').value = text;
+  const saved = localStorage.getItem('dev_notes_agent_name');
+  if (saved && $('devNotesAgentName') && !$('devNotesAgentName').value) $('devNotesAgentName').value = saved;
+  modal.hidden = false;
+}
+
+function closeDevNotesModal() {
+  const modal = $('devNotesModal');
+  if (modal) modal.hidden = true;
+}
+
+function bindDevNotes() {
+  $('genDevNotes')?.addEventListener('click', () => {
+    if (!segs.length) return showToast('請先載入並標記逐字稿');
+    const name = devNotesAgentName();
+    if (name) localStorage.setItem('dev_notes_agent_name', name);
+    const notes = buildDevNotesLocal(segs, { agentName: name, result: lastResult });
+    openDevNotesModal(formatDevNotesText(notes));
+    showToast('已產生開發重點（本機規則）— 可複製或 AI 精修');
+  });
+
+  $('genDevNotesAI')?.addEventListener('click', () => runDevNotesAI());
+  $('devNotesClose')?.addEventListener('click', closeDevNotesModal);
+  $('devNotesModal')?.addEventListener('click', (e) => {
+    if (e.target === $('devNotesModal')) closeDevNotesModal();
+  });
+  $('devNotesCopy')?.addEventListener('click', async () => {
+    const ok = await copyText($('devNotesOut').value);
+    showToast(ok ? '已複製開發重點' : '複製失敗');
+  });
+  $('devNotesDownload')?.addEventListener('click', () => {
+    const text = $('devNotesOut').value;
+    if (!text.trim()) return showToast('尚無內容');
+    const name = downloadText(`${exportBaseName(sourceName)}-開發重點.txt`, text, 'text/plain;charset=utf-8');
+    showToast(`已下載 ${name}`);
+  });
+  $('devNotesAgentName')?.addEventListener('change', () => {
+    localStorage.setItem('dev_notes_agent_name', $('devNotesAgentName').value.trim());
+  });
+}
+
+async function runDevNotesAI() {
+  if (!segs.length) return showToast('請先載入並標記逐字稿');
+  const key = $('apiKey').value.trim();
+  if (!key) {
+    showToast('請先貼上 Gemini API Key（或先用「一鍵轉開發重點」本機版）');
+    return;
+  }
+  if (!$('aiConsent').checked) {
+    showToast('請先勾選「我已去識別化並同意傳送至 Google 分析」');
+    return;
+  }
+  const u = getUsage();
+  const lim = getLimit($('quotaLimit').value);
+  const quota = checkQuotaBefore(u.count, lim);
+  if (!quota.ok) {
+    showQuotaModal('今日估算額度已達上限', `本機估算今日已使用 <b>${u.count} / ${lim}</b> 次。`);
+    return;
+  }
+
+  let model = $('aiModel').value.trim() || DEFAULT_MODEL;
+  if (isDeprecatedModel(model)) model = DEFAULT_MODEL;
+  const btn = $('genDevNotesAI');
+  btn.disabled = true;
+  showToast('AI 正在整理開發重點…');
+  try {
+    const { notes, usedTokens } = await buildDevNotesAI(segs, fmt, {
+      callGemini: (opts) => callGeminiResilient(opts),
+      apiKey: key,
+      model,
+      signal: undefined,
+    });
+    const name = devNotesAgentName() || notes.agentName;
+    if (name) notes.agentName = name;
+    openDevNotesModal(formatDevNotesText(notes));
+    bumpUsage(usedTokens);
+    renderQuota();
+    showToast('AI 精修開發重點完成');
+  } catch (e) {
+    showToast(`AI 精修失敗：${e.message}`);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
 function bindExports() {
   $('copyReport').onclick = () => copyWithFeedback($('copyReport'), reportText, '完整報告已複製到剪貼簿');
   $('copySummary').onclick = () => copyWithFeedback($('copySummary'), summaryText(), '摘要已複製，直接貼到 LINE／Slack');
@@ -366,9 +462,9 @@ function saveModelPreference(model) {
   localStorage.setItem('gemini_model', model);
 }
 
-async function callGeminiResilient({ apiKey, model, text, signal }) {
+async function callGeminiResilient({ apiKey, model, text, signal, parse }) {
   try {
-    return await callGemini({ apiKey, model, text, signal });
+    return await callGemini({ apiKey, model, text, signal, parse });
   } catch (e) {
     if (e.status !== 404) throw e;
     const suggested = extractSuggestedModel(e.message);
@@ -376,7 +472,7 @@ async function callGeminiResilient({ apiKey, model, text, signal }) {
     if (next === model) throw e;
     saveModelPreference(next);
     showToast(`模型已切換為 ${next}，重新請求中…`);
-    return callGemini({ apiKey, model: next, text, signal });
+    return callGemini({ apiKey, model: next, text, signal, parse });
   }
 }
 
@@ -584,6 +680,7 @@ function init() {
   bindUpload();
   bindLabels();
   bindExports();
+  bindDevNotes();
   bindHistory();
   bindApiKey();
   bindAI();

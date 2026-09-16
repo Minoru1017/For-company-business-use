@@ -132,7 +132,7 @@ export function formatApiError(status, errBody) {
   return msg;
 }
 
-export async function callGemini({ apiKey, model, text, signal, fetchImpl = fetch }) {
+export async function callGemini({ apiKey, model, text, signal, fetchImpl = fetch, parse = parseAIResponse }) {
   const res = await fetchImpl(
     `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
     {
@@ -154,5 +154,5 @@ export async function callGemini({ apiKey, model, text, signal, fetchImpl = fetc
   const data = errBody;
   const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
   const usedTokens = data?.usageMetadata?.totalTokenCount || 0;
-  return { raw, usedTokens, parsed: parseAIResponse(raw) };
+  return { raw, usedTokens, parsed: parse(raw) };
 }
