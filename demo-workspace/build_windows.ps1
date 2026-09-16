@@ -122,15 +122,20 @@ $AppFiles = @(
     "desktop_ui.py",
     ".env.example",
     "START_HERE.txt",
-    "README.md"
+    "README.md",
+    "start_call_coach.cmd",
+    "start_worker.cmd",
+    "start_hsinchu_gpu.cmd"
 )
 foreach ($file in $AppFiles) {
+    if (-not (Test-Path $file)) { throw "Missing installer file: $file" }
     Copy-Item $file $Payload -Force
 }
 Copy-Item -Recurse "demo_app" "$Payload\demo_app"
 Copy-Item "installer\setup_env.py" "$Payload\installer\setup_env.py" -Force
 
-Set-Content -Path "$Payload\VERSION.txt" -Value "Call Coach Assistant Windows v$Version (installer)" -Encoding UTF8
+$BuildStamp = (Get-Date).ToUniversalTime().ToString("yyyy-MM-dd HH:mm UTC")
+Set-Content -Path "$Payload\VERSION.txt" -Value "Call Coach Assistant Windows v$Version (installer)`nBuilt: $BuildStamp`nSee GitHub Releases tag assistant-v$Version-build.* for matching commit." -Encoding UTF8
 
 Write-Host "[Build] PyInstaller application (.exe) ..."
 python -m pip install -q -r requirements-build.txt
@@ -154,6 +159,8 @@ Copy-Item $Payload $ZipDist -Recurse -Force
 Copy-Item "啟動 Call Coach.cmd" $ZipDist -Force
 Copy-Item "CallCoachAssistant.cmd" $ZipDist -Force
 Copy-Item "start_worker.cmd" $ZipDist -Force
+Copy-Item "start_hsinchu_gpu.cmd" $ZipDist -Force
+Copy-Item "start_call_coach.cmd" $ZipDist -Force
 
 $Zip = "dist\CallCoachAssistant-Windows.zip"
 if (Test-Path $Zip) { Remove-Item $Zip -Force }
