@@ -861,6 +861,17 @@ button.primary:hover { background:linear-gradient(180deg,#ffffff,#e6e0d1);
 .export-label { font-family:var(--mono); font-size:.62rem; letter-spacing:.2em; color:var(--muted); min-width:110px; text-transform:uppercase; }
 .export-group button { font-size:.8rem; padding:8px 16px; }
 
+.dev-notes-modal { position:fixed; inset:0; z-index:98; display:flex; align-items:center; justify-content:center;
+  padding:20px; background:rgba(0,0,0,.72); }
+.dev-notes-modal[hidden] { display:none; }
+.dev-notes-dialog { width:min(640px,100%); max-height:90vh; overflow:auto; background:var(--panel);
+  border:1px solid var(--border); border-radius:12px; padding:20px 22px; }
+.dev-notes-dialog h2 { font-family:var(--disp); font-size:1.1rem; margin:0 0 8px; }
+.dev-notes-agent { display:block; margin:12px 0 8px; font-size:.85rem; }
+.dev-notes-agent input { width:100%; margin-top:6px; }
+.dev-notes-out { width:100%; margin:8px 0 12px; font-family:var(--mono); font-size:.78rem; line-height:1.55;
+  background:rgba(0,0,0,.35); border:1px solid var(--border); border-radius:8px; color:var(--text); padding:12px; resize:vertical; }
+
 /* ---- 最近分析 ---- */
 .history-sec details { border:1px dashed var(--border); border-radius:6px; padding:10px 14px; }
 .history-sec details[open] { border-style:solid; }

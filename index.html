@@ -233,6 +233,11 @@
       <div class="sec-head"><span class="num">10</span><h2>把結果帶走</h2><span class="tag">Copy · Download · Print</span></div>
       <div class="export-bar">
         <div class="export-group">
+          <span class="export-label">開發複盤</span>
+          <button class="primary" id="genDevNotes" type="button">一鍵轉開發重點</button>
+          <button id="genDevNotesAI" type="button">AI 精修開發重點</button>
+        </div>
+        <div class="export-group">
           <span class="export-label">貼到群組／回報</span>
           <button class="primary" id="copySummary" type="button">複製摘要（LINE／Slack）</button>
           <button id="copyChecklist" type="button">複製「下一通要問」清單</button>
@@ -250,7 +255,7 @@
           <button id="openOutputFolder" type="button">開啟 output 資料夾</button>
         </div>
       </div>
-      <p class="hint" id="exportHint">摘要與清單是純文字，直接貼進 LINE／Slack 就能看；.md 可放 Notion／Obsidian；.srt 含你調好的業務／客戶標記，下次載入不用重標。</p>
+      <p class="hint" id="exportHint">「開發重點」可貼進複盤表或 Notion；摘要與清單直接貼 LINE／Slack；.md 可放 Obsidian；.srt 含業務／客戶標記。</p>
     </section>
 
     <div class="footer">
@@ -262,6 +267,23 @@
 </div>
 
 <div id="toast"><span class="dot"></span><span id="toastMsg"></span></div>
+<div id="devNotesModal" class="dev-notes-modal" hidden>
+  <div class="dev-notes-dialog">
+    <h2>開發重點（電訪複盤筆記）</h2>
+    <p class="hint">格式：角色[時間]摘要；下方可選填業務姓名。本機版不上傳；AI 精修需 API Key 與同意條款。</p>
+    <label class="dev-notes-agent">
+      業務姓名（選填）
+      <input type="text" id="devNotesAgentName" class="field" placeholder="例：潘秉鈞" autocomplete="name">
+    </label>
+    <textarea id="devNotesOut" class="dev-notes-out" rows="16" spellcheck="false"></textarea>
+    <div class="btns">
+      <button type="button" class="primary" id="devNotesCopy">複製全文</button>
+      <button type="button" id="devNotesDownload">下載 .txt</button>
+      <button type="button" id="devNotesClose">關閉</button>
+    </div>
+  </div>
+</div>
+
 <div id="quotaModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.65);z-index:99;align-items:center;justify-content:center;padding:20px">
   <div style="background:var(--panel);border:1px solid var(--warn);border-radius:14px;max-width:440px;padding:24px">
     <h2 id="qmTitle" style="color:var(--warn)">免費額度即將用完</h2>
