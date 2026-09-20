@@ -230,7 +230,7 @@ class WorkerState:
         self.gpu = gpu or {"available": False, "name": None}
         gpu_ok = bool(self.gpu.get("available"))
         self.device = "cuda" if gpu_ok else "cpu"
-        self.compute_type = "float16" if gpu_ok else "int8"
+        self.compute_type = demo_core.gpu_whisper_compute_type(self.gpu) if gpu_ok else "int8"
         self.batch = 16 if gpu_ok else demo_core.transcribe_batch()
         self.model = worker_model(gpu_ok)
         self.name = _setting("CALL_COACH_WORKER_NAME") or socket.gethostname()

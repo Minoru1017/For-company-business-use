@@ -431,6 +431,120 @@ def gpu_whisper_model() -> str:
     return "large-v3"
 
 
+_BLACKWELL_GPU_MARKERS = ("5070", "5080", "5090", "5060", "5050", "RTX 50")
+
+
+def _gpu_name_upper(gpu_info: dict | None) -> str:
+    return str((gpu_info or {}).get("name") or "").upper()
+
+
+def is_blackwell_gpu(gpu_info: dict | None = None) -> bool:
+    name = _gpu_name_upper(gpu_info)
+    return any(m in name for m in _BLACKWELL_GPU_MARKERS)
+
+
+def gpu_whisper_compute_type(gpu_info: dict | None = None) -> str:
+    """CTranslate2 compute type for WhisperX on CUDA (RTX 50 often needs int8/float32)."""
+    override = load_env().get("CALL_COACH_GPU_COMPUTE", "").strip()
+    if override:
+        return override
+    if is_blackwell_gpu(gpu_info):
+        return "int8"
+    return "float16"
+
+
+def gpu_transcribe_attempts(gpu_info: dict | None, base_batch: int) -> list[tuple[str, int]]:
+    """Ordered (compute_type, batch_size) retries after a failed GPU WhisperX run."""
+    gpu_info = gpu_info or {}
+    base_batch = max(1, min(base_batch, 16))
+    override = load_env().get("CALL_COACH_GPU_COMPUTE", "").strip()
+    if override:
+        primary = override
+    elif is_blackwell_gpu(gpu_info):
+        primary = "int8"
+    else:
+        primary = "float16"
+    plans: list[tuple[str, int]] = [(primary, base_batch)]
+    for ct, bs in (("float32", max(2, base_batch // 2)), ("int8", max(2, min(4, base_batch)))):
+        if (ct, bs) not in plans:
+            plans.append((ct, bs))
+    return plans
+
+
+def whisperx_failure_hints(log_lines: list[str]) -> list[str]:
+    """Turn recent WhisperX stderr/stdout into short user-facing hints."""
+    text = "\n".join(log_lines[-80:])
+    hints: list[str] = []
+    checks = [
+        (r"out of memory|CUDA out of memory|allocat", "GPU 顯存不足：請關閉其他佔用 GPU 的程式，或在 .env 設定 CALL_COACH_GPU_BATCH=4 後重試"),
+        (r"cudnn|CUDNN", "CUDA/cuDNN 錯誤：請更新 NVIDIA 驅動（RTX 50 建議 570+）並重開機，再執行 GPU 版安裝"),
+        (r"gated|401|403|authorized|HF_TOKEN|huggingface", "Hugging Face 分軌模型未授權：請確認 .env 的 HF_TOKEN 有效，並在 Hugging Face 同意 pyannote 模型授權"),
+        (r"compute_type|float16|float32", "若為 RTX 50 系列：在 .env 設定 CALL_COACH_GPU_COMPUTE=int8 或 float32 後重試"),
+        (r"No such file|ffmpeg|torchcodec", "缺少相依元件或 ffmpeg：請確認完整 GPU 環境安裝成功，並重新執行 start_hsinchu_gpu.cmd reinstall"),
+    ]
+    for pattern, msg in checks:
+        if re.search(pattern, text, re.IGNORECASE) and msg not in hints:
+            hints.append(msg)
+    return hints
+
+
+def run_whisperx_transcribe(
+    *,
+    audio: Path,
+    whisper_model: str,
+    threads: int,
+    output_dir: Path,
+    device: str,
+    compute_type: str,
+    batch: int,
+    env_vars: dict[str, str],
+    log: LogFn,
+    hooks: JobHooks | None,
+    progress,
+    gpu_retry: bool = False,
+    gpu_info: dict | None = None,
+) -> int:
+    """Run WhisperX once or with GPU compute/batch retries when ``gpu_retry`` is True."""
+    plans = [(compute_type, batch)]
+    if gpu_retry and device == "cuda":
+        plans = gpu_transcribe_attempts(gpu_info, batch)
+
+    recent: list[str] = []
+
+    def wx_log(msg: str) -> None:
+        recent.append(msg)
+        if len(recent) > 100:
+            del recent[: len(recent) - 100]
+        progress.wrap_whisperx_log(log, 0)(msg)
+
+    last_code = 1
+    for attempt, (ct, bs) in enumerate(plans):
+        if attempt > 0:
+            log(f"[提醒] GPU 轉錄失敗（exit {last_code}），改用 compute_type={ct}、batch_size={bs} 重試…")
+        last_code = run_command(
+            whisperx_cmd()
+            + whisperx_args(
+                audio,
+                model=whisper_model,
+                threads=threads,
+                batch=bs,
+                output_dir=output_dir,
+                device=device,
+                compute_type=ct,
+            ),
+            log=wx_log,
+            env=env_vars,
+            hooks=hooks,
+        )
+        if last_code == CANCEL_EXIT:
+            return last_code
+        if last_code == 0:
+            return 0
+    for hint in whisperx_failure_hints(recent):
+        log(f"[提示] {hint}")
+    return last_code
+
+
 def team_config_file() -> Path:
     from team_config import team_config_path
 
@@ -1300,9 +1414,11 @@ def run_transcribe(
             log(f"[錯誤] 本機 GPU 模式需要可用的 NVIDIA GPU：{gpu_info.get('reason')}")
             return fail(1)
         whisper_model = gpu_whisper_model()
-        wx_device, wx_compute, wx_batch = "cuda", "float16", gpu_transcribe_batch()
+        wx_compute = gpu_whisper_compute_type(gpu_info)
+        wx_device, wx_batch = "cuda", gpu_transcribe_batch()
         log(
-            f"本機 GPU：{gpu_info.get('name')}｜WhisperX {whisper_model}（cuda / float16，音訊不離開本機、不需遠端 Worker）"
+            f"本機 GPU：{gpu_info.get('name')}｜WhisperX {whisper_model}"
+            f"（cuda / {wx_compute} / batch {wx_batch}，音訊不離開本機、不需遠端 Worker）"
         )
     stem = Path(mp4.name).stem
     final_srt = ROOT / "output" / f"{stem}.srt"
@@ -1488,26 +1604,26 @@ def run_transcribe(
             log(f"[2/2] Faster-Whisper {whisper_model} 轉錄（2 小時 DEMO 約 1.5～3 小時，請接電源）…")
         progress.phase("transcribe", "載入模型")
         progress.set_part_total(1)
-        code = run_command(
-            whisperx_cmd()
-            + whisperx_args(
-                audio,
-                model=whisper_model,
-                threads=threads,
-                batch=wx_batch,
-                output_dir=ROOT / "output",
-                device=wx_device,
-                compute_type=wx_compute,
-            ),
-            log=progress.wrap_whisperx_log(log, 0),
-            env=env_vars,
+        code = run_whisperx_transcribe(
+            audio=audio,
+            whisper_model=whisper_model,
+            threads=threads,
+            output_dir=ROOT / "output",
+            device=wx_device,
+            compute_type=wx_compute,
+            batch=wx_batch,
+            env_vars=env_vars,
+            log=log,
             hooks=hooks,
+            progress=progress,
+            gpu_retry=is_local_gpu_mode(mode),
+            gpu_info=gpu_info if is_local_gpu_mode(mode) else None,
         )
         if code == CANCEL_EXIT:
             log("[已取消] 轉錄已停止")
             return fail(code)
         if code != 0:
-            log("[錯誤] 轉錄失敗")
+            log(f"[錯誤] 轉錄失敗（WhisperX 結束碼 {code}{describe_exit_code(code)}）")
             if is_local_gpu_mode(mode):
                 ti = venv_torch_info()
                 if not ti.get("cuda_build"):
