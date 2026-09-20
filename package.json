@@ -1,6 +1,6 @@
 {
   "name": "sales-call-coach",
-  "version": "11.9.1",
+  "version": "11.9.2",
   "private": true,
   "type": "module",
   "scripts": {
