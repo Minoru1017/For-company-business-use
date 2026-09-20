@@ -2,7 +2,9 @@
 from __future__ import annotations
 
 import os
+import tempfile
 import unittest
+from pathlib import Path
 from unittest import mock
 
 import demo_core
@@ -36,6 +38,18 @@ class GpuSetupTests(unittest.TestCase):
     def test_whisperx_failure_hints_oom(self) -> None:
         hints = demo_core.whisperx_failure_hints(["CUDA out of memory at line 1"])
         self.assertTrue(any("顯存" in h for h in hints))
+
+    def test_ensure_cuda_torch_builds_pip_command(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            py = Path(tmp) / "python.exe"
+            py.write_text("", encoding="utf-8")
+            with mock.patch.object(demo_core, "VENV_PY", py):
+                with mock.patch.object(demo_core, "run_command", return_value=0) as run_cmd:
+                    code = demo_core.ensure_cuda_torch(log=lambda _m: None, force=True)
+        self.assertEqual(code, 0)
+        args = run_cmd.call_args[0][0]
+        self.assertIn("--force-reinstall", args)
+        self.assertIn(demo_core.TORCH_CUDA_INDEX, args)
 
     def test_run_full_setup_passes_gpu_when_preferred(self) -> None:
         with (

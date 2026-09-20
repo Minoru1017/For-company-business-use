@@ -439,6 +439,10 @@ class Handler(BaseHTTPRequestHandler):
             ok, msg = run_job("setup-gpu", demo_core.run_setup_gpu)
             return self._send_json({"ok": ok, "message": msg})
 
+        if path == "/api/repair-gpu-torch":
+            ok, msg = run_job("repair-gpu-torch", demo_core.run_repair_gpu_torch)
+            return self._send_json({"ok": ok, "message": msg})
+
         if path == "/api/full-setup-gpu":
             ok, msg = run_job("full-setup-gpu", demo_core.run_full_setup_gpu)
             return self._send_json({"ok": ok, "message": msg})

@@ -927,6 +927,7 @@ class EnvStatus:
                 "remote-worker",
                 "gpu-diagnose",
                 "media-playback",
+                "repair-gpu-torch",
             ],
             "call_coach_url": CALL_COACH_URL,
             "hf_links": HF_LINKS,
@@ -971,10 +972,16 @@ def get_status() -> EnvStatus:
     gpu_available = bool(gpu_info.get("available"))
     gpu_name = gpu_info.get("name") if gpu_available else None
     gpu_reason = gpu_info.get("reason") if not gpu_available else None
-    cuda_torch_build = False
+    cuda_torch_build = bool(gpu_info.get("cuda")) if venv_ok else False
     if venv_ok and not gpu_available:
-        ti = venv_torch_info()
-        cuda_torch_build = bool(ti.get("cuda_build"))
+        ti = {
+            "installed": True,
+            "version": gpu_info.get("torch"),
+            "cuda_build": cuda_torch_build,
+        }
+        if not cuda_torch_build and not gpu_info.get("torch"):
+            ti = venv_torch_info()
+            cuda_torch_build = bool(ti.get("cuda_build"))
         hint = gpu_setup_hint(ti, gpu_info)
         if hint:
             gpu_reason = hint
@@ -1116,6 +1123,49 @@ def create_venv(log: LogFn = default_log) -> int:
 TORCH_CUDA_INDEX = "https://download.pytorch.org/whl/cu128"
 
 
+def ensure_cuda_torch(log: LogFn = default_log, *, force: bool = False) -> int:
+    """Install or re-pin CUDA 12.8 torch/torchaudio into .venv (RTX 50 / WhisperX GPU)."""
+    if not VENV_PY.exists():
+        log("[錯誤] 尚未建立 .venv")
+        return 1
+    cmd = [str(VENV_PY), "-m", "pip", "install"]
+    if force:
+        cmd.append("--force-reinstall")
+    cmd.extend(["torch", "torchaudio", "--index-url", TORCH_CUDA_INDEX])
+    label = "強制安裝" if force else "安裝"
+    log(f"{label} CUDA 12.8 版 PyTorch（約 2.5 GB）…")
+    code = run_command(cmd, log=log)
+    if code != 0:
+        log(f"[錯誤] CUDA 版 PyTorch 安裝失敗（exit code {code}）")
+    return code
+
+
+def run_repair_gpu_torch(log: LogFn = default_log) -> int:
+    """Re-pin CUDA torch after a CPU-only pip install (keeps WhisperX packages)."""
+    log("=== 修復 CUDA 版 PyTorch（保留已安裝的 WhisperX）===")
+    code = ensure_cuda_torch(log, force=True)
+    if code != 0:
+        return code
+    invalidate_gpu_cache()
+    ti = venv_torch_info()
+    if not ti.get("cuda_build"):
+        ver = ti.get("version") or "?"
+        log(f"[錯誤] .venv 仍是 CPU 版 PyTorch（{ver}）")
+        log(
+            "[提示] 請在助手目錄手動執行："
+            ".venv\\Scripts\\python -m pip install --force-reinstall torch torchaudio "
+            f"--index-url {TORCH_CUDA_INDEX}"
+        )
+        return 1
+    gpu_info = detect_gpu()
+    if gpu_info.get("available"):
+        log(f"GPU 就緒：{gpu_info.get('name')}（torch {gpu_info.get('torch')}, CUDA {gpu_info.get('cuda')}）")
+    else:
+        log(f"[提醒] CUDA 版 torch 已安裝，但 PyTorch 尚無法使用 GPU：{gpu_info.get('reason')}")
+    log("=== PyTorch 修復完成 ===")
+    return 0
+
+
 def run_setup(log: LogFn = default_log, *, gpu: bool = False) -> int:
     """Install the WhisperX venv. ``gpu=True`` pins CUDA 12.8 torch first (RTX 50 series needs it)."""
     log("=== 開始安裝轉錄工具 ===" + ("（GPU 版，CUDA 12.8）" if gpu else ""))
@@ -1141,13 +1191,8 @@ def run_setup(log: LogFn = default_log, *, gpu: bool = False) -> int:
         return code
 
     if gpu:
-        log("安裝 CUDA 12.8 版 PyTorch（約 2.5 GB；RTX 50 系列 Blackwell 需要此版本）...")
-        code = run_command(
-            [str(VENV_PY), "-m", "pip", "install", "--force-reinstall", "torch", "torchaudio", "--index-url", TORCH_CUDA_INDEX],
-            log=log,
-        )
+        code = ensure_cuda_torch(log, force=True)
         if code != 0:
-            log(f"[錯誤] CUDA 版 PyTorch 安裝失敗（exit code {code}）")
             log("[常見原因] 網路中斷、磁碟空間不足（需約 6 GB）")
             return code
 
@@ -1172,21 +1217,24 @@ def run_setup(log: LogFn = default_log, *, gpu: bool = False) -> int:
         return code
 
     if gpu:
-        # pip may have swapped torch for the CPU wheel while resolving whisperx; pin it back.
-        log("確認 CUDA 版 PyTorch 未被覆蓋...")
-        code = run_command(
-            [str(VENV_PY), "-m", "pip", "install", "torch", "torchaudio", "--index-url", TORCH_CUDA_INDEX],
-            log=log,
-        )
+        # whisperx dependencies often pull torch 2.x+cpu; force CUDA wheel back.
+        log("確認 CUDA 版 PyTorch 未被 WhisperX 依賴覆蓋成 CPU 版…")
+        code = ensure_cuda_torch(log, force=True)
         if code != 0:
-            log(f"[錯誤] 重新固定 CUDA 版 PyTorch 失敗（exit code {code}）")
             return code
         invalidate_gpu_cache()
+        ti = venv_torch_info()
+        if not ti.get("cuda_build"):
+            log("[錯誤] 安裝結束後 .venv 仍是 CPU 版 PyTorch，無法做本機 GPU 轉錄")
+            ver = ti.get("version") or "?"
+            log(f"[錯誤] 目前版本：{ver}")
+            log("[提示] 請按「僅修復 CUDA 版 PyTorch」或執行 start_hsinchu_gpu.cmd reinstall")
+            return 1
         gpu_info = detect_gpu()
         if gpu_info.get("available"):
             log(f"GPU 就緒：{gpu_info.get('name')}（torch {gpu_info.get('torch')}, CUDA {gpu_info.get('cuda')}）")
         else:
-            log(f"[提醒] 尚未偵測到可用 GPU：{gpu_info.get('reason')}")
+            log(f"[提醒] CUDA 版 torch 已安裝，但尚未偵測到可用 GPU：{gpu_info.get('reason')}")
             log("[提醒] 請確認 NVIDIA 驅動為 570 以上（GeForce Experience / NVIDIA App 更新），重開機後再試")
 
     env_file = ROOT / ".env"
