@@ -711,15 +711,22 @@ def _match_mp4_in_input(input_root: Path, name: str) -> Path | None:
     return None
 
 
+def resolve_input_mp4(name: str) -> Path:
+    """Resolve a user-facing MP4 basename under input/ (case-insensitive on Windows)."""
+    input_root = (ROOT / "input").resolve()
+    input_root.mkdir(parents=True, exist_ok=True)
+    safe = safe_mp4_name(name)
+    found = _match_mp4_in_input(input_root, safe)
+    if found is not None:
+        return found
+    raise FileNotFoundError(f"找不到: {safe}（請確認檔案在 input 資料夾）")
+
+
 def find_mp4(arg: str | None = None) -> Path:
     input_root = (ROOT / "input").resolve()
     input_root.mkdir(parents=True, exist_ok=True)
     if arg:
-        name = safe_mp4_name(arg)
-        found = _match_mp4_in_input(input_root, name)
-        if found is not None:
-            return found
-        raise FileNotFoundError(f"找不到: {name}（請確認檔案在 input 資料夾，檔名與清單一致）")
+        return resolve_input_mp4(arg)
 
     for preferred_name in ("demo.mp4", "DEMO.mp4"):
         found = _match_mp4_in_input(input_root, preferred_name)
@@ -919,6 +926,7 @@ class EnvStatus:
                 "report-save",
                 "remote-worker",
                 "gpu-diagnose",
+                "media-playback",
             ],
             "call_coach_url": CALL_COACH_URL,
             "hf_links": HF_LINKS,

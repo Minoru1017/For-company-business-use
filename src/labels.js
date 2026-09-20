@@ -6,7 +6,7 @@ export function getLabelFocusIdx() {
   return labelFocusIdx;
 }
 
-export function createLabelController({ segs, onToast }) {
+export function createLabelController({ segs, onToast, onSegClick }) {
   function updateSegRow(row, s) {
     row.className = `seg ${s.spk === 'S' ? 's' : 'c'}${+row.dataset.i === labelFocusIdx ? ' active' : ''}`;
   }
@@ -33,7 +33,9 @@ export function createLabelController({ segs, onToast }) {
     document.querySelectorAll('#labelList .seg').forEach((row) => {
       row.onclick = (e) => {
         e.stopPropagation();
-        setLabelFocus(+row.dataset.i);
+        const i = +row.dataset.i;
+        setLabelFocus(i);
+        onSegClick?.(i, segs[i]);
       };
       row.onkeydown = (e) => {
         const i = +row.dataset.i;
