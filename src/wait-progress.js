@@ -186,3 +186,93 @@ export function notifyJobDone({ title, body, ok = true }) {
   }
   return true;
 }
+
+export function playFailChime() {
+  try {
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) return false;
+    const ctx = new Ctx();
+    [440, 330, 262].forEach((freq, i) => {
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'triangle';
+      osc.frequency.value = freq;
+      const t0 = ctx.currentTime + i * 0.22;
+      gain.gain.setValueAtTime(0.0001, t0);
+      gain.gain.exponentialRampToValueAtTime(0.2, t0 + 0.02);
+      gain.gain.exponentialRampToValueAtTime(0.0001, t0 + 0.2);
+      osc.connect(gain).connect(ctx.destination);
+      osc.start(t0);
+      osc.stop(t0 + 0.22);
+    });
+    setTimeout(() => ctx.close?.(), 900);
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+/** GPU 安裝／偵測結果：一律提示（不受「完成時通知」開關影響）。 */
+export function gpuEnvironmentSummary(st) {
+  if (!st) {
+    return {
+      ready: false,
+      title: '無法讀取 GPU 狀態',
+      body: '請確認「Call Coach 本機助手」黑窗仍開啟，並重新整理 Call Coach 網頁。',
+    };
+  }
+  const whisperOk = !!(st.venv_ok && st.whisperx_ok);
+  const cudaOk = !!st.gpu_available;
+  const gpuLabel = st.gpu_name ? `NVIDIA ${st.gpu_name}` : 'NVIDIA GPU';
+  if (whisperOk && cudaOk) {
+    return {
+      ready: true,
+      title: 'GPU 轉錄環境就緒',
+      body: `WhisperX GPU 版已就緒；已偵測到 ${gpuLabel}（CUDA）。可選「新竹本機 GPU 轉錄」開始轉錄。`,
+    };
+  }
+  const issues = [];
+  if (!whisperOk) issues.push('WhisperX GPU 版環境尚未完整（請查看安裝記錄或重試「安裝 GPU 版 WhisperX」）');
+  if (!cudaOk) {
+    issues.push(st.gpu_reason || `${gpuLabel} 尚未被 PyTorch 使用（需 CUDA 12.8 版 torch；RTX 50 系列請用 GPU 版安裝，驅動建議 570+）`);
+  }
+  return {
+    ready: false,
+    title: 'GPU 轉錄環境未完成',
+    body: issues.join('。'),
+  };
+}
+
+/**
+ * 重要結果通知：提示音 + 桌面通知（即使頁面在前景）；若瀏覽器未授權通知則用 alert 確保使用者看到。
+ */
+export function notifyImportant({ title, body, ok = true }) {
+  if (ok) playDoneChime();
+  else playFailChime();
+  let surfaced = false;
+  if (typeof Notification !== 'undefined' && Notification.permission === 'granted') {
+    try {
+      const n = new Notification(ok ? title : `⚠ ${title}`, {
+        body,
+        tag: 'call-coach-gpu',
+        requireInteraction: !ok,
+      });
+      n.onclick = () => {
+        window.focus?.();
+        n.close();
+      };
+      surfaced = true;
+    } catch {
+      /* ignore */
+    }
+  }
+  if (!surfaced && typeof window !== 'undefined') {
+    try {
+      window.alert(`${ok ? title : `⚠ ${title}`}\n\n${body}`);
+      surfaced = true;
+    } catch {
+      /* ignore */
+    }
+  }
+  return surfaced;
+}
