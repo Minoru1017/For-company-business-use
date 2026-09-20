@@ -6,8 +6,10 @@ import { mountBrowserWorkerUI } from './browser-worker-transcribe.js';
 import { escapeHTML } from './utils.js';
 import {
   enableNotifications,
+  gpuEnvironmentSummary,
   notificationState,
   notifyEnabled,
+  notifyImportant,
   notifyJobDone,
   progressTitle,
   renderProgressHtml,
@@ -1375,24 +1377,62 @@ async function pollJob(onDone, { trackTranscribe = false, trackSetup = false } =
   pollTimer = setInterval(tick, 800);
 }
 
+function isGpuSetupEndpoint(endpoint) {
+  return endpoint === '/api/setup-gpu' || endpoint === '/api/full-setup-gpu';
+}
+
+async function announceGpuSetupResult({ installOk, job, st, showToast }) {
+  try {
+    await api('/api/gpu-diagnose');
+  } catch {
+    /* assistant may be older; status poll still runs */
+  }
+  const env = gpuEnvironmentSummary(st);
+  const errLine = lastErrorLine(job?.logs);
+  let title;
+  let body;
+  let overallOk;
+  if (!installOk) {
+    title = 'GPU 版 WhisperX 安裝失敗';
+    body = errLine ? errLine.replace(/^\[錯誤\]\s*/, '') : '請查看下方安裝記錄，按「複製日誌」傳給技術支援。';
+    if (!env.ready) body = `${body}（${env.body}）`;
+    overallOk = false;
+  } else if (env.ready) {
+    title = 'GPU 版安裝成功';
+    body = env.body;
+    overallOk = true;
+  } else {
+    title = '安裝程序已結束，但 GPU 尚未就緒';
+    body = env.body;
+    overallOk = false;
+  }
+  const notifyTitle = `Call Coach：${title}`;
+  notifyImportant({ title: notifyTitle, body, ok: overallOk });
+  showToast(`${title} — ${body.length > 100 ? `${body.slice(0, 100)}…` : body}`);
+}
+
 async function runSetupJob(endpoint, startMsg, doneMsg, showToast, refreshStatus) {
+  const gpuSetup = isGpuSetupEndpoint(endpoint);
   try {
     const r = await api(endpoint, { method: 'POST' });
     if (!r.ok) return showToast(r.message || '無法開始安裝');
     showToast(startMsg);
-    showLog(['安裝啟動中…'], { title: '安裝進行中…' });
+    showLog(['安裝啟動中…'], { title: gpuSetup ? 'GPU 版安裝進行中…' : '安裝進行中…' });
     pollJob(
-      (ok, job) => {
+      async (ok, job) => {
         showLog(job.logs || [], {
           failed: !ok,
-          title: ok ? '安裝完成' : '安裝失敗 — 請複製日誌',
+          title: ok ? (gpuSetup ? 'GPU 版安裝完成' : '安裝完成') : '安裝失敗 — 請複製日誌',
         });
-        showToast(
-          ok ? doneMsg : '安裝失敗 — 請查看下方記錄，按「複製日誌」傳給技術支援'
-        );
-        refreshStatus().then((st) => {
-          if (ok && st && !st.token_ok) openTokenPage(showToast);
-        });
+        const st = await refreshStatus();
+        if (gpuSetup) {
+          await announceGpuSetupResult({ installOk: ok, job, st, showToast });
+        } else {
+          showToast(
+            ok ? doneMsg : '安裝失敗 — 請查看下方記錄，按「複製日誌」傳給技術支援'
+          );
+        }
+        if (ok && st && !st.token_ok) openTokenPage(showToast);
       },
       { trackSetup: true }
     );

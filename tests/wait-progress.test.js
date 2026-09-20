@@ -29,6 +29,31 @@ const base = {
   done: false,
 };
 
+describe('gpuEnvironmentSummary', () => {
+  it('reports ready when whisperx and cuda are ok', () => {
+    const s = mod.gpuEnvironmentSummary({
+      venv_ok: true,
+      whisperx_ok: true,
+      gpu_available: true,
+      gpu_name: 'GeForce RTX 5070',
+    });
+    expect(s.ready).toBe(true);
+    expect(s.body).toContain('RTX 5070');
+  });
+
+  it('reports failure when cuda missing', () => {
+    const s = mod.gpuEnvironmentSummary({
+      venv_ok: true,
+      whisperx_ok: true,
+      gpu_available: false,
+      gpu_reason: 'CPU 版 PyTorch',
+      gpu_name: 'GeForce RTX 5070',
+    });
+    expect(s.ready).toBe(false);
+    expect(s.body).toMatch(/CPU 版 PyTorch|尚未/);
+  });
+});
+
 describe('formatDuration / formatEtaRange', () => {
   it('formats seconds, minutes and hours', () => {
     expect(mod.formatDuration(45)).toBe('45 秒');
