@@ -1238,6 +1238,33 @@ def run_repair_gpu_torch(log: LogFn = default_log) -> int:
     return 0
 
 
+def prepare_gpu_for_transcribe(log: LogFn = default_log) -> int:
+    """Preflight before GPU WhisperX — catches torch/torchvision mismatch before long wav jobs."""
+    stack = verify_torch_stack()
+    if stack.get("ok"):
+        return 0
+    err = stack.get("error") or "未知錯誤"
+    log(f"[錯誤] GPU 轉錄環境檢查未通過：{err}")
+    skip = load_env().get("CALL_COACH_SKIP_AUTO_TORCH_REPAIR", "").strip().lower()
+    if skip in ("1", "true", "yes", "on"):
+        log("[提示] 已設定 CALL_COACH_SKIP_AUTO_TORCH_REPAIR — 請按「僅修復 CUDA 版 PyTorch」")
+        return 1
+    log("[修復] 正在自動重裝 CUDA 版 torch + torchvision + torchaudio（約 5～10 分鐘，請勿關閉助手）…")
+    code = ensure_cuda_torch(log, force=True)
+    if code != 0:
+        return code
+    invalidate_gpu_cache()
+    stack = verify_torch_stack()
+    if not stack.get("ok"):
+        log(f"[錯誤] 自動修復後仍無法載入 WhisperX 相依套件：{stack.get('error')}")
+        log("[提示] 請執行「僅修復 CUDA 版 PyTorch」或 start_hsinchu_gpu.cmd reinstall")
+        return 1
+    log(
+        f"[修復] 環境檢查通過（torch {stack.get('torch')}, torchvision {stack.get('torchvision')}）"
+    )
+    return 0
+
+
 def run_setup(log: LogFn = default_log, *, gpu: bool = False) -> int:
     """Install the WhisperX venv. ``gpu=True`` pins CUDA 12.8 torch first (RTX 50 series needs it)."""
     log("=== 開始安裝轉錄工具 ===" + ("（GPU 版，CUDA 12.8）" if gpu else ""))
@@ -1555,6 +1582,9 @@ def run_transcribe(
             f"本機 GPU：{gpu_info.get('name')}｜WhisperX {whisper_model}"
             f"（cuda / {wx_compute} / batch {wx_batch}，音訊不離開本機、不需遠端 Worker）"
         )
+        code = prepare_gpu_for_transcribe(log)
+        if code != 0:
+            return fail(code)
     stem = Path(mp4.name).stem
     final_srt = ROOT / "output" / f"{stem}.srt"
 
@@ -1760,6 +1790,9 @@ def run_transcribe(
         if code != 0:
             log(f"[錯誤] 轉錄失敗（WhisperX 結束碼 {code}{describe_exit_code(code)}）")
             if is_local_gpu_mode(mode):
+                stack = verify_torch_stack()
+                if not stack.get("ok"):
+                    log("[提示] torch / torchvision 不相容 — 請按「僅修復 CUDA 版 PyTorch」（11.9.3+ 助手會在轉錄前自動修復）")
                 ti = venv_torch_info()
                 if not ti.get("cuda_build"):
                     log("[提示] 若剛按過「完整環境安裝」，可能已覆蓋成 CPU 版 PyTorch — 請執行「安裝 GPU 版」或 start_hsinchu_gpu.cmd reinstall")

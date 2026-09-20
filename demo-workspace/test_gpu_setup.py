@@ -61,6 +61,19 @@ class GpuSetupTests(unittest.TestCase):
             demo_core.whisperx_env_broken(["ModuleNotFoundError: Could not import module 'Wav2Vec2ForCTC'"])
         )
 
+    def test_prepare_gpu_skips_when_stack_ok(self) -> None:
+        with mock.patch.object(demo_core, "verify_torch_stack", return_value={"ok": True}):
+            self.assertEqual(demo_core.prepare_gpu_for_transcribe(log=lambda _m: None), 0)
+
+    def test_prepare_gpu_auto_repair_when_stack_bad(self) -> None:
+        with (
+            mock.patch.object(demo_core, "verify_torch_stack", side_effect=[{"ok": False, "error": "nms"}, {"ok": True, "torch": "2.8", "torchvision": "0.23"}]),
+            mock.patch.object(demo_core, "ensure_cuda_torch", return_value=0) as repair,
+            mock.patch.object(demo_core, "invalidate_gpu_cache"),
+        ):
+            self.assertEqual(demo_core.prepare_gpu_for_transcribe(log=lambda _m: None), 0)
+        repair.assert_called_once()
+
     def test_run_full_setup_passes_gpu_when_preferred(self) -> None:
         with (
             mock.patch.object(demo_core, "prefer_gpu_setup", return_value=True),
