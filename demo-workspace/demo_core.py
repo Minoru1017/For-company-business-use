@@ -405,11 +405,19 @@ def gpu_environment_diagnose() -> dict:
             whisperx_error = str(e)
 
     hint = gpu_setup_hint(torch_info, gpu_info)
+    torch_stack = verify_torch_stack() if VENV_PY.exists() else {"ok": False, "error": "no venv"}
+    if not torch_stack.get("ok") and not hint:
+        hint = (
+            f"torch / torchvision 不相容：{torch_stack.get('error')}。"
+            "請按「僅修復 CUDA 版 PyTorch」（會一併重裝 torchvision）。"
+        )
     return {
         "venv_ok": VENV_PY.exists(),
         "whisperx_cli_ok": WHISPERX.exists() or (ROOT / ".venv" / "Scripts" / "whisperx.cmd").exists(),
         "whisperx_import_ok": whisperx_import_ok,
         "whisperx_import_error": whisperx_error,
+        "torch_stack_ok": bool(torch_stack.get("ok")),
+        "torch_stack": torch_stack,
         "torch": torch_info,
         "gpu": gpu_info,
         "hf_token_ok": has_valid_token(),
@@ -471,6 +479,18 @@ def gpu_transcribe_attempts(gpu_info: dict | None, base_batch: int) -> list[tupl
     return plans
 
 
+def whisperx_env_broken(log_lines: list[str]) -> bool:
+    """Import / dependency errors that batch or compute_type retries cannot fix."""
+    text = "\n".join(log_lines[-60:])
+    return bool(
+        re.search(
+            r"torchvision::nms|operator torchvision|Wav2Vec2ForCTC|Could not import module|ModuleNotFoundError",
+            text,
+            re.IGNORECASE,
+        )
+    )
+
+
 def whisperx_failure_hints(log_lines: list[str]) -> list[str]:
     """Turn recent WhisperX stderr/stdout into short user-facing hints."""
     text = "\n".join(log_lines[-80:])
@@ -481,6 +501,11 @@ def whisperx_failure_hints(log_lines: list[str]) -> list[str]:
         (r"gated|401|403|authorized|HF_TOKEN|huggingface", "Hugging Face 分軌模型未授權：請確認 .env 的 HF_TOKEN 有效，並在 Hugging Face 同意 pyannote 模型授權"),
         (r"compute_type|float16|float32", "若為 RTX 50 系列：在 .env 設定 CALL_COACH_GPU_COMPUTE=int8 或 float32 後重試"),
         (r"No such file|ffmpeg|torchcodec", "缺少相依元件或 ffmpeg：請確認完整 GPU 環境安裝成功，並重新執行 start_hsinchu_gpu.cmd reinstall"),
+        (
+            r"torchvision::nms|operator torchvision|Wav2Vec2ForCTC|Could not import module",
+            "torch 與 torchvision 版本不相容（常見於只重裝 torch）：請按「僅修復 CUDA 版 PyTorch」"
+            f"或手動執行 pip install --force-reinstall torch torchvision torchaudio --index-url {TORCH_CUDA_INDEX}",
+        ),
     ]
     for pattern, msg in checks:
         if re.search(pattern, text, re.IGNORECASE) and msg not in hints:
@@ -540,6 +565,8 @@ def run_whisperx_transcribe(
             return last_code
         if last_code == 0:
             return 0
+        if whisperx_env_broken(recent):
+            break
     for hint in whisperx_failure_hints(recent):
         log(f"[提示] {hint}")
     return last_code
@@ -1121,19 +1148,58 @@ def create_venv(log: LogFn = default_log) -> int:
 
 
 TORCH_CUDA_INDEX = "https://download.pytorch.org/whl/cu128"
+TORCH_CUDA_PACKAGES = ("torch", "torchvision", "torchaudio")
+
+
+def verify_torch_stack() -> dict:
+    """WhisperX alignment pulls transformers → torchvision; versions must match torch."""
+    if not VENV_PY.exists():
+        return {"ok": False, "error": "尚未建立 .venv"}
+    code = (
+        "import json;"
+        "try:"
+        " import torch,torchvision;"
+        " from torchvision.transforms import InterpolationMode;"
+        " from transformers import Wav2Vec2ForCTC;"
+        " print(json.dumps({'ok':True,'torch':torch.__version__,'torchvision':torchvision.__version__}))"
+        "except Exception as e:"
+        " print(json.dumps({'ok':False,'error':str(e)}))"
+    )
+    try:
+        proc = quiet_run(
+            [str(VENV_PY), "-c", code],
+            cwd=ROOT,
+            env=shell_env(cache_env()),
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=180,
+        )
+    except (OSError, subprocess.TimeoutExpired) as e:
+        return {"ok": False, "error": str(e)}
+    for line in reversed((proc.stdout or "").splitlines()):
+        line = line.strip()
+        if line.startswith("{"):
+            try:
+                return json.loads(line)
+            except ValueError:
+                break
+    tail = (proc.stderr or proc.stdout or "").strip().splitlines()
+    return {"ok": False, "error": tail[-1] if tail else f"exit {proc.returncode}"}
 
 
 def ensure_cuda_torch(log: LogFn = default_log, *, force: bool = False) -> int:
-    """Install or re-pin CUDA 12.8 torch/torchaudio into .venv (RTX 50 / WhisperX GPU)."""
+    """Install or re-pin CUDA 12.8 torch/vision/audio into .venv (RTX 50 / WhisperX GPU)."""
     if not VENV_PY.exists():
         log("[錯誤] 尚未建立 .venv")
         return 1
     cmd = [str(VENV_PY), "-m", "pip", "install"]
     if force:
         cmd.append("--force-reinstall")
-    cmd.extend(["torch", "torchaudio", "--index-url", TORCH_CUDA_INDEX])
+    cmd.extend([*TORCH_CUDA_PACKAGES, "--index-url", TORCH_CUDA_INDEX])
     label = "強制安裝" if force else "安裝"
-    log(f"{label} CUDA 12.8 版 PyTorch（約 2.5 GB）…")
+    log(f"{label} CUDA 12.8 版 PyTorch + torchvision + torchaudio（約 2.5 GB）…")
     code = run_command(cmd, log=log)
     if code != 0:
         log(f"[錯誤] CUDA 版 PyTorch 安裝失敗（exit code {code}）")
@@ -1153,9 +1219,15 @@ def run_repair_gpu_torch(log: LogFn = default_log) -> int:
         log(f"[錯誤] .venv 仍是 CPU 版 PyTorch（{ver}）")
         log(
             "[提示] 請在助手目錄手動執行："
-            ".venv\\Scripts\\python -m pip install --force-reinstall torch torchaudio "
+            ".venv\\Scripts\\python -m pip install --force-reinstall "
+            "torch torchvision torchaudio "
             f"--index-url {TORCH_CUDA_INDEX}"
         )
+        return 1
+    stack = verify_torch_stack()
+    if not stack.get("ok"):
+        log(f"[錯誤] torch / torchvision / transformers 不相容：{stack.get('error')}")
+        log("[提示] 請按「僅修復 CUDA 版 PyTorch」或重新執行 GPU 版安裝（會一併重裝 torchvision）")
         return 1
     gpu_info = detect_gpu()
     if gpu_info.get("available"):
@@ -1230,6 +1302,13 @@ def run_setup(log: LogFn = default_log, *, gpu: bool = False) -> int:
             log(f"[錯誤] 目前版本：{ver}")
             log("[提示] 請按「僅修復 CUDA 版 PyTorch」或執行 start_hsinchu_gpu.cmd reinstall")
             return 1
+        stack = verify_torch_stack()
+        if not stack.get("ok"):
+            log(f"[錯誤] WhisperX 相依的 torchvision 與 torch 不相容：{stack.get('error')}")
+            log("[提示] 請再執行一次「僅修復 CUDA 版 PyTorch」（會強制重裝 torchvision）")
+            return 1
+        if stack.get("torchvision"):
+            log(f"torchvision {stack.get('torchvision')} 與 torch 版本檢查通過")
         gpu_info = detect_gpu()
         if gpu_info.get("available"):
             log(f"GPU 就緒：{gpu_info.get('name')}（torch {gpu_info.get('torch')}, CUDA {gpu_info.get('cuda')}）")

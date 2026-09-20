@@ -49,7 +49,17 @@ class GpuSetupTests(unittest.TestCase):
         self.assertEqual(code, 0)
         args = run_cmd.call_args[0][0]
         self.assertIn("--force-reinstall", args)
+        self.assertIn("torchvision", args)
         self.assertIn(demo_core.TORCH_CUDA_INDEX, args)
+
+    def test_whisperx_failure_hints_torchvision_mismatch(self) -> None:
+        hints = demo_core.whisperx_failure_hints(["RuntimeError: operator torchvision::nms does not exist"])
+        self.assertTrue(any("torchvision" in h for h in hints))
+
+    def test_whisperx_env_broken_detects_import_error(self) -> None:
+        self.assertTrue(
+            demo_core.whisperx_env_broken(["ModuleNotFoundError: Could not import module 'Wav2Vec2ForCTC'"])
+        )
 
     def test_run_full_setup_passes_gpu_when_preferred(self) -> None:
         with (
