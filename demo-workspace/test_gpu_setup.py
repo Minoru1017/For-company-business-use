@@ -28,6 +28,15 @@ class GpuSetupTests(unittest.TestCase):
         with mock.patch.dict(os.environ, {"CALL_COACH_GPU_BATCH": "4"}):
             self.assertEqual(demo_core.gpu_transcribe_batch(), 4)
 
+    def test_blackwell_defaults_to_int8_compute(self) -> None:
+        gpu = {"available": True, "name": "NVIDIA GeForce RTX 5070"}
+        self.assertTrue(demo_core.is_blackwell_gpu(gpu))
+        self.assertEqual(demo_core.gpu_whisper_compute_type(gpu), "int8")
+
+    def test_whisperx_failure_hints_oom(self) -> None:
+        hints = demo_core.whisperx_failure_hints(["CUDA out of memory at line 1"])
+        self.assertTrue(any("顯存" in h for h in hints))
+
     def test_run_full_setup_passes_gpu_when_preferred(self) -> None:
         with (
             mock.patch.object(demo_core, "prefer_gpu_setup", return_value=True),
