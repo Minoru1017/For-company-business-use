@@ -273,11 +273,22 @@ function checklistItems(st) {
       fix: cloudConsent ? null : { action: 'consent', text: '勾選同意' },
     });
   } else if (transcribeMode === 'local_gpu') {
+    const whisperGpuReady = !!(st.venv_ok && st.whisperx_ok && (st.gpu_available || st.cuda_torch_build));
     items.push({
-      ok: !!(st.venv_ok && st.whisperx_ok),
+      ok: whisperGpuReady,
       label: 'WhisperX GPU 版環境',
-      detail: st.venv_ok && st.whisperx_ok ? '' : '新竹請執行 start_hsinchu_gpu.cmd reinstall 或下方「安裝 GPU 版」',
-      fix: st.venv_ok && st.whisperx_ok ? null : { action: 'setup-gpu', text: '安裝 GPU 版 WhisperX' },
+      detail:
+        whisperGpuReady
+          ? ''
+          : st.venv_ok && st.whisperx_ok && !st.cuda_torch_build
+            ? 'WhisperX 已安裝，但 PyTorch 仍是 CPU 版 — 請按「僅修復 CUDA 版 PyTorch」'
+            : '新竹請執行 start_hsinchu_gpu.cmd reinstall 或下方「安裝 GPU 版」',
+      fix:
+        st.venv_ok && st.whisperx_ok
+          ? st.cuda_torch_build || st.gpu_available
+            ? null
+            : { action: 'repair-gpu-torch', text: '僅修復 CUDA 版 PyTorch' }
+          : { action: 'setup-gpu', text: '安裝 GPU 版 WhisperX' },
     });
     items.push({
       ok: !!st.token_ok,
@@ -288,7 +299,11 @@ function checklistItems(st) {
       ok: !!st.gpu_available,
       label: st.gpu_available ? `NVIDIA GPU（${st.gpu_name || '已偵測'}）` : 'NVIDIA GPU（本機 CUDA）',
       warn: st.gpu_available ? '' : st.gpu_reason || '請安裝 GPU 版 WhisperX（CUDA 12.8）',
-      fix: st.gpu_available ? null : { action: 'setup-gpu', text: '安裝／修復 GPU 版 PyTorch' },
+      fix: st.gpu_available
+        ? null
+        : st.venv_ok && st.whisperx_ok && !st.cuda_torch_build
+          ? { action: 'repair-gpu-torch', text: '僅修復 CUDA 版 PyTorch' }
+          : { action: 'setup-gpu', text: '安裝／修復 GPU 版 PyTorch' },
     });
   } else if (transcribeMode === 'remote') {
     items.push({
@@ -1132,6 +1147,8 @@ async function runFix(action, { st, showToast, refreshStatus, panel }) {
       return runFullSetup(showToast, refreshStatus);
     case 'setup-gpu':
       return runGpuSetup(showToast, refreshStatus);
+    case 'repair-gpu-torch':
+      return runRepairGpuTorch(showToast, refreshStatus);
     case 'full-setup-gpu':
       return runFullGpuSetup(showToast, refreshStatus);
     case 'install-ffmpeg':
@@ -1227,6 +1244,12 @@ function transcribeBlockReason(st) {
       return '請先安裝 GPU 版 WhisperX（新竹可執行 start_worker.cmd → 安裝 GPU 版，或按「完整環境安裝」）';
     }
     if (!st?.token_ok) return '本機 GPU 模式請先設定 HF_TOKEN（.env 或下方貼上）';
+    if (!st?.cuda_torch_build && st?.venv_ok && st?.whisperx_ok) {
+      return (
+        st?.gpu_reason ||
+        'PyTorch 仍是 CPU 版：請按檢查清單「僅修復 CUDA 版 PyTorch」（勿用「完整環境安裝」）'
+      );
+    }
     if (!st?.gpu_available) {
       return st?.gpu_reason || '未偵測到可用 GPU，請安裝 CUDA 12.8 版 PyTorch（RTX 50 系列）';
     }
@@ -1301,7 +1324,15 @@ async function pollJob(onDone, { trackTranscribe = false, trackSetup = false } =
     try {
       const j = await api('/api/job');
       failures = 0;
-      const setupKinds = new Set(['setup', 'setup-gpu', 'full-setup', 'full-setup-gpu', 'install-ffmpeg', 'uninstall']);
+      const setupKinds = new Set([
+        'setup',
+        'setup-gpu',
+        'repair-gpu-torch',
+        'full-setup',
+        'full-setup-gpu',
+        'install-ffmpeg',
+        'uninstall',
+      ]);
       const isSetup = setupKinds.has(j.kind);
       if (isSetup || trackSetup) {
         showLog(j.logs, {
@@ -1387,7 +1418,11 @@ async function pollJob(onDone, { trackTranscribe = false, trackSetup = false } =
 }
 
 function isGpuSetupEndpoint(endpoint) {
-  return endpoint === '/api/setup-gpu' || endpoint === '/api/full-setup-gpu';
+  return (
+    endpoint === '/api/setup-gpu' ||
+    endpoint === '/api/full-setup-gpu' ||
+    endpoint === '/api/repair-gpu-torch'
+  );
 }
 
 async function announceGpuSetupResult({ installOk, job, st, showToast }) {
@@ -1458,6 +1493,19 @@ async function runSetup(showToast, refreshStatus) {
 
 async function runGpuSetup(showToast, refreshStatus) {
   return runSetupJob('/api/setup-gpu', '開始安裝 GPU 版 WhisperX（CUDA 12.8）…', 'GPU 版 WhisperX 安裝完成', showToast, refreshStatus);
+}
+
+async function runRepairGpuTorch(showToast, refreshStatus) {
+  if (!bridgeSupports('repair-gpu-torch')) {
+    return runGpuSetup(showToast, refreshStatus);
+  }
+  return runSetupJob(
+    '/api/repair-gpu-torch',
+    '開始修復 CUDA 版 PyTorch（保留 WhisperX，約 3～8 分鐘）…',
+    'CUDA 版 PyTorch 修復完成',
+    showToast,
+    refreshStatus
+  );
 }
 
 async function runFullGpuSetup(showToast, refreshStatus) {
