@@ -17,13 +17,14 @@ from __future__ import annotations
 import json
 import mimetypes
 import os
+import re
 import subprocess
 import sys
 import threading
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
-from urllib.parse import urlparse
+from urllib.parse import parse_qs, unquote, urlparse
 
 import demo_core
 import job_log
@@ -236,7 +237,7 @@ class Handler(BaseHTTPRequestHandler):
             return False
         return True
 
-    def _check_api_access(self, path: str) -> bool:
+    def _check_api_access(self, path: str, query: str = "") -> bool:
         if not self._check_host():
             return False
         if path in security.PUBLIC_API_PATHS:
@@ -246,10 +247,63 @@ class Handler(BaseHTTPRequestHandler):
                 return False
             return True
         token = self.headers.get(security.TOKEN_HEADER, "")
+        if not token and path.startswith("/api/media") and query:
+            token = parse_qs(query).get("token", [""])[0]
         if token != security.API_TOKEN:
             self._reject(401, "未授權的本機 API 請求")
             return False
         return True
+
+    def _send_file_range(self, path: Path) -> None:
+        if not path.exists() or not path.is_file():
+            self.send_error(404)
+            return
+        size = path.stat().st_size
+        ctype = mimetypes.guess_type(str(path))[0] or "application/octet-stream"
+        range_header = self.headers.get("Range")
+        if range_header:
+            match = re.match(r"bytes=(\d*)-(\d*)", range_header.strip())
+            if not match:
+                self.send_error(416)
+                return
+            start_s, end_s = match.group(1), match.group(2)
+            start = int(start_s) if start_s else 0
+            end = int(end_s) if end_s else size - 1
+            if start >= size or start < 0:
+                self.send_error(416)
+                return
+            end = min(end, size - 1)
+            length = end - start + 1
+            self.send_response(206)
+            self.send_header("Content-Type", ctype)
+            self.send_header("Accept-Ranges", "bytes")
+            self.send_header("Content-Range", f"bytes {start}-{end}/{size}")
+            self.send_header("Content-Length", str(length))
+            self._apply_cors()
+            self.end_headers()
+            with path.open("rb") as handle:
+                handle.seek(start)
+                remaining = length
+                while remaining > 0:
+                    chunk = handle.read(min(65536, remaining))
+                    if not chunk:
+                        break
+                    self.wfile.write(chunk)
+                    remaining -= len(chunk)
+            return
+
+        self.send_response(200)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Accept-Ranges", "bytes")
+        self.send_header("Content-Length", str(size))
+        self._apply_cors()
+        self.end_headers()
+        with path.open("rb") as handle:
+            while True:
+                chunk = handle.read(65536)
+                if not chunk:
+                    break
+                self.wfile.write(chunk)
 
     def _send_file(self, path: Path) -> None:
         if not path.exists() or not path.is_file():
@@ -274,15 +328,35 @@ class Handler(BaseHTTPRequestHandler):
     def do_GET(self) -> None:
         parsed = urlparse(self.path)
         path = parsed.path
+        query = parsed.query
 
         if path == "/api/bootstrap":
-            if not self._check_api_access(path):
+            if not self._check_api_access(path, query):
                 return
             return self._send_json({"ok": True, "token": security.API_TOKEN})
 
         if path.startswith("/api/"):
-            if not self._check_api_access(path):
+            if not self._check_api_access(path, query):
                 return
+
+        if path == "/api/media":
+            files = [
+                {"name": p.name, "size": p.stat().st_size}
+                for p in demo_core.list_mp4_files()
+            ]
+            return self._send_json({"ok": True, "files": files})
+
+        if path.startswith("/api/media/"):
+            name = unquote(path[len("/api/media/") :].lstrip("/"))
+            if not name or "/" in name or "\\" in name:
+                return self._reject(400, "無效的檔名")
+            try:
+                media_path = demo_core.resolve_input_mp4(name)
+            except ValueError as exc:
+                return self._reject(400, str(exc))
+            except FileNotFoundError as exc:
+                return self._reject(404, str(exc))
+            return self._send_file_range(media_path)
 
         if path == "/api/status":
             return self._send_json(demo_core.get_status().to_dict())

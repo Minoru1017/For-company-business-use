@@ -182,6 +182,14 @@ export function bridgeSupports(capability) {
   return !!lastBridgeStatus?.api_capabilities?.includes?.(capability);
 }
 
+export function getSelectedDemoMp4() {
+  return selectedMp4;
+}
+
+export async function getBridgeApiToken() {
+  return ensureApiToken();
+}
+
 /** 把報告／已標記 SRT 存到助手的 output 資料夾（與逐字稿放在一起）。 */
 export async function saveReportToBridge(filename, content) {
   return api('/api/report', { method: 'POST', body: JSON.stringify({ filename, content }) });
@@ -534,6 +542,7 @@ export function initLocalTranscribe({ onTranscriptReady, showToast, getMode }) {
       workerAutoTested = true;
       testWorker(() => {}, refreshStatus);
     }
+    window.__demoPlayerOnBridgeStatus?.(st);
     return st;
   }
 

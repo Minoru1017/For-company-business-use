@@ -27,10 +27,13 @@ import { clearHistory, deleteHistory, formatSavedAt, getHistory, listHistory, sa
 import {
   bridgeSupports,
   checkLocalBridge,
+  getBridgeStatus,
+  getBridgeApiToken,
   initLocalTranscribe,
   openBridgeFolder,
   saveReportToBridge,
 } from './local-transcribe.js';
+import { initDemoPlayer, refreshDemoPlayerFromBridge, seekDemoTo, updateDemoPlayerSegments } from './demo-player.js';
 import { initModeChooser, resolveMode } from './mode.js';
 import { bindLabelCollapseHandlers, createLabelController } from './labels.js';
 import { applyBuiltinSpeakerLabels, enrichSegments, parse, parseVibeJson } from './parser.js';
@@ -135,9 +138,15 @@ function finishLoad(filename, src) {
   lastResult = null;
   aiSummary = '';
   $('fname').textContent = `已載入（${segs.length} 句，來源：${src}）`;
-  labelCtrl = createLabelController({ segs, onToast: showToast });
+  labelCtrl = createLabelController({
+    segs,
+    onToast: showToast,
+    onSegClick: (_i, s) => seekDemoTo(s.start),
+  });
   labelCtrl.resetFocus();
   labelCtrl.renderLabels();
+  updateDemoPlayerSegments(segs, sourceName);
+  refreshDemoPlayerFromBridge(getBridgeStatus());
   showToast(`已載入 ${segs.length} 句逐字稿`);
   $('labelCard').hidden = false;
   $('result').hidden = true;
@@ -699,6 +708,8 @@ function init() {
       if (mode === 'demo') window.__refreshBridge?.();
     },
   });
+
+  initDemoPlayer({ fetchApiToken: getBridgeApiToken });
 
   // 助手在線時，報告可直接存進 output 資料夾；狀態每 8 秒由 local-transcribe 更新
   checkLocalBridge().then(refreshExportBar);
