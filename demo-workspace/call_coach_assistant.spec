@@ -27,6 +27,7 @@ a = Analysis(
         "team_config",
         "srt_utils",
         "proc_utils",
+        "recording_pipeline",
         "tkinter",
     ],
     hookspath=[],

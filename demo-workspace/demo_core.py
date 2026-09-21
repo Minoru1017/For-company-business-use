@@ -955,6 +955,7 @@ class EnvStatus:
                 "gpu-diagnose",
                 "media-playback",
                 "repair-gpu-torch",
+                "recording-pipeline",
             ],
             "call_coach_url": CALL_COACH_URL,
             "hf_links": HF_LINKS,
@@ -1811,6 +1812,194 @@ def run_transcribe(
     for s in srts:
         log(f"逐字稿: {s.name}")
     log(f"請上傳至 Call Coach: {CALL_COACH_URL}")
+    progress.finish(ok=True)
+    return 0
+
+
+def run_transcribe_wav(
+    wav_path: Path | str,
+    log: LogFn = default_log,
+    hooks: JobHooks | None = None,
+    mode: str = "standard",
+    cloud_consent: bool = False,
+) -> int:
+    """Transcribe a WAV on disk (e.g. MicroSIP / NAS share) without an MP4 in input/."""
+    from azure_transcribe import run_azure_transcribe
+    from progress_tracker import ProgressTracker, estimate_azure_minutes, estimate_remote_minutes
+    from remote_transcribe import run_remote_transcribe
+    from transcribe_modes import (
+        MODE_AZURE,
+        MODE_LABELS,
+        MODE_REMOTE,
+        OFFSITE_MODES,
+        is_local_gpu_mode,
+        model_for_mode,
+        normalize_mode,
+        validate_transcribe_request,
+    )
+    from transcribe_parallel import probe_duration_seconds
+
+    wav = Path(wav_path).resolve()
+    if not wav.is_file():
+        log(f"[錯誤] 找不到 WAV：{wav}")
+        return 1
+
+    mode = normalize_mode(mode)
+    log("=== 通話錄音轉錄 ===")
+    log(f"模式：{MODE_LABELS[mode]}")
+    log(f"音訊檔: {wav.name}")
+    progress = ProgressTracker(log, mode=mode)
+
+    def fail(code: int) -> int:
+        progress.finish(ok=False)
+        return code
+
+    if hooks and hooks.is_cancelled():
+        log("[已取消] 轉錄已停止")
+        return fail(CANCEL_EXIT)
+
+    err = validate_transcribe_request(mode, cloud_consent, has_azure_config(), has_worker_config())
+    if err:
+        log(f"[錯誤] {err}")
+        return fail(1)
+
+    if mode not in OFFSITE_MODES:
+        if not VENV_PY.exists():
+            log("[錯誤] 本機轉錄環境尚未安裝，請先按「一鍵安裝」；或改用 Azure 雲端轉錄（免安裝）")
+            return fail(1)
+        if not has_valid_token():
+            log("[錯誤] 本機轉錄請先設定 HF_TOKEN；或改用 Azure 雲端轉錄（不需 HF Token）")
+            return fail(1)
+
+    env_vars = shell_env(cache_env())
+    (ROOT / "models").mkdir(exist_ok=True)
+    (ROOT / "output").mkdir(exist_ok=True)
+
+    ffmpeg = ffmpeg_exe()
+    whisper_model = model_for_mode(mode)
+    threads = transcribe_threads()
+    batch = transcribe_batch()
+    wx_device, wx_compute, wx_batch = "cpu", "int8", batch
+    gpu_info: dict | None = None
+    if is_local_gpu_mode(mode):
+        gpu_info = detect_gpu_cached()
+        if not gpu_info.get("available"):
+            log(f"[錯誤] 本機 GPU 模式需要可用的 NVIDIA GPU：{gpu_info.get('reason')}")
+            return fail(1)
+        whisper_model = gpu_whisper_model()
+        wx_compute = gpu_whisper_compute_type(gpu_info)
+        wx_device, wx_batch = "cuda", gpu_transcribe_batch()
+        log(
+            f"本機 GPU：{gpu_info.get('name')}｜WhisperX {whisper_model}"
+            f"（cuda / {wx_compute} / batch {wx_batch}）"
+        )
+        code = prepare_gpu_for_transcribe(log)
+        if code != 0:
+            return fail(code)
+
+    stem = wav.stem
+    final_srt = ROOT / "output" / f"{stem}.srt"
+    duration = probe_duration_seconds(wav, ffmpeg, log) if ffmpeg else 0.0
+    if duration > 0:
+        progress.set_duration(duration)
+        log(f"音訊長度：約 {int(duration // 60)} 分 {int(duration % 60)} 秒")
+
+    if mode == MODE_REMOTE:
+        if not ffmpeg:
+            log("[錯誤] 遠端主機轉錄需要 ffmpeg 讀取音訊長度")
+            return fail(1)
+        progress.use_plan("remote")
+        worker_url, worker_token = worker_config()
+        code = run_remote_transcribe(
+            wav,
+            final_srt,
+            worker_url=worker_url,
+            token=worker_token,
+            duration_s=duration,
+            log=log,
+            cancel_check=lambda: bool(hooks and hooks.is_cancelled()),
+            progress=progress,
+        )
+        if code == 0:
+            progress.phase("save", final_srt.name)
+            log("=== 通話錄音轉錄完成 ===")
+            log(f"逐字稿: {final_srt.name}")
+            progress.finish(ok=True)
+            return 0
+        return fail(code)
+
+    if mode == MODE_AZURE:
+        progress.use_plan("azure")
+        eta_low, eta_high = estimate_azure_minutes(duration)
+        progress.set_eta_minutes(eta_low, eta_high)
+        log(f"預估總耗時約 {eta_low}～{eta_high} 分鐘（含上傳）")
+        azure_key, azure_region = azure_config()
+        progress.phase("azure", "上傳音訊並等待 Azure 回傳")
+        code = run_azure_transcribe(
+            wav,
+            final_srt,
+            speech_key=azure_key,
+            speech_region=azure_region,
+            endpoint=azure_endpoint() or None,
+            log=log,
+            cancel_check=lambda: bool(hooks and hooks.is_cancelled()),
+        )
+        if code == 0:
+            progress.phase("save", final_srt.name)
+            log("=== 通話錄音轉錄完成 ===")
+            log(f"逐字稿: {final_srt.name}")
+            progress.finish(ok=True)
+            return 0
+        return fail(code)
+
+    progress.use_plan("local")
+    if is_local_gpu_mode(mode):
+        eta_low, eta_high = estimate_remote_minutes(duration, gpu=True)
+        log(
+            f"WhisperX {whisper_model}（GPU），音檔約 {int(duration // 60)} 分鐘"
+            f"（預估約 {eta_low}～{eta_high} 分鐘）…"
+        )
+    else:
+        from transcribe_parallel import estimate_transcribe_minutes
+
+        eta_low, eta_high = estimate_transcribe_minutes(duration, 1, 1)
+        log(
+            f"Faster-Whisper {whisper_model}，音檔約 {int(duration // 60)} 分鐘"
+            f"（預估約 {eta_low}～{eta_high} 分鐘）…"
+        )
+    progress.set_eta_minutes(eta_low, eta_high)
+
+    if hooks and hooks.is_cancelled():
+        log("[已取消] 轉錄已停止")
+        return fail(CANCEL_EXIT)
+
+    progress.phase("transcribe", "載入模型")
+    progress.set_part_total(1)
+    code = run_whisperx_transcribe(
+        audio=wav,
+        whisper_model=whisper_model,
+        threads=threads,
+        output_dir=ROOT / "output",
+        device=wx_device,
+        compute_type=wx_compute,
+        batch=wx_batch,
+        env_vars=env_vars,
+        log=log,
+        hooks=hooks,
+        progress=progress,
+        gpu_retry=is_local_gpu_mode(mode),
+        gpu_info=gpu_info if is_local_gpu_mode(mode) else None,
+    )
+    if code == CANCEL_EXIT:
+        log("[已取消] 轉錄已停止")
+        return fail(code)
+    if code != 0:
+        log(f"[錯誤] 轉錄失敗（WhisperX 結束碼 {code}{describe_exit_code(code)}）")
+        return fail(code)
+    progress.part_done(0)
+    progress.phase("save", final_srt.name)
+    log("=== 通話錄音轉錄完成 ===")
+    log(f"逐字稿: {final_srt.name}")
     progress.finish(ok=True)
     return 0
 

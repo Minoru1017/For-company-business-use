@@ -190,6 +190,37 @@ def run_job(kind: str, fn) -> tuple[bool, str]:
     return True, "已開始"
 
 
+def start_recording_watcher() -> None:
+    import recording_pipeline
+
+    if not recording_pipeline.watch_enabled():
+        return
+
+    def loop() -> None:
+        recording_pipeline.scan_and_log_summary(print)
+        while True:
+            try:
+                import time
+
+                time.sleep(recording_pipeline.poll_seconds())
+                if not recording_pipeline.watch_enabled():
+                    continue
+                with JOB.lock:
+                    busy = JOB.running
+                if busy:
+                    continue
+                hooks = JobHooks(JOB)
+
+                def fn(log):
+                    return recording_pipeline.process_recording_pipeline(log, hooks=hooks)
+
+                run_job("recording-pipeline", fn)
+            except Exception as exc:  # noqa: BLE001 — keep watcher alive
+                print(f"[通話錄音] 監看執行緒錯誤：{exc}")
+
+    threading.Thread(target=loop, daemon=True, name="recording-watcher").start()
+
+
 class Handler(BaseHTTPRequestHandler):
     server_version = "DEMODemoApp/1.0"
 
@@ -364,6 +395,11 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/gpu-diagnose":
             return self._send_json({"ok": True, "diagnose": demo_core.gpu_environment_diagnose()})
 
+        if path == "/api/recording-pipeline/status":
+            import recording_pipeline
+
+            return self._send_json({"ok": True, **recording_pipeline.pipeline_status()})
+
         if path == "/api/job":
             snap = JOB.snapshot()
             snap["status"] = demo_core.get_status().to_dict()
@@ -446,6 +482,21 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/full-setup-gpu":
             ok, msg = run_job("full-setup-gpu", demo_core.run_full_setup_gpu)
             return self._send_json({"ok": ok, "message": msg})
+
+        if path == "/api/recording-pipeline/dismiss":
+            import recording_pipeline
+
+            recording_pipeline.clear_pending()
+            return self._send_json({"ok": True, "pending": None})
+
+        if path == "/api/recording-pipeline/scan":
+            import recording_pipeline
+
+            lines: list[str] = []
+            count = recording_pipeline.scan_and_log_summary(lines.append)
+            return self._send_json(
+                {"ok": True, "wav_count": count, "lines": lines, **recording_pipeline.pipeline_status()}
+            )
 
         if path == "/api/transcribe":
             data = self._parse_json(body)
@@ -763,6 +814,7 @@ def main(argv: list[str] | None = None) -> int:
         print("（關閉此視窗即停止服務）\n")
 
     server = ThreadingHTTPServer((host, PORT), Handler)
+    start_recording_watcher()
 
     if demo_core.is_frozen():
         return _run_with_window(server, host, url)

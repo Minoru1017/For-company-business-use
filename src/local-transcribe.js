@@ -78,6 +78,8 @@ let workerHealth = null;
 let workerTesting = false;
 let workerAutoTested = false;
 let teamPanelOpen = false;
+let recordingPending = null;
+const RECORDING_NOTIFY_KEY = 'callCoachRecordingNotifyKey';
 
 function isOffsite(mode = transcribeMode) {
   return OFFSITE_MODES.has(mode);
@@ -182,6 +184,48 @@ export function getBridgeStatus() {
 
 export function bridgeSupports(capability) {
   return !!lastBridgeStatus?.api_capabilities?.includes?.(capability);
+}
+
+async function refreshRecordingPending(showToast) {
+  if (!bridgeSupports('recording-pipeline')) {
+    recordingPending = null;
+    return;
+  }
+  try {
+    const r = await api('/api/recording-pipeline/status');
+    const next = r.pending || null;
+    if (next?.srt) {
+      const key = `${next.srt}:${next.created_at || ''}`;
+      if (sessionStorage.getItem(RECORDING_NOTIFY_KEY) !== key) {
+        sessionStorage.setItem(RECORDING_NOTIFY_KEY, key);
+        const mins = Math.max(1, Math.floor((next.duration_s || 0) / 60));
+        notifyImportant({
+          title: 'Call Coach：通話錄音已轉完',
+          body: `${next.wav_name || '通話'}（約 ${mins} 分鐘）— 在 DEMO 區確認是否分析`,
+          ok: true,
+        });
+        showToast?.('通話錄音逐字稿已就緒 — 請在下方按「載入並分析」');
+      }
+    }
+    recordingPending = next;
+  } catch {
+    recordingPending = null;
+  }
+}
+
+function renderRecordingBanner() {
+  if (!recordingPending?.srt) return '';
+  const mins = Math.max(1, Math.floor((recordingPending.duration_s || 0) / 60));
+  const phone = recordingPending.phone_hint ? ` · 電話 ${recordingPending.phone_hint}` : '';
+  return `
+    <div class="bridge-recording-pending" id="bridgeRecordingPending">
+      <strong>通話錄音一條龍 · 逐字稿已就緒</strong>
+      <p class="hint">${escapeHTML(recordingPending.wav_name || '通話')}${escapeHTML(phone)}（約 ${mins} 分鐘）— 要載入並分析嗎？（CRM 名單可對照電話與時間）</p>
+      <div class="bridge-actions">
+        <button type="button" class="btn primary" id="bridgeRecordingAnalyze">載入並分析</button>
+        <button type="button" class="btn" id="bridgeRecordingDismiss">稍後</button>
+      </div>
+    </div>`;
 }
 
 export function getSelectedDemoMp4() {
@@ -552,6 +596,7 @@ export function initLocalTranscribe({ onTranscriptReady, showToast, getMode }) {
     if (offline) offline.hidden = true;
     panel.hidden = false;
     applyDefaultMode(st);
+    await refreshRecordingPending(showToast);
     if (!uploadBusy && !transcribeBusy && !pinnedLogState) renderPanel(st);
     // First time the remote mode shows up with a saved worker, probe it silently so the
     // checklist says "connected / GPU: RTX…" without an extra click.
@@ -606,6 +651,7 @@ export function initLocalTranscribe({ onTranscriptReady, showToast, getMode }) {
 
     panel.innerHTML = `
       <p class="bridge-lead">錄影轉成逐字稿後，會<strong>自動載入</strong>到上方分析區，不需手動上傳 SRT。</p>
+      ${renderRecordingBanner()}
       ${renderChecklist(st)}
       ${advancedLocal}
       ${pythonWarn}
@@ -828,6 +874,31 @@ export function initLocalTranscribe({ onTranscriptReady, showToast, getMode }) {
       cancelTranscribe(showToast, refreshStatus)
     );
     panel.querySelector('#bridgeImport')?.addEventListener('click', () => importLatest(onTranscriptReady, showToast));
+    panel.querySelector('#bridgeRecordingAnalyze')?.addEventListener('click', async () => {
+      const srt = recordingPending?.srt;
+      if (!srt) return;
+      try {
+        const r = await api(`/api/srt/${encodeURIComponent(srt)}`);
+        onTranscriptReady(r.content, r.filename);
+        await api('/api/recording-pipeline/dismiss', { method: 'POST' });
+        recordingPending = null;
+        showToast('已載入通話逐字稿 — 可開始 AI 分析');
+        document.getElementById('labelCard')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        await refreshStatus();
+      } catch (e) {
+        showToast(e?.message || '無法載入逐字稿');
+      }
+    });
+    panel.querySelector('#bridgeRecordingDismiss')?.addEventListener('click', async () => {
+      try {
+        await api('/api/recording-pipeline/dismiss', { method: 'POST' });
+        recordingPending = null;
+        showToast('已略過 — 之後可從 output 資料夾手動載入 SRT');
+        await refreshStatus();
+      } catch (e) {
+        showToast(e?.message || '無法更新狀態');
+      }
+    });
     panel.querySelector('#bridgeNotifyToggle')?.addEventListener('click', () => toggleNotify(showToast));
     bindLogActions(showToast, refreshStatus);
     restorePinnedLog();
@@ -842,7 +913,19 @@ export function initLocalTranscribe({ onTranscriptReady, showToast, getMode }) {
 
   api('/api/job')
     .then((j) => {
-      if (!j.running || j.kind !== 'transcribe') return;
+      if (!j.running) return;
+      if (j.kind === 'recording-pipeline') {
+        transcribeBusy = true;
+        setTranscribeUI({ active: true, message: '通話錄音自動轉錄中…請保持助手視窗開啟' });
+        showLog(j.logs || []);
+        pollJob(async (ok) => {
+          await refreshStatus();
+          if (ok) showToast('通話錄音轉錄完成 — 請確認是否分析');
+          else showToast('通話錄音轉錄失敗 — 請查看下方記錄');
+        }, { trackTranscribe: true });
+        return;
+      }
+      if (j.kind !== 'transcribe') return;
       transcribeBusy = true;
       setTranscribeUI({ active: true, message: '轉錄進行中…請保持助手視窗開啟' });
       showLog(j.logs || []);
