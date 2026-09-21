@@ -133,7 +133,7 @@ class Handler(BaseHTTPRequestHandler):
 
     def _auth_ok(self) -> bool:
         expected = host_token()
-        provided = self.headers.get(TOKEN_HEADER, "")
+        provided = (self.headers.get(TOKEN_HEADER, "") or "").strip()
         return security.worker_token_matches(expected, provided)
 
     def _reject(self, status: int, message: str) -> None:
@@ -216,7 +216,14 @@ def _run_with_window(server: ThreadingHTTPServer, token: str, port: int, bind: s
     root.resizable(True, False)
     tk.Label(root, text="新竹主機代理（公司可遠端睡眠）", font=("", 12, "bold")).pack(pady=(10, 4))
     tk.Label(root, text=f"Port {port} · 請保持此視窗開啟", fg="#555").pack()
-    text = tk.Text(root, height=10, width=62, font=("Consolas", 9))
+    tk.Label(root, text="Host Token（貼到公司端「新竹遠端睡眠」）", font=("", 10, "bold")).pack(pady=(6, 2))
+    token_row = tk.Frame(root)
+    token_row.pack(padx=10, fill="x")
+    token_entry = tk.Entry(token_row, font=("Consolas", 10))
+    token_entry.insert(0, token)
+    token_entry.configure(state="readonly")
+    token_entry.pack(side="left", fill="x", expand=True)
+    text = tk.Text(root, height=8, width=62, font=("Consolas", 9))
     text.pack(padx=10, pady=8)
     text.insert("end", "\n".join(lines))
     text.configure(state="disabled")
@@ -253,7 +260,10 @@ def main(argv: list[str] | None = None) -> int:
         print(f"[錯誤] 無法監聽 {bind}:{port}：{e}")
         return 1
 
-    if demo_core.is_frozen() and "--console" not in argv:
+    use_window = "--console" not in argv and (
+        demo_core.is_frozen() or sys.platform == "win32"
+    )
+    if use_window:
         return _run_with_window(server, token, port, bind)
 
     for line in _banner_lines(token, port, bind):
