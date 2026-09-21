@@ -1,0 +1,14 @@
+Call Coach — 公司端遠端工具
+================================
+
+這個安裝包不含轉錄引擎，只給公司電腦用。
+
+第一次使用前（兩邊各做一次）
+  1. 新竹、公司都安裝 Tailscale，登入同一帳號
+  2. 新竹：安裝 Call Coach 本機助手，執行 start_hsinchu_host_agent.cmd，記下 Host Token
+  3. 公司：雙擊「新竹遠端睡眠」或 start_company_remote_sleep.cmd
+     輸入新竹 Tailscale IP 與 Token（之後存在 %APPDATA%\CallCoachRemoteHsinchu\config.json）
+
+遠端桌面請用 DeskIn（見 REMOTE_HSINCHU.md）。
+
+完整說明：同資料夾 REMOTE_HSINCHU.md
