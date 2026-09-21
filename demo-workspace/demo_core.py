@@ -1122,6 +1122,77 @@ def describe_exit_code(code: int) -> str:
     return ""
 
 
+GET_PIP_URL = "https://bootstrap.pypa.io/get-pip.py"
+
+
+def venv_pip_argv(*pip_args: str) -> list[str]:
+    """Run pip inside .venv. On Windows prefer pip.exe when `-m pip` is broken."""
+    pip_exe = VENV_PY.parent / "pip.exe"
+    if sys.platform == "win32" and pip_exe.is_file():
+        return [str(pip_exe), *pip_args]
+    return [str(VENV_PY), "-m", "pip", *pip_args]
+
+
+def venv_pip_works() -> bool:
+    if not VENV_PY.is_file():
+        return False
+    try:
+        proc = quiet_run(
+            venv_pip_argv("--version"),
+            cwd=ROOT,
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+        return proc.returncode == 0
+    except (OSError, subprocess.TimeoutExpired):
+        return False
+
+
+def _download_get_pip(log: LogFn) -> Path | None:
+    target = ROOT / "runtime" / "get-pip.py"
+    if target.is_file() and target.stat().st_size > 10_000:
+        return target
+    log("下載 get-pip.py（還原 .venv 的 pip）…")
+    code = run_command(
+        [
+            str(base_python_exe()),
+            "-c",
+            f"import urllib.request; urllib.request.urlretrieve({GET_PIP_URL!r}, {str(target)!r})",
+        ],
+        log=log,
+    )
+    if code != 0 or not target.is_file():
+        return None
+    return target
+
+
+def ensure_venv_pip(log: LogFn = default_log) -> int:
+    """Make sure .venv pip is runnable (fixes 'No module named pip.__main__')."""
+    if not VENV_PY.is_file():
+        log("[錯誤] 尚未建立 .venv")
+        return 1
+    if venv_pip_works():
+        return 0
+    log("[修復] .venv 的 pip 無法執行（常見於 pip 套件損壞），正在還原…")
+    code = run_command([str(VENV_PY), "-m", "ensurepip", "--upgrade", "--default-pip"], log=log)
+    if code != 0 or not venv_pip_works():
+        get_pip = _download_get_pip(log)
+        if not get_pip:
+            log("[錯誤] 無法下載 get-pip.py，請確認網路後重試")
+            return 1
+        log("使用 get-pip 還原 pip…")
+        code = run_command([str(VENV_PY), str(get_pip), "pip", "wheel"], log=log)
+        if code != 0:
+            log(f"[錯誤] get-pip 失敗（exit code {code}）")
+            return code
+    if not venv_pip_works():
+        log("[錯誤] pip 仍無法執行，請執行「完整 GPU 環境安裝」或 start_hsinchu_gpu.cmd reinstall")
+        return 1
+    log("pip 已還原，正在更新 pip / wheel…")
+    return run_command(venv_pip_argv("install", "-U", "pip", "wheel"), log=log)
+
+
 def create_venv(log: LogFn = default_log) -> int:
     """Create .venv using venv or virtualenv (embed Python lacks venv)."""
     py = base_python_exe()
@@ -1199,10 +1270,14 @@ def ensure_cuda_torch(log: LogFn = default_log, *, force: bool = False) -> int:
     if not VENV_PY.exists():
         log("[錯誤] 尚未建立 .venv")
         return 1
-    cmd = [str(VENV_PY), "-m", "pip", "install"]
+    code = ensure_venv_pip(log)
+    if code != 0:
+        return code
+    pip_args: list[str] = ["install"]
     if force:
-        cmd.append("--force-reinstall")
-    cmd.extend([*TORCH_CUDA_PINS, "--index-url", TORCH_CUDA_INDEX])
+        pip_args.append("--force-reinstall")
+    pip_args.extend([*TORCH_CUDA_PINS, "--index-url", TORCH_CUDA_INDEX])
+    cmd = venv_pip_argv(*pip_args)
     label = "強制安裝" if force else "安裝"
     log(f"{label} CUDA 12.8 版 PyTorch 2.8 + torchvision 0.23（與 WhisperX 相容，約 2.5 GB）…")
     code = run_command(cmd, log=log)
@@ -1223,9 +1298,9 @@ def run_repair_gpu_torch(log: LogFn = default_log) -> int:
         ver = ti.get("version") or "?"
         log(f"[錯誤] .venv 仍是 CPU 版 PyTorch（{ver}）")
         log(
-            "[提示] 請在助手目錄手動執行："
-            ".venv\\Scripts\\python -m pip install --force-reinstall "
-            "torch torchvision torchaudio "
+            "[提示] 請在助手目錄 CMD 手動執行："
+            ".venv\\Scripts\\pip.exe install --force-reinstall "
+            "torch==2.8.0 torchvision==0.23.0 torchaudio==2.8.0 "
             f"--index-url {TORCH_CUDA_INDEX}"
         )
         return 1
@@ -1288,10 +1363,8 @@ def run_setup(log: LogFn = default_log, *, gpu: bool = False) -> int:
     if code != 0:
         return code
 
-    code = run_command([str(VENV_PY), "-m", "pip", "install", "-U", "pip", "wheel"], log=log)
+    code = ensure_venv_pip(log)
     if code != 0:
-        log(f"[錯誤] pip 升級失敗（exit code {code}）")
-        log("[提示] 詳細日誌已儲存至 logs/ 資料夾，請複製給技術支援")
         return code
 
     if gpu:
@@ -1302,16 +1375,13 @@ def run_setup(log: LogFn = default_log, *, gpu: bool = False) -> int:
 
     log("安裝 whisperx、faster-whisper、azure 語音 SDK（首次約 5～15 分鐘，請保持網路連線）...")
     code = run_command(
-        [
-            str(VENV_PY),
-            "-m",
-            "pip",
+        venv_pip_argv(
             "install",
             "whisperx",
             "huggingface_hub",
             "faster-whisper",
             "azure-cognitiveservices-speech",
-        ],
+        ),
         log=log,
     )
     if code != 0:

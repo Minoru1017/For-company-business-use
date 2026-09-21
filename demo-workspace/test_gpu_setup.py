@@ -43,15 +43,30 @@ class GpuSetupTests(unittest.TestCase):
         with tempfile.TemporaryDirectory() as tmp:
             py = Path(tmp) / "python.exe"
             py.write_text("", encoding="utf-8")
-            with mock.patch.object(demo_core, "VENV_PY", py):
-                with mock.patch.object(demo_core, "run_command", return_value=0) as run_cmd:
-                    code = demo_core.ensure_cuda_torch(log=lambda _m: None, force=True)
+            with (
+                mock.patch.object(demo_core, "VENV_PY", py),
+                mock.patch.object(demo_core, "ensure_venv_pip", return_value=0),
+                mock.patch.object(demo_core, "run_command", return_value=0) as run_cmd,
+            ):
+                code = demo_core.ensure_cuda_torch(log=lambda _m: None, force=True)
         self.assertEqual(code, 0)
         args = run_cmd.call_args[0][0]
         self.assertIn("--force-reinstall", args)
         self.assertIn("torchvision==0.23.0", args)
         self.assertIn("torch==2.8.0", args)
         self.assertIn(demo_core.TORCH_CUDA_INDEX, args)
+
+    def test_venv_pip_argv_uses_pip_exe_on_windows(self) -> None:
+        with tempfile.TemporaryDirectory() as tmp:
+            scripts = Path(tmp)
+            py = scripts / "python.exe"
+            pip = scripts / "pip.exe"
+            py.write_text("", encoding="utf-8")
+            pip.write_text("", encoding="utf-8")
+            with mock.patch.object(demo_core, "VENV_PY", py), mock.patch.object(demo_core.sys, "platform", "win32"):
+                argv = demo_core.venv_pip_argv("install", "torch")
+            self.assertEqual(argv[0], str(pip))
+            self.assertEqual(argv[1:], ["install", "torch"])
 
     def test_verify_torch_stack_code_is_valid_python(self) -> None:
         compile(demo_core.VERIFY_TORCH_STACK_CODE, "<verify_torch_stack>", "exec")
