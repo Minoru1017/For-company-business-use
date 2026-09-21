@@ -16,7 +16,7 @@ Call Coach 本機助手 — 從這裡開始
   → 或刪除整個資料夾，至 Releases 重新下載最新 zip
 
 【新竹：公司遠端睡眠】
-  → 雙擊 start_hsinchu_host_agent.cmd（若沒有，見 REMOTE_HSINCHU.md）
-  → 或 CMD：CallCoachAssistant.exe --host-agent
+  → 開始選單「Call Coach 新竹主機代理」（CallCoachAssistant.exe --host-agent）
+  → 或雙擊 start_hsinchu_host_agent.cmd
 
 下載：https://github.com/Minoru1017/For-company-business-use/releases/latest
