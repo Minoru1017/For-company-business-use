@@ -26,11 +26,16 @@
 
 **不必裝 Call Coach 自製喚醒 App。** 詳細圖文：[REMOTE_HSINCHU.md](REMOTE_HSINCHU.md)
 
+| 電腦 | 建議安裝 |
+|------|----------|
+| **公司**（只要遠端睡眠 + DeskIn） | Releases 的 **`CallCoachCompanyRemote-Setup.exe`**（輕量，無 WhisperX） |
+| **新竹 GPU 主機** | **`CallCoachAssistant-Setup.exe`** + `start_hsinchu_host_agent.cmd` |
+
 1. 新竹、公司各裝 **Tailscale**（同一帳號）+ **DeskIn**（同一帳號，新竹設開機自啟）。  
 2. **日常**：新竹只關螢幕、不睡眠 → 公司直接 **DeskIn** 連線。  
 3. **要睡眠時**：新竹 PC 開 BIOS／網卡 **Wake-on-LAN**；公司需透過 **家裡常開設備**（NAS／小主機 + Tailscale）或日後路由器 WoL 設定喚醒，再開 DeskIn。路由器型號未知也可先用第 2 點。
 
-進階（可忽略）：`CallCoachCompanyWake.exe`、`start_hsinchu_host_agent.cmd` 為 repo 內選配工具。
+進階（可忽略）：`CallCoachCompanyWake.exe` 為 repo 內選配工具。
 
 ### 零門檻路徑：Azure 雲端轉錄（團隊預設）
 
