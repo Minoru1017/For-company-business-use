@@ -129,13 +129,16 @@ $AppFiles = @(
     "start_hsinchu_recording_watch.cmd",
     "start_recording_watch.cmd",
     "start_hsinchu_host_agent.cmd",
-    "start_company_wake.cmd"
+    "start_company_wake.cmd",
+    "start_company_remote_sleep.cmd"
 )
 foreach ($file in $AppFiles) {
     if (-not (Test-Path $file)) { throw "Missing installer file: $file" }
     Copy-Item $file $Payload -Force
 }
 Copy-Item -Recurse "demo_app" "$Payload\demo_app"
+New-Item -ItemType Directory -Force -Path "$Payload\scripts" | Out-Null
+Copy-Item "scripts\company_remote_sleep.ps1" "$Payload\scripts\" -Force
 Copy-Item "installer\setup_env.py" "$Payload\installer\setup_env.py" -Force
 
 $BuildStamp = (Get-Date).ToUniversalTime().ToString("yyyy-MM-dd HH:mm UTC")

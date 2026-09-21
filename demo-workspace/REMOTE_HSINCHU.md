@@ -62,6 +62,22 @@
 
 ---
 
+## 公司端讓新竹「睡眠」（選用）
+
+**前提**：新竹 PC **目前是醒的**，且正在跑 **主機代理**（不是 Tailscale 本身）。
+
+1. **新竹**（做一次）：雙擊 `C:\CallCoachAssistant\start_hsinchu_host_agent.cmd`  
+   - 記下 **Host Token**，建議寫入新竹 `.env`：`CALL_COACH_HOST_AGENT_TOKEN=...`  
+   - 此黑窗/背景要在你想被遠端休眠前保持運行（可設開機自動執行）。  
+2. **新竹防火牆**：若公司連不上，允許 **TCP 8769** 私人/Tailscale 網路。  
+3. **公司**：雙擊 `start_company_remote_sleep.cmd`（在 Call Coach 助手資料夾）  
+   - 第一次會問 **Tailscale IP**（例 `100.126.54.41`）和 **Token**，之後存在  
+     `%APPDATA%\CallCoachRemoteHsinchu\config.json`。  
+
+睡眠後 **DeskIn 會斷**；要再用需 **WoL 喚醒** 或到新竹按電源。若不想處理喚醒，請改「只關螢幕」不要遠端睡眠。
+
+---
+
 ## 和 Call Coach 的關係
 
 | 需求 | 用什麼 |

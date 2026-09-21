@@ -58,6 +58,12 @@ Magic Packet **無法從公司網路直接丟到新竹家裡**（除非路由器
 3. 尽量 **有線** 接路由器（Wi‑Fi 休眠喚醒不可靠）。  
 4. Tailscale 設 **開機自啟**（醒來後公司才能用 100.x 連）。
 
+## 公司遠端讓新竹睡眠
+
+1. 新竹：`start_hsinchu_host_agent.cmd`（8769 + Token）  
+2. 公司：`start_company_remote_sleep.cmd`（Tailscale IP + Token，設定存 `%APPDATA%\CallCoachRemoteHsinchu\config.json`）  
+3. 睡眠後 DeskIn 斷線；喚醒需 WoL 或人為開機。
+
 ## 不要用
 
 - 除非使用者明確要進階：repo 內 `CallCoachCompanyWake.exe` / `host agent`（較複雜）。  
