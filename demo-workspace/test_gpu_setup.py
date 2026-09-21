@@ -49,8 +49,12 @@ class GpuSetupTests(unittest.TestCase):
         self.assertEqual(code, 0)
         args = run_cmd.call_args[0][0]
         self.assertIn("--force-reinstall", args)
-        self.assertIn("torchvision", args)
+        self.assertIn("torchvision==0.23.0", args)
+        self.assertIn("torch==2.8.0", args)
         self.assertIn(demo_core.TORCH_CUDA_INDEX, args)
+
+    def test_verify_torch_stack_code_is_valid_python(self) -> None:
+        compile(demo_core.VERIFY_TORCH_STACK_CODE, "<verify_torch_stack>", "exec")
 
     def test_whisperx_failure_hints_torchvision_mismatch(self) -> None:
         hints = demo_core.whisperx_failure_hints(["RuntimeError: operator torchvision::nms does not exist"])

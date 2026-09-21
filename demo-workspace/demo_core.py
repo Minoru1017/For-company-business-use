@@ -1148,23 +1148,27 @@ def create_venv(log: LogFn = default_log) -> int:
 
 
 TORCH_CUDA_INDEX = "https://download.pytorch.org/whl/cu128"
-TORCH_CUDA_PACKAGES = ("torch", "torchvision", "torchaudio")
+# WhisperX 3.8.x pins torch~=2.8; unpinned cu128 index currently resolves to 2.11 and breaks imports.
+TORCH_CUDA_PINS = ("torch==2.8.0", "torchvision==0.23.0", "torchaudio==2.8.0")
+
+VERIFY_TORCH_STACK_CODE = """
+import json
+try:
+    import torch
+    import torchvision
+    from torchvision.transforms import InterpolationMode
+    from transformers import Wav2Vec2ForCTC
+    print(json.dumps({"ok": True, "torch": torch.__version__, "torchvision": torchvision.__version__}))
+except Exception as e:
+    print(json.dumps({"ok": False, "error": str(e)}))
+"""
 
 
 def verify_torch_stack() -> dict:
     """WhisperX alignment pulls transformers → torchvision; versions must match torch."""
     if not VENV_PY.exists():
         return {"ok": False, "error": "尚未建立 .venv"}
-    code = (
-        "import json;"
-        "try:"
-        " import torch,torchvision;"
-        " from torchvision.transforms import InterpolationMode;"
-        " from transformers import Wav2Vec2ForCTC;"
-        " print(json.dumps({'ok':True,'torch':torch.__version__,'torchvision':torchvision.__version__}))"
-        "except Exception as e:"
-        " print(json.dumps({'ok':False,'error':str(e)}))"
-    )
+    code = VERIFY_TORCH_STACK_CODE
     try:
         proc = quiet_run(
             [str(VENV_PY), "-c", code],
@@ -1197,9 +1201,9 @@ def ensure_cuda_torch(log: LogFn = default_log, *, force: bool = False) -> int:
     cmd = [str(VENV_PY), "-m", "pip", "install"]
     if force:
         cmd.append("--force-reinstall")
-    cmd.extend([*TORCH_CUDA_PACKAGES, "--index-url", TORCH_CUDA_INDEX])
+    cmd.extend([*TORCH_CUDA_PINS, "--index-url", TORCH_CUDA_INDEX])
     label = "強制安裝" if force else "安裝"
-    log(f"{label} CUDA 12.8 版 PyTorch + torchvision + torchaudio（約 2.5 GB）…")
+    log(f"{label} CUDA 12.8 版 PyTorch 2.8 + torchvision 0.23（與 WhisperX 相容，約 2.5 GB）…")
     code = run_command(cmd, log=log)
     if code != 0:
         log(f"[錯誤] CUDA 版 PyTorch 安裝失敗（exit code {code}）")
