@@ -125,7 +125,9 @@ $AppFiles = @(
     "README.md",
     "start_call_coach.cmd",
     "start_worker.cmd",
-    "start_hsinchu_gpu.cmd"
+    "start_hsinchu_gpu.cmd",
+    "start_hsinchu_recording_watch.cmd",
+    "start_recording_watch.cmd"
 )
 foreach ($file in $AppFiles) {
     if (-not (Test-Path $file)) { throw "Missing installer file: $file" }
@@ -160,6 +162,8 @@ Copy-Item "啟動 Call Coach.cmd" $ZipDist -Force
 Copy-Item "CallCoachAssistant.cmd" $ZipDist -Force
 Copy-Item "start_worker.cmd" $ZipDist -Force
 Copy-Item "start_hsinchu_gpu.cmd" $ZipDist -Force
+Copy-Item "start_hsinchu_recording_watch.cmd" $ZipDist -Force
+Copy-Item "start_recording_watch.cmd" $ZipDist -Force
 Copy-Item "start_call_coach.cmd" $ZipDist -Force
 
 $Zip = "dist\CallCoachAssistant-Windows.zip"
