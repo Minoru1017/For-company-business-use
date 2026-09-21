@@ -80,6 +80,19 @@
 
 睡眠後 **DeskIn 會斷**；要再用需 **WoL 喚醒** 或到新竹按電源。若不想處理喚醒，請改「只關螢幕」不要遠端睡眠。
 
+### ④ 限定時段：可遠端睡眠 + 定時自己醒（新竹）
+
+在 **`C:\CallCoachAssistant\host_schedule.json`**（由 `host_schedule.example.json` 複製；主機代理視窗 **「睡眠排程」** 可開啟）：
+
+| 設定 | 作用 |
+|------|------|
+| **`remote_sleep_allowed`** | 只有在此時段內，公司按「新竹遠端睡眠」才會成功 |
+| **`wake_at`** | 新竹 PC 在 **睡眠（非關機）** 時，由 Windows **定時喚醒**（RTC，不需 Wi‑Fi WoL） |
+
+- 主機代理**啟動時**會註冊工作排程器 `CallCoachHostWake_*`，並開啟電源「喚醒計時器」。  
+- 修改 JSON 後請**重新啟動主機代理**。  
+- **休眠 hibernate / 關機** 較難定時喚醒；建議遠端睡眠用預設 **sleep**。Wi‑Fi WoL 仍無法替代 RTC 定時喚醒。
+
 ---
 
 ## 和 Call Coach 的關係

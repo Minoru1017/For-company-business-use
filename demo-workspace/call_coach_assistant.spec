@@ -30,6 +30,7 @@ a = Analysis(
         "recording_pipeline",
         "assistant_update",
         "hsinchu_host_agent",
+        "host_power_schedule",
         "wol_utils",
         "tkinter",
     ],
