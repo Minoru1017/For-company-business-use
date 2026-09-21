@@ -28,6 +28,8 @@ let offlinePollTimer = null;
 let selectedMp4 = null;
 let uploadBusy = false;
 let transcribeBusy = false;
+/** Keeps failure logs visible after checklist refresh (renderPanel would wipe the log DOM). */
+let pinnedLogState = null;
 let uploadXhr = null;
 let uploadStartAt = 0;
 let bridgeApiToken = null;
@@ -550,7 +552,7 @@ export function initLocalTranscribe({ onTranscriptReady, showToast, getMode }) {
     if (offline) offline.hidden = true;
     panel.hidden = false;
     applyDefaultMode(st);
-    if (!uploadBusy && !transcribeBusy) renderPanel(st);
+    if (!uploadBusy && !transcribeBusy && !pinnedLogState) renderPanel(st);
     // First time the remote mode shows up with a saved worker, probe it silently so the
     // checklist says "connected / GPU: RTX…" without an extra click.
     if (transcribeMode === 'remote' && st.worker_ok && !workerHealth && !workerTesting && !workerAutoTested) {
@@ -695,6 +697,7 @@ export function initLocalTranscribe({ onTranscriptReady, showToast, getMode }) {
             <button type="button" class="btn" id="bridgeCopyLog">複製日誌</button>
             <button type="button" class="btn" id="bridgeDownloadLog">下載日誌</button>
             <button type="button" class="btn" id="bridgeOpenLogs">開啟 logs 資料夾</button>
+            <button type="button" class="btn hidden" id="bridgeDismissLog">關閉記錄</button>
           </div>
         </div>
         <p class="bridge-log-hint hidden" id="bridgeLogHint">安裝失敗時，請複製或下載日誌傳給技術支援。</p>
@@ -826,7 +829,8 @@ export function initLocalTranscribe({ onTranscriptReady, showToast, getMode }) {
     );
     panel.querySelector('#bridgeImport')?.addEventListener('click', () => importLatest(onTranscriptReady, showToast));
     panel.querySelector('#bridgeNotifyToggle')?.addEventListener('click', () => toggleNotify(showToast));
-    bindLogActions(showToast);
+    bindLogActions(showToast, refreshStatus);
+    restorePinnedLog();
     if (transcribeBusy) setTranscribeUI({ active: true });
     maybeAutoOpenTokenPage(st, showToast);
   }
@@ -1022,7 +1026,13 @@ async function toggleNotify(showToast) {
   if (btn) btn.textContent = notifyButtonLabel();
 }
 
-function setTranscribeUI({ active, message = '轉錄進行中…請保持助手視窗開啟', progress = null, cancelRequested = false }) {
+function setTranscribeUI({
+  active,
+  message = '轉錄進行中…請保持助手視窗開啟',
+  progress = null,
+  cancelRequested = false,
+  failed = false,
+}) {
   const wait = document.getElementById('bridgeWait');
   const status = document.getElementById('bridgeTranscribeStatus');
   const prog = document.getElementById('bridgeWaitProgress');
@@ -1032,15 +1042,19 @@ function setTranscribeUI({ active, message = '轉錄進行中…請保持助手�
 
   if (active) {
     wait.classList.remove('hidden');
-    status.classList.add('busy');
+    wait.classList.toggle('failed', failed);
+    status.classList.toggle('busy', !failed);
+    status.classList.toggle('failed', failed);
     const summary = progress && !cancelRequested ? waitSummary(progress) : '';
     status.textContent = summary ? `${message}　${summary}` : message;
     if (prog) prog.innerHTML = renderProgressHtml(progress, { cancelRequested });
-    cancel?.classList.remove('hidden');
+    cancel?.classList.toggle('hidden', failed);
     if (start) start.disabled = true;
   } else {
     wait.classList.add('hidden');
+    wait.classList.remove('failed');
     status.classList.remove('busy');
+    status.classList.remove('failed');
     status.textContent = '';
     if (prog) prog.innerHTML = '';
     cancel?.classList.add('hidden');
@@ -1062,19 +1076,56 @@ function restoreTitle() {
   baseTitle = '';
 }
 
-function showLog(lines, { failed = false, title = '執行記錄' } = {}) {
+function showLog(lines, { failed = false, title = '執行記錄', pin = false } = {}) {
   const panel = document.getElementById('bridgeLogPanel');
   const el = document.getElementById('bridgeLog');
   const hint = document.getElementById('bridgeLogHint');
   const titleEl = document.getElementById('bridgeLogTitle');
   if (!el || !panel) return;
+  const text = (lines || []).join('\n');
+  if (pin || failed) pinnedLogState = { lines: lines || [], failed, title, text };
   panel.classList.remove('hidden');
   if (failed) panel.classList.add('err');
   else panel.classList.remove('err');
   if (titleEl) titleEl.textContent = title;
-  if (hint) hint.classList.toggle('hidden', !failed);
-  el.textContent = (lines || []).join('\n');
+  if (hint) {
+    hint.classList.toggle('hidden', !failed);
+    if (failed) {
+      hint.textContent =
+        '轉錄失敗：請按「複製日誌」或「開啟 logs 資料夾」；修好環境後按「關閉記錄」再重試。';
+    }
+  }
+  const dismiss = document.getElementById('bridgeDismissLog');
+  if (dismiss) dismiss.classList.toggle('hidden', !failed || !pin);
+  el.textContent = text;
   el.scrollTop = el.scrollHeight;
+}
+
+function restorePinnedLog() {
+  if (!pinnedLogState) return;
+  showLog(pinnedLogState.lines, {
+    failed: pinnedLogState.failed,
+    title: pinnedLogState.title,
+    pin: true,
+  });
+}
+
+function clearPinnedLog({ hideWait = false } = {}) {
+  pinnedLogState = null;
+  if (hideWait) setTranscribeUI({ active: false });
+}
+
+async function enrichLogsFromDisk(lines) {
+  const base = (lines || []).join('\n');
+  try {
+    const r = await fetchLatestLog();
+    if (r.ok && r.content && r.content.length > base.length) {
+      return r.content.split('\n');
+    }
+  } catch {
+    /* keep in-memory job logs */
+  }
+  return lines || [];
 }
 
 async function fetchLatestLog() {
@@ -1112,12 +1163,17 @@ async function downloadLatestLog(showToast) {
   }
 }
 
-function bindLogActions(showToast) {
+function bindLogActions(showToast, refreshStatus) {
   document.getElementById('bridgeCopyLog')?.addEventListener('click', () => copyLatestLog(showToast));
   document.getElementById('bridgeDownloadLog')?.addEventListener('click', () => downloadLatestLog(showToast));
   document.getElementById('bridgeOpenLogs')?.addEventListener('click', async () => {
     await api('/api/open-folder', { method: 'POST', body: JSON.stringify({ folder: 'logs' }) });
     showToast('已開啟 logs 資料夾');
+  });
+  document.getElementById('bridgeDismissLog')?.addEventListener('click', async () => {
+    clearPinnedLog({ hideWait: true });
+    showToast('已關閉失敗記錄，可再次轉錄');
+    await refreshStatus?.();
   });
 }
 
@@ -1366,20 +1422,54 @@ async function pollJob(onDone, { trackTranscribe = false, trackSetup = false } =
       }
       if (!j.running && j.exit_code !== null) {
         clearInterval(pollTimer);
+        const transcribeFailed = trackTranscribe && j.exit_code !== 0 && j.exit_code !== 130;
         if (trackTranscribe) {
           transcribeBusy = false;
-          setTranscribeUI({ active: false });
-          restoreTitle();
-          if (j.exit_code === 0) {
-            notifyJobDone({ title: 'Call Coach：轉錄完成', body: '逐字稿已產生，回到 Call Coach 就會自動載入並可開始分析。' });
-          } else if (j.exit_code !== 130) {
-            notifyJobDone({ title: 'Call Coach：轉錄失敗', body: transcribeFailToast(j.logs), ok: false });
+          if (transcribeFailed) {
+            const logs = await enrichLogsFromDisk(j.logs);
+            showLog(logs, {
+              failed: true,
+              title: '轉錄失敗 — 請複製日誌',
+              pin: true,
+            });
+            const failProgress = j.progress
+              ? { ...j.progress, done: true, ok: false, phase_label: '轉錄失敗' }
+              : {
+                  done: true,
+                  ok: false,
+                  percent: 0,
+                  phase_label: '轉錄失敗',
+                  phase_states: [],
+                  elapsed_s: 0,
+                };
+            setTranscribeUI({
+              active: true,
+              failed: true,
+              message: '轉錄失敗 — 日誌已保留在下方，請複製後再重試',
+              progress: failProgress,
+            });
+            restoreTitle();
+            notifyJobDone({ title: 'Call Coach：轉錄失敗', body: transcribeFailToast(logs), ok: false });
+          } else {
+            setTranscribeUI({ active: false });
+            restoreTitle();
+            if (j.exit_code === 0) {
+              pinnedLogState = null;
+              notifyJobDone({
+                title: 'Call Coach：轉錄完成',
+                body: '逐字稿已產生，回到 Call Coach 就會自動載入並可開始分析。',
+              });
+            }
           }
         }
         try {
           onDone(j.exit_code === 0, j);
         } finally {
-          if (trackTranscribe) window.__refreshBridge?.();
+          if (trackTranscribe && !transcribeFailed) window.__refreshBridge?.();
+          else if (trackTranscribe && transcribeFailed) {
+            const st = await checkLocalBridge();
+            if (st) window.__demoPlayerOnBridgeStatus?.(st);
+          }
         }
       }
     } catch (err) {
@@ -1407,7 +1497,15 @@ async function pollJob(onDone, { trackTranscribe = false, trackSetup = false } =
         '若轉錄仍在背景進行，重新整理網頁即可繼續追蹤，完成後按「載入最新 SRT」。',
         '詳細原因請看 logs 資料夾中最新的 transcribe-*.log。',
       ];
-      if (trackTranscribe) showLog(logs, { failed: true, title: '與助手失去連線' });
+      if (trackTranscribe) {
+        showLog(logs, { failed: true, title: '與助手失去連線', pin: true });
+        setTranscribeUI({
+          active: true,
+          failed: true,
+          message: '與助手失去連線 — 若轉錄仍在背景進行，請重開助手後重新整理網頁',
+          progress: { done: true, ok: false, percent: 0, phase_label: '連線中斷', phase_states: [], elapsed_s: 0 },
+        });
+      }
       onDone(false, { logs });
     } finally {
       inFlight = false;
@@ -1699,6 +1797,7 @@ async function runTranscribe(onTranscriptReady, showToast, refreshStatus) {
       }),
     });
     if (!r.ok) return showToast(r.message || '無法開始轉錄');
+    clearPinnedLog({ hideWait: true });
     transcribeBusy = true;
     setTranscribeUI({ active: true, message: '正在啟動轉錄…' });
     showLog([
