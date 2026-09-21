@@ -105,6 +105,8 @@ Copy-Item "runtime\ffmpeg\*" "$Payload\runtime\ffmpeg" -Force
 
 $AppFiles = @(
     "demo_app.py",
+    "hsinchu_host_agent.py",
+    "wol_utils.py",
     "demo_core.py",
     "srt_utils.py",
     "proc_utils.py",
@@ -130,7 +132,8 @@ $AppFiles = @(
     "start_recording_watch.cmd",
     "start_hsinchu_host_agent.cmd",
     "start_company_wake.cmd",
-    "start_company_remote_sleep.cmd"
+    "start_company_remote_sleep.cmd",
+    "install_host_agent.cmd"
 )
 foreach ($file in $AppFiles) {
     if (-not (Test-Path $file)) { throw "Missing installer file: $file" }
