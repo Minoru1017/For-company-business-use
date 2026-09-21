@@ -27,10 +27,11 @@ from pathlib import Path
 from urllib.parse import urlparse
 
 import demo_core
+import host_power_schedule
 import security
 import wol_utils
 
-AGENT_VERSION = "1.0"
+AGENT_VERSION = "1.1"
 DEFAULT_PORT = 8769
 DEFAULT_BIND = "0.0.0.0"
 TOKEN_HEADER = "X-Call-Coach-Host-Token"
@@ -88,13 +89,16 @@ def local_addresses() -> list[str]:
 
 
 def host_health() -> dict:
-    return {
+    sched = host_power_schedule.load_schedule()
+    data = {
         "ok": True,
         "agent_version": AGENT_VERSION,
         "hostname": socket.gethostname(),
         "addresses": local_addresses(),
         "time": time.time(),
     }
+    data.update(host_power_schedule.schedule_status_dict(sched))
+    return data
 
 
 def request_sleep(mode: str = "sleep") -> None:
@@ -163,11 +167,29 @@ class Handler(BaseHTTPRequestHandler):
             body = {}
 
         if path == "/host/sleep":
+            sched = host_power_schedule.load_schedule()
+            if sched.enabled and not sched.remote_sleep_ok():
+                return self._reject(
+                    403,
+                    "目前不在允許遠端睡眠的時段（見新竹 host_schedule.json）",
+                )
             try:
                 request_sleep(str(body.get("mode", "sleep")))
             except OSError as e:
                 return self._reject(500, str(e))
             return self._send_json({"ok": True, "message": "已送出休眠指令"})
+
+        if path == "/host/schedule/reload":
+            host_power_schedule.ensure_example_file()
+            sched = host_power_schedule.load_schedule()
+            ok, msg = host_power_schedule.sync_wake_tasks(sched)
+            return self._send_json(
+                {
+                    "ok": ok,
+                    "message": msg,
+                    **host_power_schedule.schedule_status_dict(sched),
+                }
+            )
 
         if path == "/host/wol":
             mac = str(body.get("mac", "")).strip()
@@ -189,14 +211,19 @@ SERVER_STARTED = time.time()
 
 def _banner_lines(token: str, port: int, bind: str) -> list[str]:
     addrs = local_addresses()
-    return [
+    sched = host_power_schedule.load_schedule()
+    lines = [
         "=== Call Coach 新竹主機代理 ===",
         f"監聽 http://{bind}:{port}/host/health",
         f"Tailscale / 區網：{', '.join(addrs) or '（未取得）'}",
         f"Host Token：{token}",
         "請複製 Token 給公司端 start_company_remote_sleep.cmd",
         "建議寫入 .env：CALL_COACH_HOST_AGENT_TOKEN=…",
+        "",
     ]
+    lines.extend(sched.summary_lines())
+    lines.append("排程設定：host_schedule.json（同資料夾，可從 host_schedule.example.json 複製）")
+    return lines
 
 
 def _run_with_window(server: ThreadingHTTPServer, token: str, port: int, bind: str) -> int:
@@ -212,7 +239,7 @@ def _run_with_window(server: ThreadingHTTPServer, token: str, port: int, bind: s
 
     root = tk.Tk()
     root.title("Call Coach 新竹主機代理")
-    root.geometry("520x320")
+    root.geometry("540x380")
     root.resizable(True, False)
     tk.Label(root, text="新竹主機代理（公司可遠端睡眠）", font=("", 12, "bold")).pack(pady=(10, 4))
     tk.Label(root, text=f"Port {port} · CallCoachAssistant.exe --host-agent", fg="#555").pack()
@@ -243,11 +270,24 @@ def _run_with_window(server: ThreadingHTTPServer, token: str, port: int, bind: s
 
         subprocess.Popen([sys.executable, "--assistant"], cwd=str(ROOT), close_fds=False)
 
+    def on_schedule() -> None:
+        host_power_schedule.ensure_example_file()
+        path = host_power_schedule.SCHEDULE_FILE
+        if not path.is_file():
+            path.write_text(
+                (host_power_schedule.EXAMPLE_FILE.read_text(encoding="utf-8")),
+                encoding="utf-8",
+            )
+        os.startfile(str(path))  # type: ignore[attr-defined]
+        ok, msg = host_power_schedule.sync_wake_tasks(host_power_schedule.load_schedule())
+        messagebox.showinfo("排程", f"已開啟 host_schedule.json\n\n{msg}")
+
     row = tk.Frame(root)
     row.pack(pady=6)
-    tk.Button(row, text="複製 Token", command=copy_token, width=14).pack(side="left", padx=4)
-    tk.Button(row, text="另開本機助手", command=on_assistant, width=14).pack(side="left", padx=4)
-    tk.Button(row, text="結束代理", command=on_quit, width=14).pack(side="left", padx=4)
+    tk.Button(row, text="複製 Token", command=copy_token, width=12).pack(side="left", padx=2)
+    tk.Button(row, text="睡眠排程", command=on_schedule, width=12).pack(side="left", padx=2)
+    tk.Button(row, text="另開助手", command=on_assistant, width=10).pack(side="left", padx=2)
+    tk.Button(row, text="結束代理", command=on_quit, width=10).pack(side="left", padx=2)
     root.protocol("WM_DELETE_WINDOW", on_quit)
     root.mainloop()
     server.server_close()
@@ -257,6 +297,13 @@ def _run_with_window(server: ThreadingHTTPServer, token: str, port: int, bind: s
 def main(argv: list[str] | None = None) -> int:
     argv = list(sys.argv[1:] if argv is None else argv)
     demo_core.ensure_workspace_files()
+    host_power_schedule.ensure_example_file()
+    sched = host_power_schedule.load_schedule()
+    ok, wake_msg = host_power_schedule.sync_wake_tasks(sched)
+    if not ok:
+        print(f"[提醒] 定時喚醒工作：{wake_msg}")
+    elif sched.enabled and sched.wake_at:
+        print(f"[排程] {wake_msg}")
     token = host_token()
     port = host_port()
     bind = host_bind()

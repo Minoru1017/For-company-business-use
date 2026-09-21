@@ -42,7 +42,18 @@ try {
     $r = Invoke-RestMethod -Method POST -Uri $uri -Headers $headers -Body $body -ContentType "application/json; charset=utf-8" -TimeoutSec 15
     Write-Host "OK: $($r.message)"
 } catch {
-    Write-Host "失敗: $($_.Exception.Message)"
-    Write-Host "請確認：① 新竹已執行 start_hsinchu_host_agent.cmd  ② Windows 防火牆允許連入 ${port}  ③ Token 正確"
+    $detail = $_.Exception.Message
+    if ($_.ErrorDetails -and $_.ErrorDetails.Message) {
+        try {
+            $errBody = $_.ErrorDetails.Message | ConvertFrom-Json
+            if ($errBody.message) { $detail = $errBody.message }
+        } catch { }
+    }
+    Write-Host "失敗: $detail"
+    if ($detail -match "時段") {
+        Write-Host "（新竹 host_schedule.json 限制遠端睡眠時段；或等定時喚醒後再連 DeskIn）"
+    } else {
+        Write-Host "請確認：① 新竹已執行 start_hsinchu_host_agent.cmd  ② Windows 防火牆允許連入 ${port}  ③ Token 正確"
+    }
     exit 1
 }

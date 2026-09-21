@@ -106,6 +106,8 @@ Copy-Item "runtime\ffmpeg\*" "$Payload\runtime\ffmpeg" -Force
 $AppFiles = @(
     "demo_app.py",
     "hsinchu_host_agent.py",
+    "host_power_schedule.py",
+    "host_schedule.example.json",
     "wol_utils.py",
     "demo_core.py",
     "srt_utils.py",
