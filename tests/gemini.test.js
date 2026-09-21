@@ -1,5 +1,15 @@
 import { describe, expect, it } from 'vitest';
-import { chunkTranscript, extractSuggestedModel, formatApiError, isDeprecatedModel, mergeAIResults, parseAIResponse, pickPreferredModel } from '../src/gemini.js';
+import {
+  chunkTranscript,
+  extractSuggestedModel,
+  formatApiError,
+  isDeprecatedModel,
+  isRetryableGeminiStatus,
+  mergeAIResults,
+  modelsToTryForCapacity,
+  parseAIResponse,
+  pickPreferredModel,
+} from '../src/gemini.js';
 
 describe('gemini helpers', () => {
   it('parses valid AI JSON', () => {
@@ -34,6 +44,14 @@ describe('gemini helpers', () => {
     expect(formatApiError(401, {})).toContain('401');
     expect(formatApiError(404, { error: { message: 'use models/gemini-3.6-flash' } })).toContain('gemini-3.6-flash');
     expect(formatApiError(429, {})).toContain('429');
+    expect(formatApiError(503, { error: { message: 'high demand' } })).toContain('flash-lite');
+  });
+
+  it('retries and capacity fallbacks', () => {
+    expect(isRetryableGeminiStatus(503)).toBe(true);
+    expect(isRetryableGeminiStatus(401)).toBe(false);
+    expect(modelsToTryForCapacity('gemini-3.6-flash')[0]).toBe('gemini-3.6-flash');
+    expect(modelsToTryForCapacity('gemini-3.6-flash')).toContain('gemini-3.6-flash-lite');
   });
 
   it('detects deprecated models and picks preferred', () => {

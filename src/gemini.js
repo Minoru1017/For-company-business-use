@@ -1,5 +1,9 @@
 export const DEFAULT_MODEL = 'gemini-3.6-flash';
 export const FALLBACK_MODELS = ['gemini-3.6-flash', 'gemini-3.6-flash-lite', 'gemini-3.6-pro'];
+/** When primary model returns 503/429, try these in order (flash-lite often has spare capacity). */
+export const CAPACITY_FALLBACK_ORDER = ['gemini-3.6-flash-lite', 'gemini-3.6-pro', 'gemini-3.6-flash'];
+
+const RETRY_DELAYS_MS = [2000, 5000, 12000];
 
 /** Models Google has deprecated for new users (prefix match). */
 const DEPRECATED_PREFIXES = ['gemini-1.5-', 'gemini-2.0-', 'gemini-2.5-'];
@@ -128,8 +132,116 @@ export function formatApiError(status, errBody) {
       : `模型不存在或 API 路徑錯誤（404）：${msg}。請按「驗證模型」確認可用清單。`;
   }
   if (status === 429) return `官方額度已用完或請求過於頻繁（429）：${msg}`;
+  if (status === 503) {
+    return `Google 服務暫時忙碌（503）：${msg}。系統會自動等待重試並改試 flash-lite / pro。`;
+  }
   if (status >= 500) return `Google 服務暫時異常（${status}）：${msg}。請稍後重試。`;
   return msg;
+}
+
+export function isRetryableGeminiStatus(status) {
+  return status === 429 || status === 500 || status === 502 || status === 503;
+}
+
+/** Models to attempt when capacity errors persist (deduped, primary first). */
+export function modelsToTryForCapacity(primary) {
+  const seen = new Set();
+  const out = [];
+  for (const m of [primary, ...CAPACITY_FALLBACK_ORDER, ...FALLBACK_MODELS]) {
+    const name = String(m || '').trim();
+    if (!name || seen.has(name) || isDeprecatedModel(name)) continue;
+    seen.add(name);
+    out.push(name);
+  }
+  return out;
+}
+
+function sleepMs(ms, signal) {
+  if (signal?.aborted) throw new DOMException('Aborted', 'AbortError');
+  return new Promise((resolve, reject) => {
+    const id = setTimeout(resolve, ms);
+    if (!signal) return;
+    signal.addEventListener(
+      'abort',
+      () => {
+        clearTimeout(id);
+        reject(new DOMException('Aborted', 'AbortError'));
+      },
+      { once: true }
+    );
+  });
+}
+
+/** Retry the same model on transient Google errors (503 high demand, 429, 5xx). */
+export async function callGeminiWithRetry({
+  apiKey,
+  model,
+  text,
+  signal,
+  fetchImpl = fetch,
+  parse = parseAIResponse,
+  onRetry,
+}) {
+  let lastErr;
+  for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt++) {
+    try {
+      return await callGemini({ apiKey, model, text, signal, fetchImpl, parse });
+    } catch (e) {
+      lastErr = e;
+      if (!isRetryableGeminiStatus(e.status) || attempt >= RETRY_DELAYS_MS.length) throw e;
+      const delayMs = RETRY_DELAYS_MS[attempt];
+      onRetry?.({ attempt: attempt + 1, maxAttempts: RETRY_DELAYS_MS.length, delayMs, status: e.status, model });
+      await sleepMs(delayMs, signal);
+    }
+  }
+  throw lastErr;
+}
+
+/**
+ * 404 → suggested model; 503/429/5xx → retry then alternate models.
+ * Returns { raw, usedTokens, parsed, modelUsed }.
+ */
+export async function callGeminiResilient({
+  apiKey,
+  model,
+  text,
+  signal,
+  fetchImpl = fetch,
+  parse = parseAIResponse,
+  onRetry,
+  onModelSwitch,
+}) {
+  const queue = modelsToTryForCapacity(model);
+  let lastErr;
+  for (let i = 0; i < queue.length; i++) {
+    const tryModel = queue[i];
+    if (i > 0) onModelSwitch?.(tryModel, model);
+    try {
+      const result = await callGeminiWithRetry({
+        apiKey,
+        model: tryModel,
+        text,
+        signal,
+        fetchImpl,
+        parse,
+        onRetry: (info) => onRetry?.({ ...info, model: tryModel }),
+      });
+      return { ...result, modelUsed: tryModel };
+    } catch (e) {
+      lastErr = e;
+      if (e.status === 404) {
+        const suggested = extractSuggestedModel(e.message);
+        if (suggested && !queue.includes(suggested)) queue.push(suggested);
+        continue;
+      }
+      if (isRetryableGeminiStatus(e.status)) continue;
+      throw e;
+    }
+  }
+  if (lastErr) {
+    lastErr.message = `${lastErr.message}（已依序嘗試：${queue.join(' → ')}）`;
+  }
+  throw lastErr;
 }
 
 export async function callGemini({ apiKey, model, text, signal, fetchImpl = fetch, parse = parseAIResponse }) {

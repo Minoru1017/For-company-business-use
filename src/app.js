@@ -2,10 +2,9 @@ import { runAnalysis } from './analyze.js';
 import { drawChart } from './chart.js';
 import {
   buildTranscript,
-  callGemini,
+  callGeminiResilient,
   chunkTranscript,
   DEFAULT_MODEL,
-  extractSuggestedModel,
   FALLBACK_MODELS,
   isDeprecatedModel,
   listGeminiModels,
@@ -471,20 +470,6 @@ function saveModelPreference(model) {
   localStorage.setItem('gemini_model', model);
 }
 
-async function callGeminiResilient({ apiKey, model, text, signal, parse }) {
-  try {
-    return await callGemini({ apiKey, model, text, signal, parse });
-  } catch (e) {
-    if (e.status !== 404) throw e;
-    const suggested = extractSuggestedModel(e.message);
-    const next = suggested && suggested !== model ? suggested : DEFAULT_MODEL;
-    if (next === model) throw e;
-    saveModelPreference(next);
-    showToast(`模型已切換為 ${next}，重新請求中…`);
-    return callGemini({ apiKey, model: next, text, signal, parse });
-  }
-}
-
 function bindApiKey() {
   $('rememberKey').checked = keyStorage.remember;
   $('apiKey').value = keyStorage.load();
@@ -639,13 +624,28 @@ async function runAIAnalysis() {
       const perChunk = i ? (Date.now() - startedAt) / i : 0;
       const remainSec = i ? Math.ceil((perChunk * (chunks.length - i)) / 1000) : null;
       const eta = remainSec == null ? '（每段通常 10～40 秒）' : `（約還需 ${remainSec >= 60 ? `${Math.ceil(remainSec / 60)} 分` : `${remainSec} 秒`}）`;
-      setAIProgress(i, chunks.length, `AI 分析中：第 ${i + 1} / ${chunks.length} 段…${eta}`);
-      const { parsed, usedTokens } = await callGeminiResilient({
+      setAIProgress(i, chunks.length, `AI 分析中：第 ${i + 1} / ${chunks.length} 段（${model}）…${eta}`);
+      const { parsed, usedTokens, modelUsed } = await callGeminiResilient({
         apiKey: key,
         model,
         text: MANUAL_PROMPT + prefix + chunks[i],
         signal: aiAbort.signal,
+        onRetry: ({ attempt, maxAttempts, delayMs, status }) => {
+          setAIProgress(
+            i,
+            chunks.length,
+            `Google 回報 ${status}，${Math.round(delayMs / 1000)} 秒後重試 (${attempt}/${maxAttempts})…`
+          );
+        },
+        onModelSwitch: (next, prev) => {
+          if (next !== prev) {
+            model = next;
+            showToast(`${prev} 忙碌，改試 ${next}…`);
+            setAIProgress(i, chunks.length, `已改試 ${next}，第 ${i + 1} / ${chunks.length} 段…`);
+          }
+        },
       });
+      if (modelUsed && modelUsed !== model) model = modelUsed;
       totalTokens += usedTokens;
       partials.push(parsed);
     }
@@ -665,7 +665,9 @@ async function runAIAnalysis() {
         'Google 回應本 Key 的免費額度已耗盡。可等幾分鐘後重試、等明日重置，或升級付費方案。'
       );
     }
-    $('aiStatus').textContent = e.name === 'AbortError' || e.message === '已取消分析' ? '已取消 AI 分析' : `分析失敗：${e.message}`;
+    const cancelled = e.name === 'AbortError' || e.message === '已取消分析';
+    const extra503 = e.status === 503 ? ' 可改選模型「gemini-3.6-flash-lite」或稍後再試。' : '';
+    $('aiStatus').textContent = cancelled ? '已取消 AI 分析' : `分析失敗：${e.message}${extra503}`;
   } finally {
     $('aiBtn').disabled = false;
     $('aiCancel').hidden = true;
