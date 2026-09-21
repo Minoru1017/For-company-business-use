@@ -22,16 +22,15 @@
 | 不確定 | 在安裝資料夾雙擊 `CallCoachAssistant.exe` → 會跳出模式選擇 |
 | 完整移除 | 助手或 Worker 視窗 → **完整解除安裝…**（清 `.venv`／`worker`／可選 `models`，並啟動 Windows 解除安裝精靈） |
 
-### 新竹主機喚醒 + DeskIn（公司端專用 App）
+### 公司連新竹桌面（標準：Tailscale + DeskIn）
 
-| 端 | 安裝 | 用途 |
-|----|------|------|
-| **新竹 GPU 電腦** | 執行 `start_hsinchu_host_agent.cmd`（或 `CallCoachAssistant.exe --host-agent`） | 休眠、回報在線、可選在本機 LAN 轉送 WoL |
-| **公司電腦** | **`CallCoachCompanyWake.exe`**（見 Releases 或 `build_company_wake.ps1`） | 選擇是否喚醒、送 Magic Packet、喚醒後一鍵開 DeskIn |
+**不必裝 Call Coach 自製喚醒 App。** 詳細圖文：[REMOTE_HSINCHU.md](REMOTE_HSINCHU.md)
 
-**前置（新竹）**：BIOS 與網卡開 **Wake-on-LAN**；兩台都裝 **Tailscale**（公司端填 `100.x.x.x`）。若公司網路無法直接廣播到家裡，請在路由器設定 **WoL 轉發**，或把 WoL 廣播位址改成家裡子網（例 `192.168.1.255`），必要時勾「由主機代理轉送」（需家裡有 always-on 裝置代發）。
+1. 新竹、公司各裝 **Tailscale**（同一帳號）+ **DeskIn**（同一帳號，新竹設開機自啟）。  
+2. **日常**：新竹只關螢幕、不睡眠 → 公司直接 **DeskIn** 連線。  
+3. **要睡眠時**：新竹 PC 開 BIOS／網卡 **Wake-on-LAN**；公司需透過 **家裡常開設備**（NAS／小主機 + Tailscale）或日後路由器 WoL 設定喚醒，再開 DeskIn。路由器型號未知也可先用第 2 點。
 
-公司端設定檔：`%APPDATA%\CallCoachCompanyWake\settings.json`。
+進階（可忽略）：`CallCoachCompanyWake.exe`、`start_hsinchu_host_agent.cmd` 為 repo 內選配工具。
 
 ### 零門檻路徑：Azure 雲端轉錄（團隊預設）
 
