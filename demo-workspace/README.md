@@ -29,7 +29,7 @@
 | 電腦 | 建議安裝 |
 |------|----------|
 | **公司**（只要遠端睡眠 + DeskIn） | Releases 的 **`CallCoachCompanyRemote-Setup.exe`**（輕量，無 WhisperX） |
-| **新竹 GPU 主機** | **`CallCoachAssistant-Setup.exe`** + `start_hsinchu_host_agent.cmd` |
+| **新竹 GPU 主機** | **`CallCoachAssistant-Setup.exe`**；開始選單 **新竹主機代理** 或 `start_hsinchu_host_agent.cmd` |
 
 1. 新竹、公司各裝 **Tailscale**（同一帳號）+ **DeskIn**（同一帳號，新竹設開機自啟）。  
 2. **日常**：新竹只關螢幕、不睡眠 → 公司直接 **DeskIn** 連線。  

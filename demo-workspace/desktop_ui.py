@@ -108,6 +108,40 @@ def launch_full_uninstall_dialog(parent, *, then_exit: bool = False) -> None:
     run_full_uninstall_async(parent, remove_models=remove_models, remove_logs=remove_logs)
 
 
+def switch_exe_to_host_agent(server, root) -> None:
+    """Stop the local assistant HTTP server and re-exec in host-agent mode."""
+    from tkinter import messagebox
+
+    if not messagebox.askyesno(
+        "啟動新竹主機代理",
+        "將停止「本機助手」並改為「新竹主機代理」模式。\n\n"
+        "視窗會顯示 Host Token，供公司端「新竹遠端睡眠」使用。\n"
+        "本機 DEMO 轉錄 API 會停止，直到您重新開啟本機助手。\n\n"
+        "（Worker 與主機代理可各開一個視窗；若已在跑 Worker 請直接另開主機代理。）\n\n"
+        "繼續？",
+        parent=root,
+    ):
+        return
+    server.shutdown()
+    root.destroy()
+    server.server_close()
+    args = [sys.executable, "--host-agent"]
+    if sys.platform == "win32":
+        subprocess.Popen(args, cwd=str(demo_core.ROOT), close_fds=False)
+    else:
+        subprocess.Popen(args, cwd=str(demo_core.ROOT))
+    raise SystemExit(0)
+
+
+def launch_host_agent_subprocess() -> None:
+    """Start host-agent mode in a second process (assistant / worker keep running)."""
+    args = [sys.executable, "--host-agent"]
+    if sys.platform == "win32":
+        subprocess.Popen(args, cwd=str(demo_core.ROOT), close_fds=False)
+    else:
+        subprocess.Popen(args, cwd=str(demo_core.ROOT))
+
+
 def switch_exe_to_worker(server, root) -> None:
     """Stop the local assistant HTTP server and re-exec this binary in Worker mode."""
     from tkinter import messagebox
@@ -133,7 +167,10 @@ def switch_exe_to_worker(server, root) -> None:
 
 
 def run_launcher() -> str:
-    """Mode picker when CallCoachAssistant.exe is started without --assistant / --worker. Returns assistant|worker|full_uninstall|exit."""
+    """Mode picker when CallCoachAssistant.exe is started without CLI mode flags.
+
+    Returns assistant|worker|host_agent|full_uninstall|exit.
+    """
     import tkinter as tk
     from tkinter import messagebox
 
@@ -141,7 +178,7 @@ def run_launcher() -> str:
 
     root = tk.Tk()
     root.title("Call Coach")
-    root.geometry("440x320")
+    root.geometry("460x400")
     root.resizable(False, False)
     tk.Label(root, text="Call Coach 本機助手", font=("", 14, "bold")).pack(pady=(16, 4))
     tk.Label(
@@ -165,6 +202,13 @@ def run_launcher() -> str:
         width=42,
     ).pack(pady=(10, 4))
     tk.Label(root, text="顯示網址與 Token，供公司電腦連線轉錄", fg="#666", font=("", 8)).pack()
+    tk.Button(
+        root,
+        text="新竹主機代理（公司可遠端睡眠）",
+        command=lambda: pick("host_agent"),
+        width=42,
+    ).pack(pady=(10, 4))
+    tk.Label(root, text="顯示 Host Token · 與本機助手同一支 CallCoachAssistant.exe", fg="#666", font=("", 8)).pack()
 
     def on_full_uninstall() -> None:
         launch_full_uninstall_dialog(root, then_exit=True)

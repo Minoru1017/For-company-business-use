@@ -621,6 +621,11 @@ def _run_with_window(server: ThreadingHTTPServer, state: WorkerState, port: int)
 
         subprocess.Popen([sys.executable, "--assistant"], cwd=str(demo_core.ROOT))
 
+    def on_host_agent() -> None:
+        import desktop_ui
+
+        desktop_ui.launch_host_agent_subprocess()
+
     def on_full_uninstall() -> None:
         import desktop_ui
 
@@ -646,7 +651,8 @@ def _run_with_window(server: ThreadingHTTPServer, state: WorkerState, port: int)
     tk.Button(row, text="結束 Worker", command=on_quit, width=16).pack(side="left", padx=4)
     row2 = tk.Frame(root)
     row2.pack(pady=(0, 6))
-    tk.Button(row2, text="另開本機助手視窗", command=on_assistant, width=24).pack(side="left", padx=4)
+    tk.Button(row2, text="另開本機助手", command=on_assistant, width=16).pack(side="left", padx=4)
+    tk.Button(row2, text="另開新竹主機代理", command=on_host_agent, width=16).pack(side="left", padx=4)
     tk.Button(row2, text="完整解除安裝…", command=on_full_uninstall, width=24).pack(side="left", padx=4)
     root.protocol("WM_DELETE_WINDOW", on_quit)
     root.mainloop()

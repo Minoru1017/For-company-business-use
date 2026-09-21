@@ -767,6 +767,9 @@ def _run_with_window(server: ThreadingHTTPServer, host: str, url: str) -> int:
     def on_worker() -> None:
         desktop_ui.switch_exe_to_worker(server, root)
 
+    def on_host_agent() -> None:
+        desktop_ui.launch_host_agent_subprocess()
+
     def on_full_uninstall() -> None:
         desktop_ui.launch_full_uninstall_dialog(root)
 
@@ -778,13 +781,14 @@ def _run_with_window(server: ThreadingHTTPServer, host: str, url: str) -> int:
 
     root = tk.Tk()
     root.title("Call Coach 本機助手")
-    root.geometry("400x300")
+    root.geometry("400x340")
     root.resizable(False, False)
     tk.Label(root, text="Call Coach 本機助手", font=("", 13, "bold")).pack(pady=(14, 4))
     tk.Label(root, text=f"本機 API：http://{host}:{PORT}/").pack()
     tk.Label(root, text="請保持此視窗開啟，關閉即停止服務", fg="#555").pack(pady=(6, 10))
     tk.Button(root, text="開啟 Call Coach", command=open_browser, width=32).pack(pady=3)
     tk.Button(root, text="啟動遠端轉錄 Worker（家用 GPU）", command=on_worker, width=32).pack(pady=3)
+    tk.Button(root, text="新竹主機代理（另開視窗）", command=on_host_agent, width=32).pack(pady=3)
     tk.Button(root, text="完整解除安裝…", command=on_full_uninstall, width=32).pack(pady=3)
     tk.Button(root, text="結束助手", command=on_quit, width=32).pack(pady=3)
     root.protocol("WM_DELETE_WINDOW", on_quit)
@@ -811,8 +815,14 @@ def main(argv: list[str] | None = None) -> int:
 
         return company_wake_app.main()
 
-    if demo_core.is_frozen() and "--assistant" not in argv and "--worker" not in argv and "--console" not in argv:
-        # Double-click CallCoachAssistant.exe → mode picker; 開始選單「本機助手」捷徑帶 --assistant 略過此步。
+    if (
+        demo_core.is_frozen()
+        and "--assistant" not in argv
+        and "--worker" not in argv
+        and "--host-agent" not in argv
+        and "--console" not in argv
+    ):
+        # Double-click CallCoachAssistant.exe → mode picker; 開始選單捷徑帶參數略過此步。
         import desktop_ui
 
         choice = desktop_ui.run_launcher()
@@ -820,6 +830,10 @@ def main(argv: list[str] | None = None) -> int:
             import worker_server
 
             return worker_server.main([])
+        if choice == "host_agent":
+            import hsinchu_host_agent
+
+            return hsinchu_host_agent.main([])
         if choice != "assistant":
             return 0
 

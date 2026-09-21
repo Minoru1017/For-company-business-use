@@ -66,7 +66,7 @@
 
 **前提**：新竹 PC **目前是醒的**，且正在跑 **主機代理**（不是 Tailscale 本身）。
 
-1. **新竹**（做一次）：雙擊 `start_hsinchu_host_agent.cmd` 或 **`install_host_agent.cmd`**（舊版安裝若缺 cmd 用後者）  
+1. **新竹**（做一次）：開始選單 **Call Coach 新竹主機代理**，或雙擊 `start_hsinchu_host_agent.cmd`（皆為 `CallCoachAssistant.exe --host-agent`）  
    - 或 CMD：`cd /d C:\CallCoachAssistant` → `CallCoachAssistant.exe --host-agent`  
    - 仍沒有：至 [GitHub 此檔](https://github.com/Minoru1017/For-company-business-use/raw/main/demo-workspace/start_hsinchu_host_agent.cmd) 另存到助手資料夾  
    - 記下 **Host Token**，建議寫入新竹 `.env`：`CALL_COACH_HOST_AGENT_TOKEN=...`  
