@@ -187,28 +187,84 @@ class Handler(BaseHTTPRequestHandler):
 SERVER_STARTED = time.time()
 
 
-def run_server() -> None:
+def _banner_lines(token: str, port: int, bind: str) -> list[str]:
+    addrs = local_addresses()
+    return [
+        "=== Call Coach 新竹主機代理 ===",
+        f"監聽 http://{bind}:{port}/host/health",
+        f"Tailscale / 區網：{', '.join(addrs) or '（未取得）'}",
+        f"Host Token：{token}",
+        "請複製 Token 給公司端 start_company_remote_sleep.cmd",
+        "建議寫入 .env：CALL_COACH_HOST_AGENT_TOKEN=…",
+    ]
+
+
+def _run_with_window(server: ThreadingHTTPServer, token: str, port: int, bind: str) -> int:
+    import tkinter as tk
+    from tkinter import messagebox
+
+    lines = _banner_lines(token, port, bind)
+
+    def serve() -> None:
+        server.serve_forever()
+
+    threading.Thread(target=serve, daemon=True).start()
+
+    root = tk.Tk()
+    root.title("Call Coach 新竹主機代理")
+    root.geometry("520x320")
+    root.resizable(True, False)
+    tk.Label(root, text="新竹主機代理（公司可遠端睡眠）", font=("", 12, "bold")).pack(pady=(10, 4))
+    tk.Label(root, text=f"Port {port} · 請保持此視窗開啟", fg="#555").pack()
+    text = tk.Text(root, height=10, width=62, font=("Consolas", 9))
+    text.pack(padx=10, pady=8)
+    text.insert("end", "\n".join(lines))
+    text.configure(state="disabled")
+
+    def copy_token() -> None:
+        root.clipboard_clear()
+        root.clipboard_append(token)
+        messagebox.showinfo("已複製", "Host Token 已複製 — 貼到公司端遠端睡眠設定")
+
+    def on_quit() -> None:
+        if messagebox.askokcancel("結束", "確定要停止主機代理嗎？公司將無法遠端睡眠"):
+            server.shutdown()
+            root.destroy()
+
+    row = tk.Frame(root)
+    row.pack(pady=6)
+    tk.Button(row, text="複製 Token", command=copy_token, width=14).pack(side="left", padx=4)
+    tk.Button(row, text="結束代理", command=on_quit, width=14).pack(side="left", padx=4)
+    root.protocol("WM_DELETE_WINDOW", on_quit)
+    root.mainloop()
+    server.server_close()
+    return 0
+
+
+def main(argv: list[str] | None = None) -> int:
+    argv = list(sys.argv[1:] if argv is None else argv)
     demo_core.ensure_workspace_files()
     token = host_token()
     port = host_port()
     bind = host_bind()
-    addrs = local_addresses()
-    print("=== Call Coach 新竹主機代理 ===")
-    print(f"監聽 http://{bind}:{port}/host/health")
-    print(f"Tailscale / 區網位址：{', '.join(addrs) or '（未取得）'}")
-    print(f"Host Token（請複製到公司端喚醒 App）：{token}")
-    print("請在 .env 設定 CALL_COACH_HOST_AGENT_TOKEN 以免重開後 Token 改變。")
-    server = ThreadingHTTPServer((bind, port), Handler)
+    try:
+        server = ThreadingHTTPServer((bind, port), Handler)
+    except OSError as e:
+        print(f"[錯誤] 無法監聽 {bind}:{port}：{e}")
+        return 1
+
+    if demo_core.is_frozen() and "--console" not in argv:
+        return _run_with_window(server, token, port, bind)
+
+    for line in _banner_lines(token, port, bind):
+        print(line)
+    print("\n（Ctrl+C 停止）\n")
     try:
         server.serve_forever()
     except KeyboardInterrupt:
         print("\n已停止")
     finally:
         server.server_close()
-
-
-def main() -> int:
-    run_server()
     return 0
 
 
