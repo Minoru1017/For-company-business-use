@@ -1,0 +1,66 @@
+name: Build Company Wake App (Windows)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "demo-workspace/company_wake*.py"
+      - "demo-workspace/wol_utils.py"
+      - "demo-workspace/hsinchu_host_agent.py"
+      - "demo-workspace/call_coach_company_wake.spec"
+      - "demo-workspace/build_company_wake.ps1"
+      - ".github/workflows/build-company-wake.yml"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: demo-workspace
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build company wake exe
+        shell: pwsh
+        run: ./build_company_wake.ps1
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CallCoachCompanyWake
+          path: |
+            demo-workspace/dist/CallCoachCompanyWake.exe
+            demo-workspace/dist/start_company_wake.cmd
+          if-no-files-found: error
+
+      - name: Read version
+        id: meta
+        shell: bash
+        working-directory: .
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=company-wake-v${VERSION}-build.${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+
+      - name: Publish GitHub Release asset
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.meta.outputs.tag }}
+          name: Call Coach Company Wake v${{ steps.meta.outputs.version }} (build ${{ github.run_number }})
+          body: |
+            ## 公司端：新竹主機喚醒 + DeskIn
+
+            - **`CallCoachCompanyWake.exe`** — 僅安裝在**公司電腦**
+            - 新竹 GPU 主機請用 Call Coach 助手內 **`start_hsinchu_host_agent.cmd`**，勿裝此 exe
+
+            **Commit:** ${{ github.sha }}
+          files: demo-workspace/dist/CallCoachCompanyWake.exe
+          make_latest: false

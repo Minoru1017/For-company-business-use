@@ -802,6 +802,14 @@ def main(argv: list[str] | None = None) -> int:
         import worker_server
 
         return worker_server.main(argv)
+    if "--host-agent" in argv:
+        import hsinchu_host_agent
+
+        return hsinchu_host_agent.main()
+    if "--company-wake" in argv:
+        import company_wake_app
+
+        return company_wake_app.main()
 
     if demo_core.is_frozen() and "--assistant" not in argv and "--worker" not in argv and "--console" not in argv:
         # Double-click CallCoachAssistant.exe → mode picker; 開始選單「本機助手」捷徑帶 --assistant 略過此步。

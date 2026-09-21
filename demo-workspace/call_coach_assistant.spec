@@ -29,6 +29,8 @@ a = Analysis(
         "proc_utils",
         "recording_pipeline",
         "assistant_update",
+        "hsinchu_host_agent",
+        "wol_utils",
         "tkinter",
     ],
     hookspath=[],

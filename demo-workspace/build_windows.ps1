@@ -127,7 +127,9 @@ $AppFiles = @(
     "start_worker.cmd",
     "start_hsinchu_gpu.cmd",
     "start_hsinchu_recording_watch.cmd",
-    "start_recording_watch.cmd"
+    "start_recording_watch.cmd",
+    "start_hsinchu_host_agent.cmd",
+    "start_company_wake.cmd"
 )
 foreach ($file in $AppFiles) {
     if (-not (Test-Path $file)) { throw "Missing installer file: $file" }
