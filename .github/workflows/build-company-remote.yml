@@ -1,0 +1,82 @@
+name: Build Company Remote Tools (Windows)
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "demo-workspace/scripts/company_remote_sleep.ps1"
+      - "demo-workspace/start_company_remote_sleep.cmd"
+      - "demo-workspace/REMOTE_HSINCHU.md"
+      - "demo-workspace/START_HERE_COMPANY_REMOTE.txt"
+      - "demo-workspace/installer/CallCoachCompanyRemote.iss"
+      - "demo-workspace/build_company_remote.ps1"
+      - ".github/workflows/build-company-remote.yml"
+      - "package.json"
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    runs-on: windows-latest
+    defaults:
+      run:
+        working-directory: demo-workspace
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Read release metadata
+        id: meta
+        shell: bash
+        working-directory: .
+        run: |
+          VERSION=$(node -p "require('./package.json').version")
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "tag=company-remote-v${VERSION}-build.${GITHUB_RUN_NUMBER}" >> "$GITHUB_OUTPUT"
+
+      - name: Install Inno Setup
+        run: choco install innosetup -y
+
+      - name: Build company remote installer
+        shell: pwsh
+        run: ./build_company_remote.ps1
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: CallCoachCompanyRemote
+          path: |
+            demo-workspace/dist/CallCoachCompanyRemote-Setup.exe
+            demo-workspace/dist/CallCoachCompanyRemote-Windows.zip
+          if-no-files-found: error
+
+      - name: Publish GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.meta.outputs.tag }}
+          name: Call Coach 公司端遠端工具 v${{ steps.meta.outputs.version }} (build ${{ github.run_number }})
+          body: |
+            ## 公司電腦專用（輕量）
+
+            不含 WhisperX、不含本機轉錄助手。只含 **Tailscale 遠端睡眠** 與說明。
+
+            ### 下載
+
+            1. **`CallCoachCompanyRemote-Setup.exe`** — 建議（開始選單捷徑「新竹遠端睡眠」）
+            2. **`CallCoachCompanyRemote-Windows.zip`** — 免安裝解壓即用（若公司封鎖 .exe 安裝程式）
+
+            ### 使用前
+
+            - 新竹 PC：安裝 [Call Coach 本機助手](https://github.com/Minoru1017/For-company-business-use/releases) 並執行 `start_hsinchu_host_agent.cmd`
+            - 兩邊都裝 **Tailscale**（同一帳號）；遠端桌面用 **DeskIn**
+            - 公司端第一次執行時輸入新竹 **Tailscale IP** 與 **Host Token**
+
+            進階喚醒工具 `CallCoachCompanyWake.exe` 為選配，一般不必安裝。
+
+            **Commit:** ${{ github.sha }}
+          files: |
+            demo-workspace/dist/CallCoachCompanyRemote-Setup.exe
+            demo-workspace/dist/CallCoachCompanyRemote-Windows.zip
+          make_latest: false
+          draft: false

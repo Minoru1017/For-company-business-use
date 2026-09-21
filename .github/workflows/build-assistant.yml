@@ -66,7 +66,11 @@ jobs:
           body: |
             ## Call Coach 本機轉錄助手（Windows）
 
-            ### 公司電腦（推薦）— 安裝精靈
+            ### 公司電腦只要連新竹（遠端睡眠）
+
+            下載同頁或另 tag **`company-remote-v*`** 的 **`CallCoachCompanyRemote-Setup.exe`**（不含轉錄，約 1 MB）。
+
+            ### 公司電腦要本機／遠端轉錄 — 安裝精靈
 
             1. 下載 **`CallCoachAssistant-Setup.exe`**
             2. 執行安裝精靈（建議使用預設位置 `C:\CallCoachAssistant`）

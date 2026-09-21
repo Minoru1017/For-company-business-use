@@ -72,7 +72,9 @@
    - 記下 **Host Token**，建議寫入新竹 `.env`：`CALL_COACH_HOST_AGENT_TOKEN=...`  
    - 此黑窗/背景要在你想被遠端休眠前保持運行（可設開機自動執行）。  
 2. **新竹防火牆**：若公司連不上，允許 **TCP 8769** 私人/Tailscale 網路。  
-3. **公司**：雙擊 `start_company_remote_sleep.cmd`（在 Call Coach 助手資料夾）  
+3. **公司**：  
+   - **推薦**：從 [GitHub Releases](https://github.com/Minoru1017/For-company-business-use/releases) 下載 **`CallCoachCompanyRemote-Setup.exe`**（公司專用輕量包，不含轉錄）  
+   - 或已裝完整助手時：雙擊 `start_company_remote_sleep.cmd`  
    - 第一次會問 **Tailscale IP**（例 `100.126.54.41`）和 **Token**，之後存在  
      `%APPDATA%\CallCoachRemoteHsinchu\config.json`。  
 
