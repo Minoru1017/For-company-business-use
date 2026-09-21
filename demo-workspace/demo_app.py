@@ -400,6 +400,12 @@ class Handler(BaseHTTPRequestHandler):
 
             return self._send_json({"ok": True, **recording_pipeline.pipeline_status()})
 
+        if path == "/api/update/check":
+            import assistant_update
+
+            force = parse_qs(query).get("force", [""])[0].strip().lower() in ("1", "true", "yes")
+            return self._send_json(assistant_update.check_for_update(force_refresh=force))
+
         if path == "/api/job":
             snap = JOB.snapshot()
             snap["status"] = demo_core.get_status().to_dict()
@@ -488,6 +494,26 @@ class Handler(BaseHTTPRequestHandler):
 
             recording_pipeline.clear_pending()
             return self._send_json({"ok": True, "pending": None})
+
+        if path == "/api/update/download":
+            import assistant_update
+
+            data = self._parse_json(body) or {}
+            url = str(data.get("url", "")).strip()
+            if not url:
+                info = assistant_update.check_for_update(force_refresh=True)
+                if not info.get("ok"):
+                    return self._send_json({"ok": False, "message": info.get("message", "無法檢查更新")}, 502)
+                url = str(info.get("download_url") or "").strip()
+            if not url:
+                return self._send_json({"ok": False, "message": "找不到安裝包下載網址"}, 404)
+            try:
+                assistant_update.open_setup_download(url)
+            except ValueError as e:
+                return self._send_json({"ok": False, "message": str(e)}, 400)
+            except OSError as e:
+                return self._send_json({"ok": False, "message": str(e)}, 500)
+            return self._send_json({"ok": True, "message": "已開啟下載 — 完成後執行 Setup.exe 覆蓋安裝", "url": url})
 
         if path == "/api/recording-pipeline/scan":
             import recording_pipeline

@@ -956,12 +956,20 @@ class EnvStatus:
                 "media-playback",
                 "repair-gpu-torch",
                 "recording-pipeline",
+                "assistant-update",
             ],
+            "assistant_version": read_assistant_version(),
             "call_coach_url": CALL_COACH_URL,
             "hf_links": HF_LINKS,
             "transcribe_modes": ["fast", "standard", "local_gpu", "azure", "remote"],
             "smart_app_control": smart_app_control_state(),
         }
+
+
+def read_assistant_version() -> str | None:
+    from assistant_update import read_installed_version
+
+    return read_installed_version(ROOT)
 
 
 def faster_whisper_installed() -> bool:

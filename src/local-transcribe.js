@@ -80,6 +80,8 @@ let workerAutoTested = false;
 let teamPanelOpen = false;
 let recordingPending = null;
 const RECORDING_NOTIFY_KEY = 'callCoachRecordingNotifyKey';
+const UPDATE_DISMISS_KEY = 'callCoachUpdateDismissVersion';
+let assistantUpdateInfo = null;
 
 function isOffsite(mode = transcribeMode) {
   return OFFSITE_MODES.has(mode);
@@ -211,6 +213,47 @@ async function refreshRecordingPending(showToast) {
   } catch {
     recordingPending = null;
   }
+}
+
+async function refreshAssistantUpdate(showToast, { force = false } = {}) {
+  if (!bridgeSupports('assistant-update')) {
+    assistantUpdateInfo = null;
+    return;
+  }
+  const lastKey = 'callCoachUpdateCheckAt';
+  const last = Number(sessionStorage.getItem(lastKey) || 0);
+  if (!force && Date.now() - last < 6 * 60 * 60 * 1000) return;
+  try {
+    const info = await api('/api/update/check');
+    sessionStorage.setItem(lastKey, String(Date.now()));
+    assistantUpdateInfo = info?.ok ? info : null;
+    if (info?.update_available && info.latest && sessionStorage.getItem(UPDATE_DISMISS_KEY) !== info.latest) {
+      notifyImportant({
+        title: 'Call Coach 助手有新版本',
+        body: `目前 ${info.current} → 最新 ${info.latest}。請在 DEMO 區選擇是否下載更新。`,
+        ok: true,
+      });
+      showToast?.(`助手可更新至 v${info.latest} — 見下方更新提示`);
+    }
+  } catch {
+    assistantUpdateInfo = null;
+  }
+}
+
+function renderUpdateBanner() {
+  const info = assistantUpdateInfo;
+  if (!info?.update_available || !info.latest) return '';
+  if (sessionStorage.getItem(UPDATE_DISMISS_KEY) === info.latest) return '';
+  return `
+    <div class="bridge-update-pending" id="bridgeUpdatePending">
+      <strong>本機助手可更新</strong>
+      <p class="hint">目前 v${escapeHTML(info.current || '?')} → 最新 v${escapeHTML(info.latest)}${info.release_name ? `（${escapeHTML(info.release_name)}）` : ''}。下載完成後執行 Setup.exe 覆蓋安裝，再從開始選單啟動助手。</p>
+      <div class="bridge-actions">
+        <button type="button" class="btn primary" id="bridgeUpdateDownload">下載更新</button>
+        <button type="button" class="btn" id="bridgeUpdateRelease">Releases 說明</button>
+        <button type="button" class="btn" id="bridgeUpdateDismiss">稍後</button>
+      </div>
+    </div>`;
 }
 
 function renderRecordingBanner() {
@@ -651,6 +694,7 @@ export function initLocalTranscribe({ onTranscriptReady, showToast, getMode }) {
 
     panel.innerHTML = `
       <p class="bridge-lead">錄影轉成逐字稿後，會<strong>自動載入</strong>到上方分析區，不需手動上傳 SRT。</p>
+      ${renderUpdateBanner()}
       ${renderRecordingBanner()}
       ${renderChecklist(st)}
       ${advancedLocal}
@@ -874,6 +918,23 @@ export function initLocalTranscribe({ onTranscriptReady, showToast, getMode }) {
       cancelTranscribe(showToast, refreshStatus)
     );
     panel.querySelector('#bridgeImport')?.addEventListener('click', () => importLatest(onTranscriptReady, showToast));
+    panel.querySelector('#bridgeUpdateDownload')?.addEventListener('click', async () => {
+      try {
+        const r = await api('/api/update/download', { method: 'POST', body: JSON.stringify({}) });
+        showToast(r.message || '已開啟下載');
+      } catch (e) {
+        showToast(e?.message || '無法開啟下載');
+      }
+    });
+    panel.querySelector('#bridgeUpdateRelease')?.addEventListener('click', async () => {
+      const url = assistantUpdateInfo?.release_page_url || ASSISTANT_RELEASE_PAGE;
+      window.open(url, '_blank', 'noopener,noreferrer');
+    });
+    panel.querySelector('#bridgeUpdateDismiss')?.addEventListener('click', () => {
+      if (assistantUpdateInfo?.latest) sessionStorage.setItem(UPDATE_DISMISS_KEY, assistantUpdateInfo.latest);
+      showToast('已略過此版本 — 下次 Release 仍會再提示');
+      refreshStatus();
+    });
     panel.querySelector('#bridgeRecordingAnalyze')?.addEventListener('click', async () => {
       const srt = recordingPending?.srt;
       if (!srt) return;
@@ -906,9 +967,16 @@ export function initLocalTranscribe({ onTranscriptReady, showToast, getMode }) {
     maybeAutoOpenTokenPage(st, showToast);
   }
 
-  refreshStatus();
+  refreshStatus().then(async (st) => {
+    if (!st) return;
+    await refreshAssistantUpdate(showToast, { force: true });
+    if (assistantUpdateInfo?.update_available && !uploadBusy && !transcribeBusy && !pinnedLogState) {
+      renderPanel(st);
+    }
+  });
   if (refreshTimer) clearInterval(refreshTimer);
   refreshTimer = setInterval(refreshStatus, 8000);
+  setInterval(() => refreshAssistantUpdate(showToast, { force: true }), 6 * 60 * 60 * 1000);
   window.__refreshBridge = refreshStatus;
 
   api('/api/job')

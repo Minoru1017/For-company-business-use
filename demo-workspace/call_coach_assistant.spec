@@ -28,6 +28,7 @@ a = Analysis(
         "srt_utils",
         "proc_utils",
         "recording_pipeline",
+        "assistant_update",
         "tkinter",
     ],
     hookspath=[],
