@@ -1,6 +1,6 @@
 {
   "enabled": true,
-  "comment": "時間為新竹 PC 本機 Windows 時區。days：0=週一 … 6=週日。複製為 host_schedule.json 後改時間。",
+  "comment": "時間為新竹 PC 本機 Windows 時區。days：0=週一 … 6=週日。複製為 host_schedule.json 後改時間；存檔後按代理視窗「重讀排程」。",
   "remote_sleep_allowed": [
     {
       "start": "22:00",
@@ -13,5 +13,6 @@
       "time": "08:00",
       "days": [0, 1, 2, 3, 4]
     }
-  ]
+  ],
+  "stay_awake_minutes": 30
 }
