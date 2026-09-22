@@ -112,14 +112,38 @@ def request_sleep(mode: str = "sleep") -> None:
     if mode in ("hibernate", "h", "hybrid"):
         subprocess.Popen(["shutdown", "/h"], cwd=str(ROOT))  # noqa: S603
         return
-    # Sleep (suspend to RAM)
+    # Sleep (S3). Do NOT use `rundll32 powrprof.dll,SetSuspendState 0 1 0`: rundll32 passes a
+    # string pointer for every argument, so bHibernate / bWakeupEventsDisabled are both non-zero
+    # → the PC hibernates with wake timers disabled and RTC wake can never fire.
+    threading.Thread(target=_suspend_s3, daemon=True).start()
+
+
+def _suspend_s3() -> None:
+    """SetSuspendState(hibernate=False, force=False, wakeEventsDisabled=False) via ctypes.
+
+    Runs on a worker thread after a short delay so the HTTP response is flushed first.
+    Falls back to the .NET call through PowerShell if the direct call fails.
+    """
+    import ctypes
+
+    time.sleep(0.5)
+    try:
+        powrprof = ctypes.windll.powrprof  # type: ignore[attr-defined]
+        powrprof.SetSuspendState.argtypes = [ctypes.c_ubyte, ctypes.c_ubyte, ctypes.c_ubyte]
+        powrprof.SetSuspendState.restype = ctypes.c_ubyte
+        if powrprof.SetSuspendState(0, 0, 0):
+            return
+    except (OSError, AttributeError):
+        pass
     subprocess.Popen(  # noqa: S603
         [
-            "rundll32.exe",
-            "powrprof.dll,SetSuspendState",
-            "0",
-            "1",
-            "0",
+            "powershell.exe",
+            "-NoProfile",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-Command",
+            "Add-Type -AssemblyName System.Windows.Forms; "
+            "[System.Windows.Forms.Application]::SetSuspendState('Suspend', $false, $false) | Out-Null",
         ],
         cwd=str(ROOT),
     )
@@ -220,6 +244,10 @@ class Handler(BaseHTTPRequestHandler):
             ok, msg = run_wake_test()
             return self._send_json({"ok": ok, "message": msg}, 200 if ok else 500)
 
+        if path == "/host/wake/diag":
+            p = host_power_schedule.write_wake_diagnostics("由 API 要求")
+            return self._send_json({"ok": True, "path": str(p), "report": p.read_text(encoding="utf-8")})
+
         if path == "/host/schedule/reload":
             host_power_schedule.ensure_example_file()
             sched = host_power_schedule.load_schedule()
@@ -257,13 +285,21 @@ def run_wake_test(delay_min: int = host_power_schedule.TEST_WAKE_DELAY_MIN) -> t
     when = (datetime.now() + timedelta(minutes=delay_min)).replace(second=0, microsecond=0)
     ok, msg = host_power_schedule.schedule_one_time_wake(when, reason="test", stay_awake_minutes=10)
     if not ok:
+        host_power_schedule.write_wake_diagnostics(f"測試喚醒：預約失敗 — {msg}")
         return False, msg
+    policy = host_power_schedule.wake_timer_policy()
+    warn = ""
+    if policy == "disabled":
+        warn = "；注意：電源方案「允許喚醒計時器」為停用，請改為啟用"
+    elif policy == "important_only":
+        warn = "；注意：電源方案為「僅重要喚醒計時器」，會擋住本排程，請改為啟用"
+    host_power_schedule.write_wake_diagnostics(f"測試喚醒：已預約 {when:%H:%M}，即將睡眠。policy={policy}")
     try:
         request_sleep("sleep")
     except OSError as e:
         host_power_schedule.cancel_one_time_wake(quiet=True)
         return False, str(e)
-    return True, f"{msg}；主機即將睡眠，若 {when.strftime('%H:%M')} 自行醒來代表 RTC 喚醒可用"
+    return True, f"{msg}；主機即將睡眠，若 {when.strftime('%H:%M')} 自行醒來代表 RTC 喚醒可用{warn}"
 
 
 def _banner_lines(token: str, port: int, bind: str) -> list[str]:
@@ -384,6 +420,18 @@ def _run_with_window(server: ThreadingHTTPServer, token: str, port: int, bind: s
         else:
             status_var.set(msg)
 
+    def on_diag() -> None:
+        p = host_power_schedule.write_wake_diagnostics("由視窗「喚醒診斷」產生")
+        policy = host_power_schedule.wake_timer_policy()
+        os.startfile(str(p))  # type: ignore[attr-defined]
+        if policy in ("disabled", "important_only"):
+            messagebox.showwarning(
+                "喚醒診斷",
+                "電源方案「允許喚醒計時器」目前為：" + ("停用" if policy == "disabled" else "僅重要喚醒計時器") + "\n\n"
+                "請改為「啟用」：控制台 → 電源選項 → 變更計劃設定 → 變更進階電源設定 → 睡眠 → 允許喚醒計時器。\n"
+                "或按「結束代理」後以系統管理員身分重新開啟主機代理，程式會自動設定。",
+            )
+
     row = tk.Frame(root)
     row.pack(pady=6)
     tk.Button(row, text="複製 Token", command=copy_token, width=12).pack(side="left", padx=2)
@@ -397,8 +445,9 @@ def _run_with_window(server: ThreadingHTTPServer, token: str, port: int, bind: s
         row2,
         text=f"測試喚醒（{host_power_schedule.TEST_WAKE_DELAY_MIN} 分鐘後自動醒）",
         command=on_test_wake,
-        width=34,
+        width=30,
     ).pack(side="left", padx=2)
+    tk.Button(row2, text="喚醒診斷", command=on_diag, width=12).pack(side="left", padx=2)
     root.protocol("WM_DELETE_WINDOW", on_quit)
     root.mainloop()
     server.server_close()

@@ -113,7 +113,14 @@ start_company_remote_sleep.cmd -NoWake                直接睡，不問
 
 新竹主機代理視窗 → **「測試喚醒（2 分鐘後自動醒）」** → 電腦立刻睡眠。  
 2 分鐘後若自行醒來，視窗會顯示 **「排程喚醒成功」**（結果也寫在 `logs\last_wake.json`）。  
-沒醒：按電源鍵喚醒，檢查 **BIOS → Power → RTC / Wake on timer** 是否開啟，以及 Windows **電源選項 → 睡眠 → 允許喚醒計時器 = 啟用**。
+沒醒：按電源鍵喚醒 → 代理視窗 **「喚醒診斷」**（產生 `logs\wake_diag.txt`），依序檢查：
+
+1. **喚醒計時器政策** 必須是 `enabled`；`important_only`（Windows 預設常是這個）或 `disabled` 都會擋住 → 電源選項 → 睡眠 → **允許喚醒計時器 = 啟用**（或以系統管理員開一次主機代理讓程式自動改）。  
+2. `powercfg /a` 要有 **待命 (S3)**；若只有 **S0 低電源閒置**（Modern Standby）通常也能定時醒，但要關閉「**快速啟動**」與 BIOS **ErP / Deep Sleep**。  
+3. 工作排程器要看到 `CallCoachHostWakeOnce_test`，`next=` 有時間、`result=0x0` 或 `0x41303`（尚未執行）。  
+4. **BIOS → Power / APM**：**Wake on RTC / Resume by Alarm** 開啟、**ErP Ready 關閉**、**Deep Sleep 關閉**。
+
+> 11.9.12 以前的睡眠指令會讓 Windows 進入「停用喚醒事件」的休眠，RTC 一定醒不來；請更新至 **11.9.13+** 再測。
 
 ---
 

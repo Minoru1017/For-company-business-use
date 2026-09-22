@@ -474,6 +474,11 @@ Register-ScheduledTask -TaskName {_ps_quote(name)} -Action $action -Trigger $tri
     if r.returncode != 0:
         err = (r.stderr or r.stdout or "").strip()
         return False, f"預約喚醒失敗：{err[:300]}"
+    verify = _powershell(
+        f"(Get-ScheduledTask -TaskName {_ps_quote(name)} -ErrorAction SilentlyContinue | Get-ScheduledTaskInfo).NextRunTime"
+    )
+    if not (verify.stdout or "").strip():
+        return False, f"預約喚醒失敗：工作排程器找不到 {name}（請以系統管理員執行主機代理再試）"
     _write_json(
         PENDING_WAKE_FILE,
         {"at": when.strftime("%Y-%m-%d %H:%M"), "reason": reason, "task": name, "stay_awake_minutes": minutes},
@@ -501,6 +506,63 @@ def _enable_rtc_wake() -> None:
             capture_output=True,
         )
     subprocess.run(["powercfg", "/SETACTIVE", "SCHEME_CURRENT"], capture_output=True)  # noqa: S603
+
+
+# ---------------------------------------------------------------- diagnostics
+
+DIAG_FILE = LOGS_DIR / "wake_diag.txt"
+
+
+def _run_text(cmd: list[str]) -> str:
+    try:
+        r = subprocess.run(cmd, capture_output=True, text=True, encoding="utf-8", errors="replace", timeout=20)  # noqa: S603
+    except (OSError, subprocess.TimeoutExpired) as e:
+        return f"(無法執行 {' '.join(cmd)}: {e})"
+    out = (r.stdout or "") + (("\n" + r.stderr) if r.stderr else "")
+    return out.strip() or f"(exit {r.returncode}, 無輸出)"
+
+
+def wake_timer_policy() -> str:
+    """'enabled' | 'disabled' | 'important_only' | 'unknown' from the active power plan (AC)."""
+    if sys.platform != "win32":
+        return "unknown"
+    out = _run_text(["powercfg", "/QUERY", "SCHEME_CURRENT", "SUB_SLEEP", "RTCWAKE"])
+    m = re.search(r"Current AC Power Setting Index:\s*0x0000000(\d)", out) or re.search(
+        r"目前的 AC 電源設定索引:\s*0x0000000(\d)", out
+    )
+    if not m:
+        return "unknown"
+    return {"0": "disabled", "1": "enabled", "2": "important_only"}.get(m.group(1), "unknown")
+
+
+def write_wake_diagnostics(note: str = "") -> Path:
+    """Collect what decides whether an RTC wake can fire; saved to logs/wake_diag.txt."""
+    parts = [
+        f"=== Call Coach 喚醒診斷 {datetime.now():%Y-%m-%d %H:%M:%S} ===",
+        note,
+        "",
+        f"[喚醒計時器政策 (AC)] {wake_timer_policy()}  （需為 enabled；important_only 會擋住本程式的排程）",
+        "",
+        "[powercfg /a — 可用睡眠狀態]",
+        _run_text(["powercfg", "/a"]) if sys.platform == "win32" else "(非 Windows)",
+        "",
+        "[powercfg /waketimers — 目前登記的喚醒計時器（需系統管理員才看得到）]",
+        _run_text(["powercfg", "/waketimers"]) if sys.platform == "win32" else "(非 Windows)",
+        "",
+        "[工作排程器 CallCoachHostWake*]",
+    ]
+    if sys.platform == "win32":
+        r = _powershell(
+            "Get-ScheduledTask -TaskName 'CallCoachHostWake*' -ErrorAction SilentlyContinue | "
+            "ForEach-Object { $i = $_ | Get-ScheduledTaskInfo; "
+            "'{0}  state={1}  next={2}  last={3} result=0x{4:X}' -f $_.TaskName, $_.State, $i.NextRunTime, $i.LastRunTime, $i.LastTaskResult }"
+        )
+        parts.append((r.stdout or r.stderr or "").strip() or "(沒有 CallCoachHostWake* 工作)")
+        parts += ["", "[最近一次喚醒來源 powercfg /lastwake]", _run_text(["powercfg", "/lastwake"])]
+    parts += ["", "[pending_wake.json]", json.dumps(load_pending_wake(), ensure_ascii=False), "[last_wake.json]", json.dumps(load_last_wake(), ensure_ascii=False)]
+    LOGS_DIR.mkdir(parents=True, exist_ok=True)
+    DIAG_FILE.write_text("\n".join(parts) + "\n", encoding="utf-8")
+    return DIAG_FILE
 
 
 # ---------------------------------------------------------------- --keep-awake mode
