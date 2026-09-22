@@ -810,6 +810,19 @@ def main(argv: list[str] | None = None) -> int:
         import hsinchu_host_agent
 
         return hsinchu_host_agent.main()
+    if "--keep-awake" in argv:
+        # Scheduled-task entry after an RTC wake: hold the PC awake so Tailscale/DeskIn can connect.
+        import host_power_schedule
+
+        def _arg_after(flag: str, default: str) -> str:
+            try:
+                return argv[argv.index(flag) + 1]
+            except (ValueError, IndexError):
+                return default
+
+        minutes = host_power_schedule._clamp_minutes(_arg_after("--keep-awake", "30"))
+        reason = _arg_after("--wake-reason", "scheduled")
+        return host_power_schedule.run_keep_awake(minutes, reason)
     if "--company-wake" in argv:
         import company_wake_app
 
@@ -820,6 +833,7 @@ def main(argv: list[str] | None = None) -> int:
         and "--assistant" not in argv
         and "--worker" not in argv
         and "--host-agent" not in argv
+        and "--keep-awake" not in argv
         and "--console" not in argv
     ):
         # Double-click CallCoachAssistant.exe → mode picker; 開始選單捷徑帶參數略過此步。

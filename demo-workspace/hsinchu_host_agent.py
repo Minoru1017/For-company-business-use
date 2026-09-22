@@ -8,10 +8,14 @@ off/asleep still needs Wake-on-LAN (magic packet) from the company app; enable W
 
 HTTP (default port 8769, token required except GET /host/health):
 
-    GET  /host/health     { ok, hostname, addresses, agent_version }
-    GET  /host/status     same + uptime (auth)
-    POST /host/sleep      sleep/hibernate (auth)
-    POST /host/wol        relay magic packet on this LAN (auth, optional always-on relay)
+    GET  /host/health         { ok, hostname, addresses, agent_version, schedule status }
+    GET  /host/status         same + uptime (auth)
+    POST /host/sleep          sleep/hibernate (auth); optional wake_after_min / wake_at → one-off RTC wake first
+    POST /host/wake/schedule  { wake_after_min | wake_at } register one-off RTC wake without sleeping (auth)
+    POST /host/wake/cancel    drop pending one-off wake (auth)
+    POST /host/wake/test      wake test: one-off wake in 2 min, then sleep (auth)
+    POST /host/schedule/reload re-read host_schedule.json, re-register weekly wakes (auth)
+    POST /host/wol            relay magic packet on this LAN (auth, optional always-on relay)
 """
 from __future__ import annotations
 
@@ -31,7 +35,7 @@ import host_power_schedule
 import security
 import wol_utils
 
-AGENT_VERSION = "1.1"
+AGENT_VERSION = "1.2"
 DEFAULT_PORT = 8769
 DEFAULT_BIND = "0.0.0.0"
 TOKEN_HEADER = "X-Call-Coach-Host-Token"
@@ -169,15 +173,52 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/host/sleep":
             sched = host_power_schedule.load_schedule()
             if sched.enabled and not sched.remote_sleep_ok():
+                nxt = host_power_schedule.next_wake_time(sched)
+                hint = f"；下次喚醒 {nxt.strftime('%m/%d %H:%M')}" if nxt else ""
                 return self._reject(
                     403,
-                    "目前不在允許遠端睡眠的時段（見新竹 host_schedule.json）",
+                    f"目前不在允許遠端睡眠的時段（見新竹 host_schedule.json）{hint}",
                 )
+            mode = str(body.get("mode", "sleep"))
+            wake_note = ""
+            if body.get("wake_after_min") or body.get("wake_at"):
+                if mode.strip().lower() in ("hibernate", "h", "hybrid"):
+                    return self._reject(400, "預約喚醒僅支援 sleep（休眠 hibernate 無法由 RTC 喚醒）")
+                try:
+                    when = host_power_schedule.resolve_wake_datetime(
+                        wake_after_min=body.get("wake_after_min"),
+                        wake_at=body.get("wake_at"),
+                    )
+                except ValueError as e:
+                    return self._reject(400, str(e))
+                ok, msg = host_power_schedule.schedule_one_time_wake(when, reason="remote")
+                if not ok:
+                    return self._reject(500, f"{msg}（未睡眠）")
+                wake_note = "；" + msg
             try:
-                request_sleep(str(body.get("mode", "sleep")))
+                request_sleep(mode)
             except OSError as e:
                 return self._reject(500, str(e))
-            return self._send_json({"ok": True, "message": "已送出休眠指令"})
+            return self._send_json({"ok": True, "message": "已送出休眠指令" + wake_note})
+
+        if path == "/host/wake/schedule":
+            try:
+                when = host_power_schedule.resolve_wake_datetime(
+                    wake_after_min=body.get("wake_after_min"),
+                    wake_at=body.get("wake_at"),
+                )
+            except ValueError as e:
+                return self._reject(400, str(e))
+            ok, msg = host_power_schedule.schedule_one_time_wake(when, reason="remote")
+            return self._send_json({"ok": ok, "message": msg, **host_power_schedule.schedule_status_dict()}, 200 if ok else 500)
+
+        if path == "/host/wake/cancel":
+            ok, msg = host_power_schedule.cancel_one_time_wake()
+            return self._send_json({"ok": ok, "message": msg, **host_power_schedule.schedule_status_dict()})
+
+        if path == "/host/wake/test":
+            ok, msg = run_wake_test()
+            return self._send_json({"ok": ok, "message": msg}, 200 if ok else 500)
 
         if path == "/host/schedule/reload":
             host_power_schedule.ensure_example_file()
@@ -209,6 +250,22 @@ class Handler(BaseHTTPRequestHandler):
 SERVER_STARTED = time.time()
 
 
+def run_wake_test(delay_min: int = host_power_schedule.TEST_WAKE_DELAY_MIN) -> tuple[bool, str]:
+    """Schedule a one-off wake shortly, then sleep. Result shows up in logs/last_wake.json."""
+    from datetime import datetime, timedelta
+
+    when = (datetime.now() + timedelta(minutes=delay_min)).replace(second=0, microsecond=0)
+    ok, msg = host_power_schedule.schedule_one_time_wake(when, reason="test", stay_awake_minutes=10)
+    if not ok:
+        return False, msg
+    try:
+        request_sleep("sleep")
+    except OSError as e:
+        host_power_schedule.cancel_one_time_wake(quiet=True)
+        return False, str(e)
+    return True, f"{msg}；主機即將睡眠，若 {when.strftime('%H:%M')} 自行醒來代表 RTC 喚醒可用"
+
+
 def _banner_lines(token: str, port: int, bind: str) -> list[str]:
     addrs = local_addresses()
     sched = host_power_schedule.load_schedule()
@@ -222,6 +279,9 @@ def _banner_lines(token: str, port: int, bind: str) -> list[str]:
         "",
     ]
     lines.extend(sched.summary_lines())
+    last = host_power_schedule.load_last_wake()
+    if last:
+        lines.append(f"  最近排程喚醒：{last.get('time')}（{last.get('reason')}）")
     lines.append("排程設定：host_schedule.json（同資料夾，可從 host_schedule.example.json 複製）")
     return lines
 
@@ -239,7 +299,7 @@ def _run_with_window(server: ThreadingHTTPServer, token: str, port: int, bind: s
 
     root = tk.Tk()
     root.title("Call Coach 新竹主機代理")
-    root.geometry("540x380")
+    root.geometry("560x440")
     root.resizable(True, False)
     tk.Label(root, text="新竹主機代理（公司可遠端睡眠）", font=("", 12, "bold")).pack(pady=(10, 4))
     tk.Label(root, text=f"Port {port} · CallCoachAssistant.exe --host-agent", fg="#555").pack()
@@ -250,10 +310,33 @@ def _run_with_window(server: ThreadingHTTPServer, token: str, port: int, bind: s
     token_entry.insert(0, token)
     token_entry.configure(state="readonly")
     token_entry.pack(side="left", fill="x", expand=True)
-    text = tk.Text(root, height=7, width=62, font=("Consolas", 9))
+    text = tk.Text(root, height=9, width=64, font=("Consolas", 9))
     text.pack(padx=10, pady=8)
     text.insert("end", "\n".join(lines))
     text.configure(state="disabled")
+
+    status_var = tk.StringVar(value="")
+    tk.Label(root, textvariable=status_var, fg="#1a6b1a", wraplength=520, justify="left").pack(padx=10, anchor="w")
+
+    def refresh_text() -> None:
+        text.configure(state="normal")
+        text.delete("1.0", "end")
+        text.insert("end", "\n".join(_banner_lines(token, port, bind)))
+        text.configure(state="disabled")
+
+    last_seen = {"epoch": (host_power_schedule.load_last_wake() or {}).get("epoch")}
+
+    def poll_wake() -> None:
+        last = host_power_schedule.load_last_wake()
+        if last and last.get("epoch") != last_seen["epoch"]:
+            last_seen["epoch"] = last.get("epoch")
+            status_var.set(
+                f"排程喚醒成功：{last.get('time')}（{last.get('reason')}，保持清醒 {last.get('stay_awake_minutes')} 分鐘）"
+            )
+            refresh_text()
+        root.after(5000, poll_wake)
+
+    root.after(5000, poll_wake)
 
     def copy_token() -> None:
         root.clipboard_clear()
@@ -280,14 +363,42 @@ def _run_with_window(server: ThreadingHTTPServer, token: str, port: int, bind: s
             )
         os.startfile(str(path))  # type: ignore[attr-defined]
         ok, msg = host_power_schedule.sync_wake_tasks(host_power_schedule.load_schedule())
-        messagebox.showinfo("排程", f"已開啟 host_schedule.json\n\n{msg}")
+        messagebox.showinfo("排程", f"已開啟 host_schedule.json\n\n{msg}\n\n存檔後按「重讀排程」或重啟代理。")
+
+    def on_reload() -> None:
+        ok, msg = host_power_schedule.sync_wake_tasks(host_power_schedule.load_schedule())
+        refresh_text()
+        (messagebox.showinfo if ok else messagebox.showwarning)("重讀排程", msg)
+
+    def on_test_wake() -> None:
+        if not messagebox.askokcancel(
+            "測試喚醒",
+            f"將預約 {host_power_schedule.TEST_WAKE_DELAY_MIN} 分鐘後喚醒，並讓這台電腦立刻睡眠。\n\n"
+            "若電腦準時自己醒來，本視窗會顯示「排程喚醒成功」。\n"
+            "若沒醒：請按電源鍵喚醒，並檢查 BIOS 是否允許 RTC / 定時喚醒。\n\n繼續？",
+        ):
+            return
+        ok, msg = run_wake_test()
+        if not ok:
+            messagebox.showerror("測試喚醒", msg)
+        else:
+            status_var.set(msg)
 
     row = tk.Frame(root)
     row.pack(pady=6)
     tk.Button(row, text="複製 Token", command=copy_token, width=12).pack(side="left", padx=2)
     tk.Button(row, text="睡眠排程", command=on_schedule, width=12).pack(side="left", padx=2)
+    tk.Button(row, text="重讀排程", command=on_reload, width=10).pack(side="left", padx=2)
     tk.Button(row, text="另開助手", command=on_assistant, width=10).pack(side="left", padx=2)
     tk.Button(row, text="結束代理", command=on_quit, width=10).pack(side="left", padx=2)
+    row2 = tk.Frame(root)
+    row2.pack(pady=(0, 8))
+    tk.Button(
+        row2,
+        text=f"測試喚醒（{host_power_schedule.TEST_WAKE_DELAY_MIN} 分鐘後自動醒）",
+        command=on_test_wake,
+        width=34,
+    ).pack(side="left", padx=2)
     root.protocol("WM_DELETE_WINDOW", on_quit)
     root.mainloop()
     server.server_close()

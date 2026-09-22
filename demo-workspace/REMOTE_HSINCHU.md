@@ -87,11 +87,33 @@
 | 設定 | 作用 |
 |------|------|
 | **`remote_sleep_allowed`** | 只有在此時段內，公司按「新竹遠端睡眠」才會成功 |
-| **`wake_at`** | 新竹 PC 在 **睡眠（非關機）** 時，由 Windows **定時喚醒**（RTC，不需 Wi‑Fi WoL） |
+| **`wake_at`** | 新竹 PC 在 **睡眠（非關機）** 時，由 Windows **每週定時喚醒**（RTC，不需 Wi‑Fi WoL） |
+| **`stay_awake_minutes`** | 醒來後 **保持清醒** 幾分鐘（預設 30），避免 Windows 又睡回去、DeskIn 還沒連上 |
 
 - 主機代理**啟動時**會註冊工作排程器 `CallCoachHostWake_*`，並開啟電源「喚醒計時器」。  
-- 修改 JSON 後請**重新啟動主機代理**。  
-- **休眠 hibernate / 關機** 較難定時喚醒；建議遠端睡眠用預設 **sleep**。Wi‑Fi WoL 仍無法替代 RTC 定時喚醒。
+- 修改 JSON 後按代理視窗 **「重讀排程」**（或重啟代理）。舊版沒有 `stay_awake_minutes` 的檔案照常可用。  
+- **休眠 hibernate / 關機** 無法由 RTC 喚醒；遠端睡眠請用預設 **sleep**。Wi‑Fi WoL 仍無法替代 RTC 定時喚醒。
+
+### ⑤ 一次性預約喚醒（公司端睡眠時順便預約）
+
+公司雙擊「新竹遠端睡眠」時會問：**要預約幾點自動醒？**（`08:00` 或 `480` 分鐘；留空不預約）。也可用參數：
+
+```text
+start_company_remote_sleep.cmd -WakeAt 08:00          睡眠 + 明早 08:00 醒
+start_company_remote_sleep.cmd -WakeAfterMinutes 480  睡眠 + 8 小時後醒
+start_company_remote_sleep.cmd -Status                只看狀態／下次喚醒
+start_company_remote_sleep.cmd -ScheduleOnly -WakeAt 12:30   只預約，不睡
+start_company_remote_sleep.cmd -CancelWake            取消一次性喚醒
+start_company_remote_sleep.cmd -NoWake                直接睡，不問
+```
+
+一次性喚醒獨立於每週 `wake_at`，執行完自動移除。
+
+### ⑥ 先測一次「這台真的會自己醒」
+
+新竹主機代理視窗 → **「測試喚醒（2 分鐘後自動醒）」** → 電腦立刻睡眠。  
+2 分鐘後若自行醒來，視窗會顯示 **「排程喚醒成功」**（結果也寫在 `logs\last_wake.json`）。  
+沒醒：按電源鍵喚醒，檢查 **BIOS → Power → RTC / Wake on timer** 是否開啟，以及 Windows **電源選項 → 睡眠 → 允許喚醒計時器 = 啟用**。
 
 ---
 
