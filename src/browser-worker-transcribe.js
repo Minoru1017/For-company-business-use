@@ -40,16 +40,46 @@ function normalizeWorkerUrl(raw) {
   return u;
 }
 
+/**
+ * 連不上 Worker 時給可操作的說明。GitHub Pages 是 https，瀏覽器預設會擋 http://100.x（混合內容），
+ * 這是公司電腦最常遇到的狀況，要明講怎麼解。
+ */
+export function describeWorkerConnectionFailure(workerUrl, pageProtocol) {
+  const proto = pageProtocol || (typeof location !== 'undefined' ? location.protocol : 'https:');
+  const target = normalizeWorkerUrl(workerUrl);
+  if (proto === 'https:' && /^http:\/\//i.test(target)) {
+    return (
+      '瀏覽器擋下了連線：此頁是 https，預設不允許連到 http 的 Worker（混合內容）。' +
+      '解法 ①（最快）Chrome／Edge：點網址列左邊的鎖頭或「不安全」圖示 → 網站設定 → 「不安全的內容」改為「允許」→ 重新載入此頁再試。' +
+      '解法 ②：在新竹用 Cloudflare Tunnel 或 Tailscale Serve 取得 https 網址，改填該網址（不加埠號）。'
+    );
+  }
+  return (
+    '無法連線遠端主機。請確認：新竹 Worker 視窗還開著、兩端 Tailscale 都已登入、網址含埠號 8766（Tunnel 網址則不加）、Token 正確。' +
+    '可先在新分頁直接開 Worker 網址，看到「Call Coach Worker」字樣代表網路是通的。'
+  );
+}
+
+function isNetworkError(e) {
+  return e instanceof TypeError || /failed to fetch|networkerror|load failed/i.test(String(e?.message || ''));
+}
+
 async function workerFetch(url, token, path, { method = 'GET', body = null, headers = {} } = {}) {
   const base = normalizeWorkerUrl(url);
-  const res = await fetch(`${base}${path}`, {
-    method,
-    body,
-    headers: {
-      ...headers,
-      [WORKER_TOKEN_HEADER]: token,
-    },
-  });
+  let res;
+  try {
+    res = await fetch(`${base}${path}`, {
+      method,
+      body,
+      headers: {
+        ...headers,
+        [WORKER_TOKEN_HEADER]: token,
+      },
+    });
+  } catch (e) {
+    if (isNetworkError(e)) throw new Error(describeWorkerConnectionFailure(url));
+    throw e;
+  }
   const text = await res.text();
   let data = {};
   try {
@@ -95,11 +125,7 @@ function uploadMedia(url, token, file, onProgress, registerAbort) {
     };
     xhr.onerror = () => {
       registerAbort?.(null);
-      reject(
-        new Error(
-          '無法連線遠端主機。請確認 Tailscale／Tunnel 網址、Token，且此頁為 https 時 Worker 也需為 https（避免混合內容被瀏覽器封鎖）'
-        )
-      );
+      reject(new Error(describeWorkerConnectionFailure(url)));
     };
     xhr.onabort = () => {
       registerAbort?.(null);
@@ -168,6 +194,7 @@ export function mountBrowserWorkerUI(
     <div class="browser-worker">
       <p class="hint">${intro || defaultIntro}</p>
       <input type="text" id="${id('WorkerUrl')}" class="bridge-token" placeholder="http://100.x.x.x:8766 或 https://tunnel…" value="${escapeHTML(st.url)}" autocomplete="off">
+      <div class="bridge-upload-status busy hidden" id="${id('UrlHint')}"></div>
       <input type="password" id="${id('WorkerToken')}" class="bridge-token" placeholder="Worker Token" value="${escapeHTML(st.token)}" autocomplete="off">
       <label class="bridge-consent">
         <input type="checkbox" id="${id('Consent')}" ${consentChecked ? 'checked' : ''}>
@@ -194,6 +221,19 @@ export function mountBrowserWorkerUI(
   const logEl = container.querySelector(`#${id('Log')}`);
   const fileInput = container.querySelector(`#${id('File')}`);
   const cancelBtn = container.querySelector(`#${id('Cancel')}`);
+  const urlHintEl = container.querySelector(`#${id('UrlHint')}`);
+
+  // https 頁面填 http Worker：先提醒要允許「不安全的內容」，不要等按下去才失敗
+  const renderUrlHint = () => {
+    if (!urlHintEl) return;
+    const u = normalizeWorkerUrl(urlEl?.value);
+    const pageHttps = typeof location !== 'undefined' && location.protocol === 'https:';
+    const show = pageHttps && /^http:\/\//i.test(u);
+    urlHintEl.classList.toggle('hidden', !show);
+    urlHintEl.textContent = show
+      ? '提醒：此頁是 https，連 http 的 Worker 會被瀏覽器擋。Chrome／Edge 請先點網址列鎖頭 → 網站設定 → 「不安全的內容」改「允許」→ 重新載入；或改填 https Tunnel 網址。'
+      : '';
+  };
 
   const persist = () =>
     saveSettings(
@@ -240,6 +280,7 @@ export function mountBrowserWorkerUI(
 
   urlEl?.addEventListener('input', () => {
     persist();
+    renderUrlHint();
     refreshStart();
   });
   tokenEl?.addEventListener('input', () => {
@@ -315,6 +356,7 @@ export function mountBrowserWorkerUI(
     }
   });
 
+  renderUrlHint();
   refreshStart();
   return { setFile };
 }

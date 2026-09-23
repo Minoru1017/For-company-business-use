@@ -626,8 +626,12 @@ export function initLocalTranscribe({ onTranscriptReady, showToast, getMode }) {
       if (offline) {
         offline.hidden = !inDemo;
         if (inDemo) {
-          renderOfflineWizard(offline, { onTranscriptReady, showToast });
-          scheduleOfflinePoll(refreshStatus);
+          // 只畫一次：每 8 秒重畫會把使用者剛選的 MP4／進行中的直連轉錄狀態整個清掉
+          if (!offline.dataset.wizardReady) {
+            renderOfflineWizard(offline, { onTranscriptReady, showToast });
+            offline.dataset.wizardReady = '1';
+          }
+          if (!offlinePollTimer) scheduleOfflinePoll(refreshStatus);
         }
       }
       return null;
