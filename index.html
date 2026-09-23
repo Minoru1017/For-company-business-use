@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' https://fonts.googleapis.com 'unsafe-inline'; font-src https://fonts.gstatic.com; connect-src 'self' http://127.0.0.1:8765 https://generativelanguage.googleapis.com https: http:; img-src 'self' data:; base-uri 'self'; object-src 'none'; frame-ancestors 'none';">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' https://fonts.googleapis.com 'unsafe-inline'; font-src https://fonts.gstatic.com; connect-src 'self' http://127.0.0.1:8765 https://generativelanguage.googleapis.com https: http:; img-src 'self' data:; media-src 'self' blob:; base-uri 'self'; object-src 'none'; frame-ancestors 'none';">
   <title>CALL COACH｜顧問式銷售電訪分析</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=JetBrains+Mono:wght@400;600&family=Noto+Sans+TC:wght@400;500;700;900&family=Noto+Serif+TC:wght@600;700&family=Archivo+Black&display=swap" rel="stylesheet">
@@ -17,7 +17,7 @@
   <div class="mode-chooser-inner">
     <p class="mode-chooser-kicker">CALL COACH</p>
     <h2 class="mode-chooser-title">選擇工作流程</h2>
-    <p class="mode-chooser-lead">同一套工具，依情境選擇電訪分析、DEMO 錄影轉錄，或開發電訪的臨場陪練。</p>
+    <p class="mode-chooser-lead">同一套工具，依情境選擇電訪分析、DEMO 錄影轉錄、開發電訪的臨場陪練，或每天的開發症狀紀錄。</p>
     <div class="mode-cards">
       <button type="button" class="mode-card" data-mode="dev" data-code="CODE_001 // DRIFT">
         <span class="mode-card-tag">開發 · 電訪</span>
@@ -37,6 +37,12 @@
         <p>客戶接起電話，<code>你主動問</code>、限時接話。練不慌、不套話、不卡住——不是被動看分析。</p>
         <span class="mode-card-cta">開始撥號 →</span>
       </button>
+      <button type="button" class="mode-card log" data-mode="log" data-code="CODE_004 // PULSE">
+        <span class="mode-card-tag">開發 · 症狀</span>
+        <h3>開發症狀紀錄</h3>
+        <p>日曆點一天 → 填漏斗 → 匯入公司電話的 <code>wav</code> → 全選批次分析 → 找出跨通<code>共同病症</code> → 寫下明天只改的一件事。</p>
+        <span class="mode-card-cta">開始記錄 →</span>
+      </button>
     </div>
     <p class="hint mode-chooser-hint">首次使用 DEMO：<strong>公司電腦</strong>請下載 <a href="https://github.com/Minoru1017/For-company-business-use/releases/latest/download/CallCoachAssistant-Setup.exe" target="_blank" rel="noopener noreferrer">CallCoachAssistant-Setup.exe</a> 安裝精靈（不需 .cmd）；安裝完成後從開始選單啟動助手。</p>
   </div>
@@ -53,6 +59,7 @@
       <button type="button" class="mode-pill" data-mode="dev">開發 · 電訪</button>
       <button type="button" class="mode-pill" data-mode="demo">DEMO · 轉錄</button>
       <button type="button" class="mode-pill" data-mode="drill">開發 · 陪練</button>
+      <button type="button" class="mode-pill" data-mode="log">開發 · 症狀</button>
     </nav>
     <h1 class="display" data-text="CALL&#10;COACH">CALL<br><span class="ghost">COACH</span></h1>
     <p class="tagline" id="heroTagline">電訪逐字稿分析工具——把每一通電話變成可複盤的專業判斷。<br>
@@ -85,6 +92,11 @@
   <section class="sec" id="drillSection" hidden>
     <div class="sec-head"><span class="num">01</span><h2>電訪開發 · 臨場陪練</h2><span class="tag">你主動問 · 客戶即時回 · 限時接話</span></div>
     <div id="drillPanel" class="drill"></div>
+  </section>
+
+  <section class="sec" id="logSection" hidden>
+    <div class="sec-head"><span class="num">01</span><h2>開發症狀紀錄</h2><span class="tag">日曆 · 漏斗 · 錄音 · 共同病症 · 筆記</span></div>
+    <div id="symptomLogPanel"></div>
   </section>
 
   <section class="sec history-sec" id="historySection" hidden>

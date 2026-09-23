@@ -11,6 +11,10 @@ const STORAGE_TOKEN = 'callCoachBrowserWorkerToken';
 const STORAGE_CONSENT = 'callCoachBrowserWorkerConsent';
 const WORKER_TOKEN_HEADER = 'X-Call-Coach-Worker-Token';
 
+export function loadWorkerSettings() {
+  return loadSettings();
+}
+
 function loadSettings() {
   try {
     return {
@@ -154,6 +158,30 @@ async function downloadWorkerSrt(url, token, jobId) {
   const { text } = await workerFetch(url, token, `/worker/jobs/${jobId}/srt`);
   if (!text.trim()) throw new Error('SRT 為空');
   return text;
+}
+
+/**
+ * 程式化走完整流程（上傳 → 輪詢 → 取 SRT → 刪除遠端工作），給批次分析等不需要 UI 的地方用。
+ * @returns {Promise<string>} SRT 文字
+ */
+export async function transcribeViaWorker({ url, token, file, onProgress, onLog, registerAbort }) {
+  if (!url?.trim() || !token?.trim()) throw new Error('請先在「開發 · 電訪」或 DEMO 模式填好 Worker 網址與 Token');
+  let jobId = null;
+  try {
+    onProgress?.('上傳到遠端主機…');
+    jobId = await uploadMedia(url, token, file, (pct) => onProgress?.(`上傳中 ${Math.round(pct)}%…`), registerAbort);
+    onProgress?.('遠端 GPU 轉錄中…');
+    await pollWorkerJob(url, token, jobId, onLog);
+    return await downloadWorkerSrt(url, token, jobId);
+  } finally {
+    if (jobId) {
+      try {
+        await workerFetch(url, token, `/worker/jobs/${jobId}/delete`, { method: 'POST', body: '' });
+      } catch {
+        /* ignore */
+      }
+    }
+  }
 }
 
 /**
