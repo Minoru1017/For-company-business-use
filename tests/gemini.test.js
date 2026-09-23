@@ -46,6 +46,8 @@ describe('gemini helpers', () => {
   it('spots broken API key strings before sending', () => {
     const aq = 'AQ.' + 'x'.repeat(90);
     expect(describeApiKeyProblem(aq)).toBe('');
+    // 真實 AI Studio 發出的 AQ. Key 為 53 字元，必須通過
+    expect(describeApiKeyProblem('AQ.Ab8' + 'Q'.repeat(47))).toBe('');
     expect(describeApiKeyProblem('AIza' + 'y'.repeat(35))).toBe('');
     expect(describeApiKeyProblem('')).toContain('請先貼上');
     expect(describeApiKeyProblem('Bearer ' + aq)).toContain('Bearer');

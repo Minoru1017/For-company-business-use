@@ -39,7 +39,8 @@ export function describeApiKeyProblem(rawKey) {
   if (/\s/.test(trimmed)) return 'Key 中間有空格或換行，請回 AI Studio 用「複製」按鈕整串重貼';
   if (/[^\x21-\x7e]/.test(trimmed)) return 'Key 含有全形或非英數字元（例如「。」），請重新複製貼上';
   if (/^AQ\./.test(trimmed)) {
-    if (trimmed.length < 60) return `這把「AQ.」Key 只有 ${trimmed.length} 個字元，看起來被截斷了，請整串重新複製`;
+    // 實際 AI Studio 發出的 AQ. Key 約 53 字元（例：AQ.Ab8…）
+    if (trimmed.length < 40) return `這把「AQ.」Key 只有 ${trimmed.length} 個字元，看起來被截斷了，請整串重新複製`;
     return '';
   }
   if (/^AIza/.test(trimmed)) {
