@@ -339,7 +339,7 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
       const k = shiftDateKey(end, -i);
       const s = summary[k];
       const d = dayMap[k];
-      const f = d ? funnelFromCalls(d, [], state.settings) : null;
+      const f = d || s ? funnelFromCalls(d || {}, (s?.durations || []).map((sec) => ({ durationSec: sec })), state.settings) : null;
       const top = s?.symptoms?.length
         ? s.symptoms
             .slice(0, 2)
@@ -351,7 +351,7 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
       rows.push(
         `<button type="button" class="slog-week-row ${k === state.selected ? 'selected' : ''} ${empty ? 'empty' : ''}" data-date="${k}">
           <span class="slog-week-date">${fmtDateLabel(k)}</span>
-          <span class="slog-week-funnel">${f && (f.dialed || f.connected) ? `撥 ${f.dialed} · 通 ${f.connected} · >${f.shortMin}分 ${d.over5Manual ?? '—'} · 約 ${f.invites}` : '—'}</span>
+          <span class="slog-week-funnel">${f && (f.dialed || f.connected || f.over) ? `撥 ${f.dialed} · 通 ${f.connected} · >${f.shortMin}分 ${f.over} · 約 ${f.invites}` : '—'}</span>
           <span class="slog-week-calls">${s?.calls ? `${s.calls} 通${s.analyzed ? `・${s.analyzed} 已析` : ''}` : ''}</span>
           <span class="slog-week-sym">${escapeHTML(top)}</span>
         </button>`

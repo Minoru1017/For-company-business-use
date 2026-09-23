@@ -793,8 +793,8 @@ button.primary:hover { background:linear-gradient(180deg,#ffffff,#e6e0d1);
 #toast { border-radius:4px; background:rgba(33,42,54,.9); border-color:rgba(232,228,220,.16); }
 
 /* ---- 電訪開發 · 臨場陪練 ---- */
-.mode-chooser-inner { max-width:980px; }
-.mode-cards { grid-template-columns:repeat(auto-fit,minmax(250px,1fr)); }
+.mode-chooser-inner { max-width:1140px; }
+.mode-cards { grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); }
 .mode-card.drill { background-color:var(--tab-kraft); color:var(--ink); }
 .mode-card.drill:hover { background-color:#c6b99c; }
 .drill-h { font-family:var(--disp); font-size:.92rem; font-weight:700; margin:0 0 8px; }

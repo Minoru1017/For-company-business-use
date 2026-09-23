@@ -161,7 +161,7 @@ export async function saveSettings(patch) {
 export async function summarizeRange(fromKey, toKey) {
   const [days, calls] = await Promise.all([listDays(fromKey, toKey), listCallsBetween(fromKey, toKey)]);
   const out = {};
-  const ensure = (k) => (out[k] ||= { calls: 0, analyzed: 0, hasFunnel: false, hasNote: false, symptoms: [] });
+  const ensure = (k) => (out[k] ||= { calls: 0, analyzed: 0, hasFunnel: false, hasNote: false, symptoms: [], durations: [] });
   (days || []).forEach((d) => {
     const e = ensure(d.date);
     e.hasFunnel = [d.dialed, d.connected, d.invites].some((v) => v != null && v !== '' && Number(v) > 0);
@@ -171,6 +171,7 @@ export async function summarizeRange(fromKey, toKey) {
   (calls || []).forEach((c) => {
     const e = ensure(c.date);
     e.calls += 1;
+    if (Number(c.durationSec) > 0) e.durations.push(Number(c.durationSec));
     if (c.symptoms?.keys) {
       e.analyzed += 1;
       c.symptoms.keys.forEach((k) => {
