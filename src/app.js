@@ -5,6 +5,7 @@ import {
   callGeminiResilient,
   chunkTranscript,
   DEFAULT_MODEL,
+  describeApiKeyProblem,
   FALLBACK_MODELS,
   isDeprecatedModel,
   listGeminiModels,
@@ -521,6 +522,11 @@ function bindApiKey() {
       $('aiStatus').textContent = '請先貼上 API Key 才能驗證模型';
       return;
     }
+    const keyProblem = describeApiKeyProblem(key);
+    if (keyProblem) {
+      $('aiStatus').textContent = keyProblem;
+      return;
+    }
     $('verifyModel').disabled = true;
     $('aiStatus').textContent = '正在向 Google 查詢可用模型…';
     try {
@@ -600,6 +606,11 @@ async function runAIAnalysis() {
   const key = $('apiKey').value.trim();
   if (!key) {
     $('aiStatus').textContent = '請先貼上你自己的 API Key（aistudio.google.com/apikey 免費申請）';
+    return;
+  }
+  const keyProblem = describeApiKeyProblem(key);
+  if (keyProblem) {
+    $('aiStatus').textContent = keyProblem;
     return;
   }
   if (!segs.length) {

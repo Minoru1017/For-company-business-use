@@ -13,6 +13,7 @@ import {
   validateAudioFile,
 } from './audio-transcribe.js';
 import { mountBrowserWorkerUI } from './browser-worker-transcribe.js';
+import { describeApiKeyProblem } from './gemini.js';
 import { escapeHTML } from './utils.js';
 
 const STORAGE_ENGINE = 'callCoachDevAudioEngine';
@@ -78,6 +79,7 @@ export function mountDevAudioUpload(
 
       <div class="dev-audio-pane" data-engine="gemini" ${engine === 'gemini' ? '' : 'hidden'}>
         <input type="password" id="daGeminiKey" class="bridge-token" placeholder="貼上 Gemini API Key（與下方 AI 深度分析共用）" value="${escapeHTML(getApiKey?.() || '')}" autocomplete="off">
+        <div class="bridge-upload-status err hidden" id="daKeyHint"></div>
         <label class="bridge-consent">
           <input type="checkbox" id="daConsent">
           我確認這段錄音<strong>可以傳送到 Google Gemini</strong>轉成逐字稿（敏感內容請先去識別化）——每次上傳都需重新勾選
@@ -105,6 +107,19 @@ export function mountDevAudioUpload(
   const cancelBtn = container.querySelector('#daCancel');
   const fileInput = container.querySelector('#daFile');
   const statusEl = container.querySelector('#daStatus');
+  const keyHintEl = container.querySelector('#daKeyHint');
+
+  // 只在有輸入時提示格式問題（空白不提示，避免一開始就滿版紅字）
+  const keyProblem = () => {
+    const v = keyEl?.value?.trim() || '';
+    return v ? describeApiKeyProblem(v) : '';
+  };
+  const renderKeyHint = () => {
+    if (!keyHintEl) return;
+    const p = keyProblem();
+    keyHintEl.textContent = p;
+    keyHintEl.classList.toggle('hidden', !p);
+  };
 
   let picked = null;
   let busy = false;
@@ -121,12 +136,14 @@ export function mountDevAudioUpload(
   const refreshStart = () => {
     if (!startBtn) return;
     const key = keyEl?.value?.trim();
-    const blocked = busy || !picked || !key || !consentEl?.checked;
+    const problem = keyProblem();
+    const blocked = busy || !picked || !key || !!problem || !consentEl?.checked;
     startBtn.disabled = blocked;
     startBtn.removeAttribute('title');
     if (blocked && !busy) {
       if (!picked) startBtn.title = '請先選擇錄音檔';
       else if (!key) startBtn.title = '請貼上 Gemini API Key';
+      else if (problem) startBtn.title = problem;
       else if (!consentEl?.checked) startBtn.title = '請勾選知情同意';
     }
     if (pickBtn) pickBtn.disabled = busy;
@@ -161,6 +178,7 @@ export function mountDevAudioUpload(
 
   keyEl?.addEventListener('input', () => {
     setApiKey?.(keyEl.value.trim());
+    renderKeyHint();
     refreshStart();
   });
   consentEl?.addEventListener('change', refreshStart);
@@ -239,6 +257,7 @@ export function mountDevAudioUpload(
     }
   });
 
+  renderKeyHint();
   refreshStart();
 
   return {
@@ -246,6 +265,7 @@ export function mountDevAudioUpload(
     isAudio: isAudioFileName,
     syncApiKey(value) {
       if (keyEl && keyEl.value !== value) keyEl.value = value || '';
+      renderKeyHint();
       refreshStart();
     },
   };

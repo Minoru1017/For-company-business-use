@@ -217,6 +217,9 @@ describe('transcribeAudioWithGemini', () => {
     const startCall = calls.find((c) => c.url.endsWith('/upload/v1beta/files'));
     expect(startCall.headers['X-Goog-Upload-Protocol']).toBe('resumable');
     expect(startCall.headers['X-Goog-Upload-Header-Content-Type']).toBe('audio/mpeg');
+    const finalizeCall = calls.find((c) => c.url.includes('upload_id=abc'));
+    expect(finalizeCall.headers['x-goog-api-key']).toBe('k');
+    expect(finalizeCall.headers['X-Goog-Upload-Command']).toBe('upload, finalize');
     expect(calls.some((c) => c.method === 'DELETE' && c.url.endsWith('files/xyz'))).toBe(true);
   }, 10000);
 
