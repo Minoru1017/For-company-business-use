@@ -177,6 +177,8 @@ export async function callGeminiWithRetry({
   apiKey,
   model,
   text,
+  parts,
+  generationConfig,
   signal,
   fetchImpl = fetch,
   parse = parseAIResponse,
@@ -185,7 +187,7 @@ export async function callGeminiWithRetry({
   let lastErr;
   for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt++) {
     try {
-      return await callGemini({ apiKey, model, text, signal, fetchImpl, parse });
+      return await callGemini({ apiKey, model, text, parts, generationConfig, signal, fetchImpl, parse });
     } catch (e) {
       lastErr = e;
       if (!isRetryableGeminiStatus(e.status) || attempt >= RETRY_DELAYS_MS.length) throw e;
@@ -205,6 +207,8 @@ export async function callGeminiResilient({
   apiKey,
   model,
   text,
+  parts,
+  generationConfig,
   signal,
   fetchImpl = fetch,
   parse = parseAIResponse,
@@ -221,6 +225,8 @@ export async function callGeminiResilient({
         apiKey,
         model: tryModel,
         text,
+        parts,
+        generationConfig,
         signal,
         fetchImpl,
         parse,
@@ -244,17 +250,32 @@ export async function callGeminiResilient({
   throw lastErr;
 }
 
-export async function callGemini({ apiKey, model, text, signal, fetchImpl = fetch, parse = parseAIResponse }) {
+/** Build the request body; `parts` (multimodal, e.g. inline audio + prompt) overrides plain `text`. */
+export function buildGeminiRequestBody({ text, parts, generationConfig }) {
+  const contentParts = Array.isArray(parts) && parts.length ? parts : [{ text: String(text ?? '') }];
+  return {
+    contents: [{ parts: contentParts }],
+    generationConfig: { temperature: 0.3, responseMimeType: 'application/json', ...(generationConfig || {}) },
+  };
+}
+
+export async function callGemini({
+  apiKey,
+  model,
+  text,
+  parts,
+  generationConfig,
+  signal,
+  fetchImpl = fetch,
+  parse = parseAIResponse,
+}) {
   const res = await fetchImpl(
     `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent`,
     {
       method: 'POST',
       headers: geminiHeaders(apiKey),
       signal,
-      body: JSON.stringify({
-        contents: [{ parts: [{ text }] }],
-        generationConfig: { temperature: 0.3, responseMimeType: 'application/json' },
-      }),
+      body: JSON.stringify(buildGeminiRequestBody({ text, parts, generationConfig })),
     }
   );
   const errBody = await res.json().catch(() => ({}));
@@ -264,7 +285,11 @@ export async function callGemini({ apiKey, model, text, signal, fetchImpl = fetc
     throw err;
   }
   const data = errBody;
-  const raw = data?.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  const candidate = data?.candidates?.[0];
+  const raw = (candidate?.content?.parts || [])
+    .map((p) => (typeof p?.text === 'string' ? p.text : ''))
+    .join('');
   const usedTokens = data?.usageMetadata?.totalTokenCount || 0;
-  return { raw, usedTokens, parsed: parse(raw) };
+  const finishReason = candidate?.finishReason || '';
+  return { raw, usedTokens, finishReason, parsed: parse(raw, { finishReason }) };
 }

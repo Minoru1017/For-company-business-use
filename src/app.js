@@ -33,6 +33,7 @@ import {
   saveReportToBridge,
 } from './local-transcribe.js';
 import { initDemoPlayer, refreshDemoPlayerFromBridge, seekDemoTo, updateDemoPlayerSegments } from './demo-player.js';
+import { mountDevAudioUpload } from './dev-audio-upload.js';
 import { initModeChooser, resolveMode } from './mode.js';
 import { bindLabelCollapseHandlers, createLabelController } from './labels.js';
 import { applyBuiltinSpeakerLabels, enrichSegments, parse, parseVibeJson } from './parser.js';
@@ -53,6 +54,7 @@ let lastResult = null;
 let aiSummary = '';
 let sourceName = 'transcript.srt';
 let currentHistoryId = null;
+let devAudio = null;
 
 const keyStorage = {
   get remember() {
@@ -130,6 +132,17 @@ function loadTranscriptText(text, filename = 'transcript.srt') {
   return finishLoad(filename, isVibe ? 'Vibe' : '逐字稿');
 }
 
+/** 已解析好的 segs（例如 Gemini 直接轉錄錄音檔，已含 S/C 標記）。 */
+function loadParsedSegments(parsed, filename, src) {
+  if (!Array.isArray(parsed) || !parsed.length) {
+    $('fname').textContent = '轉錄結果為空，請確認錄音內容';
+    return false;
+  }
+  segs = parsed.map((s) => ({ ...s }));
+  if (labeledRatio(segs) < 0.5) autoGuess(segs);
+  return finishLoad(filename, src || 'AI 轉錄');
+}
+
 function finishLoad(filename, src) {
   enrichSegments(segs);
   sourceName = filename || 'transcript.srt';
@@ -163,8 +176,15 @@ function loadFromHistory(id) {
 }
 
 function loadFile(f) {
+  // 錄音檔不是文字，交給「直接上傳錄音檔」面板（Gemini／新竹 Worker）處理
+  if (devAudio?.isAudio(f.name) || String(f.type || '').startsWith('audio/')) {
+    if (devAudio?.setFile(f)) {
+      $('fname').textContent = `已選擇錄音 ${f.name}，請在下方面板勾選同意後「開始轉錄」`;
+      $('devAudioMount')?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    }
+    return;
+  }
   const r = new FileReader();
-  const isVibe = /\.vibe\.json$/i.test(f.name);
   r.onload = () => loadTranscriptText(r.result, f.name);
   r.readAsText(f, 'utf-8');
 }
@@ -485,7 +505,10 @@ function bindApiKey() {
     }
   };
 
-  $('apiKey').onchange = () => keyStorage.save($('apiKey').value.trim());
+  $('apiKey').onchange = () => {
+    keyStorage.save($('apiKey').value.trim());
+    devAudio?.syncApiKey($('apiKey').value.trim());
+  };
   $('quotaLimit').value = localStorage.getItem('gemini_limit') || 250;
   $('quotaLimit').onchange = () => {
     localStorage.setItem('gemini_limit', getLimit($('quotaLimit').value));
@@ -727,25 +750,50 @@ function init() {
     getMode: resolveMode,
   });
 
+  const getApiKey = () => $('apiKey').value.trim();
+  const setApiKey = (value) => {
+    $('apiKey').value = value;
+    keyStorage.save(value);
+    devAudio?.syncApiKey(value);
+  };
+  const getModel = () => {
+    const m = $('aiModel').value.trim() || DEFAULT_MODEL;
+    return isDeprecatedModel(m) ? DEFAULT_MODEL : m;
+  };
+  const onGeminiUsed = (tokens) => {
+    bumpUsage(tokens);
+    renderQuota();
+  };
+
+  // 開發模式：錄音檔直接轉錄（Gemini 為主、新竹 Worker 為輔），完成後與逐字稿走同一條標記→分析流程
+  devAudio = mountDevAudioUpload($('devAudioMount'), {
+    onSegmentsReady: (parsed, filename, src) => {
+      const ok = loadParsedSegments(parsed, filename, src);
+      if (ok) $('labelCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      return ok;
+    },
+    onTranscriptReady: (text, filename) => {
+      if (loadTranscriptText(text, filename)) {
+        $('labelCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    },
+    getApiKey,
+    setApiKey,
+    getModel,
+    onGeminiUsed,
+    showToast,
+  });
+
   initDrill({
     // 陪練逐字稿已含說話者標籤，直接跑分析並跳到結果
     onTranscriptReady: (text, filename) => {
       if (loadTranscriptText(text, filename)) $('analyze').click();
     },
     showToast,
-    getApiKey: () => $('apiKey').value.trim(),
-    setApiKey: (value) => {
-      $('apiKey').value = value;
-      keyStorage.save(value);
-    },
-    getModel: () => {
-      const m = $('aiModel').value.trim() || DEFAULT_MODEL;
-      return isDeprecatedModel(m) ? DEFAULT_MODEL : m;
-    },
-    onGeminiUsed: (tokens) => {
-      bumpUsage(tokens);
-      renderQuota();
-    },
+    getApiKey,
+    setApiKey,
+    getModel,
+    onGeminiUsed,
   });
 }
 

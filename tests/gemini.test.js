@@ -1,5 +1,7 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
+  buildGeminiRequestBody,
+  callGemini,
   chunkTranscript,
   extractSuggestedModel,
   formatApiError,
@@ -52,6 +54,39 @@ describe('gemini helpers', () => {
     expect(isRetryableGeminiStatus(401)).toBe(false);
     expect(modelsToTryForCapacity('gemini-3.6-flash')[0]).toBe('gemini-3.6-flash');
     expect(modelsToTryForCapacity('gemini-3.6-flash')).toContain('gemini-3.6-flash-lite');
+  });
+
+  it('builds text-only and multimodal request bodies', () => {
+    const textBody = buildGeminiRequestBody({ text: 'hi' });
+    expect(textBody.contents[0].parts).toEqual([{ text: 'hi' }]);
+    expect(textBody.generationConfig).toEqual({ temperature: 0.3, responseMimeType: 'application/json' });
+
+    const audioPart = { inline_data: { mime_type: 'audio/mp4', data: 'QUFB' } };
+    const multi = buildGeminiRequestBody({
+      text: 'ignored',
+      parts: [audioPart, { text: 'transcribe' }],
+      generationConfig: { temperature: 0.1, maxOutputTokens: 65536 },
+    });
+    expect(multi.contents[0].parts[0]).toBe(audioPart);
+    expect(multi.contents[0].parts[1].text).toBe('transcribe');
+    expect(multi.generationConfig).toEqual({ temperature: 0.1, responseMimeType: 'application/json', maxOutputTokens: 65536 });
+  });
+
+  it('joins multiple text parts and passes finishReason to the parser', async () => {
+    const fetchImpl = vi.fn(async () => ({
+      ok: true,
+      status: 200,
+      json: async () => ({
+        candidates: [{ content: { parts: [{ text: '{"good":[' }, { text: '],"bad":[],"suggest":[]}' }] }, finishReason: 'STOP' }],
+        usageMetadata: { totalTokenCount: 42 },
+      }),
+    }));
+    const parse = vi.fn((raw, meta) => ({ raw, meta }));
+    const r = await callGemini({ apiKey: 'k', model: 'gemini-3.6-flash', text: 'x', fetchImpl, parse });
+    expect(r.raw).toBe('{"good":[],"bad":[],"suggest":[]}');
+    expect(r.usedTokens).toBe(42);
+    expect(r.finishReason).toBe('STOP');
+    expect(parse).toHaveBeenCalledWith(r.raw, { finishReason: 'STOP' });
   });
 
   it('detects deprecated models and picks preferred', () => {
