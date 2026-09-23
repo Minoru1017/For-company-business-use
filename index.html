@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' https://fonts.googleapis.com 'unsafe-inline'; font-src https://fonts.gstatic.com; connect-src 'self' http://127.0.0.1:8765 https://generativelanguage.googleapis.com; img-src 'self' data:; base-uri 'self'; object-src 'none'; frame-ancestors 'none';">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' https://fonts.googleapis.com 'unsafe-inline'; font-src https://fonts.gstatic.com; connect-src 'self' http://127.0.0.1:8765 https://generativelanguage.googleapis.com https: http:; img-src 'self' data:; base-uri 'self'; object-src 'none'; frame-ancestors 'none';">
   <title>CALL COACH｜顧問式銷售電訪分析</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=JetBrains+Mono:wght@400;600&family=Noto+Sans+TC:wght@400;500;700;900&family=Noto+Serif+TC:wght@600;700&family=Archivo+Black&display=swap" rel="stylesheet">
@@ -22,7 +22,7 @@
       <button type="button" class="mode-card" data-mode="dev" data-code="CODE_001 // DRIFT">
         <span class="mode-card-tag">開發 · 電訪</span>
         <h3>電訪逐字稿</h3>
-        <p>從 Vibe 匯出 <code>.vibe.json</code> 或 SRT，上傳後分析通話品質。</p>
+        <p>直接丟錄音檔（m4a/mp3/wav）由 AI 轉錄，或上傳 Vibe <code>.vibe.json</code>／SRT，分析通話品質。</p>
         <span class="mode-card-cta">上傳分析 →</span>
       </button>
       <button type="button" class="mode-card accent" data-mode="demo" data-code="CODE_002 // SIGNAL">
@@ -60,10 +60,11 @@
   </header>
 
   <section class="sec" id="devSection" hidden>
-    <div class="sec-head"><span class="num">01</span><h2>上傳逐字稿</h2><span class="tag">Vibe / SRT・VTT・TXT</span></div>
-    <div id="drop">點擊選擇 或 拖曳逐字稿檔到這裡<br><span class="mono-hint" style="font-family:var(--mono);font-size:.7rem;letter-spacing:.15em;color:#555">VIBE .JSON / SRT / VTT / TXT — LOCAL ONLY</span><div id="fname"></div></div>
-    <input type="file" id="file" accept=".vibe.json,.json,.srt,.vtt,.txt,text/plain,application/json" hidden>
-    <p class="hint" style="margin-top:10px">電訪建議用 Vibe 錄音並匯出 <code>transcript.vibe.json</code>（見 <a href="https://github.com/Minoru1017/For-company-business-use/blob/main/docs/vibe-export-checklist.md" target="_blank" rel="noopener noreferrer">Vibe 檢查清單</a>）。</p>
+    <div class="sec-head"><span class="num">01</span><h2>上傳逐字稿或錄音</h2><span class="tag">錄音檔 / Vibe / SRT・VTT・TXT</span></div>
+    <div id="drop">點擊選擇 或 拖曳逐字稿／錄音檔到這裡<br><span class="mono-hint" style="font-family:var(--mono);font-size:.7rem;letter-spacing:.15em;color:#555">VIBE .JSON / SRT / VTT / TXT — LOCAL ONLY ・ M4A / MP3 / WAV — AI 轉錄</span><div id="fname"></div></div>
+    <input type="file" id="file" accept=".vibe.json,.json,.srt,.vtt,.txt,text/plain,application/json,.m4a,.mp3,.wav,.ogg,.oga,.opus,.webm,.aac,.flac,audio/*" hidden>
+    <p class="hint" style="margin-top:10px">已有逐字稿：Vibe 匯出的 <code>transcript.vibe.json</code>（見 <a href="https://github.com/Minoru1017/For-company-business-use/blob/main/docs/vibe-export-checklist.md" target="_blank" rel="noopener noreferrer">Vibe 檢查清單</a>）或 SRT 全程在本機解析、不上傳。只有錄音檔：用下方面板由 AI 轉錄。</p>
+    <div id="devAudioMount" class="dev-audio-mount"></div>
     <div class="sample-actions">
       <button type="button" class="btn" data-load-sample>載入範例逐字稿</button>
       <span class="hint">沒有檔案也能先體驗：內建一段 3 分鐘的虛構 AI 課程 DEMO 電訪。</span>

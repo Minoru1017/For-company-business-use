@@ -257,6 +257,20 @@ h2 { font-family:var(--disp); font-size:.98rem; margin-bottom:12px; color:var(--
 .bridge-log-actions { margin: 0; }
 .bridge-log-hint { margin: 0 0 8px; font-size: .78rem; color: var(--warn); }
 
+/* 開發模式：直接上傳錄音檔（Gemini／新竹 Worker） */
+.dev-audio-mount { margin-top: 14px; }
+.dev-audio { background: #141414; border: 1px solid var(--border); border-radius: 10px; padding: 14px 16px; }
+.dev-audio-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; margin-bottom: 10px; }
+.dev-audio-head strong { font-size: .92rem; color: var(--text); }
+.dev-audio-head .hint { margin: 0; }
+.dev-audio-engines { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 8px; margin-bottom: 12px; }
+.dev-audio-engine { display: flex; align-items: flex-start; gap: 10px; padding: 10px 12px; border: 1px solid var(--border); border-radius: 8px; cursor: pointer; font-size: .82rem; line-height: 1.45; color: var(--text); transition: border-color .15s, background .15s; }
+.dev-audio-engine input { margin-top: 3px; flex: none; }
+.dev-audio-engine small { display: block; color: var(--muted); font-size: .74rem; margin-top: 2px; }
+.dev-audio-engine.active { border-color: var(--ok); background: rgba(61,220,132,.07); }
+.dev-audio-pane .hint { margin-top: 4px; }
+.dev-audio .browser-worker .hint:first-child { margin-top: 0; }
+
 button { background:transparent; color:var(--text); border:1px solid var(--border);
          border-radius:99px; padding:10px 20px; font-size:.85rem; cursor:pointer;
          font-family:var(--sans); letter-spacing:.04em; transition:.15s; }
@@ -764,6 +778,8 @@ button.primary:hover { background:linear-gradient(180deg,#ffffff,#e6e0d1);
 .bridge-checklist, .bridge-advanced, .bridge-team, .bridge-team-text { border-radius:6px; }
 .bridge-file.on { border-color:var(--tab-paper); background:rgba(220,213,196,.1); }
 .bridge-consent { background:rgba(216,187,115,.08); border-color:#6b5a2e; }
+.dev-audio, .dev-audio-engine { border-radius:6px; }
+.dev-audio-engine.active { border-color:var(--tab-paper); background:rgba(220,213,196,.08); }
 
 /* ---- 頁尾：條碼與檔號 ---- */
 .footer { border-top:1px solid #3a4553; }
