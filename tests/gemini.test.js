@@ -3,6 +3,7 @@ import {
   buildGeminiRequestBody,
   callGemini,
   chunkTranscript,
+  describeApiKeyProblem,
   extractSuggestedModel,
   formatApiError,
   isDeprecatedModel,
@@ -42,8 +43,24 @@ describe('gemini helpers', () => {
     expect(merged.summary).toContain('A');
   });
 
+  it('spots broken API key strings before sending', () => {
+    const aq = 'AQ.' + 'x'.repeat(90);
+    expect(describeApiKeyProblem(aq)).toBe('');
+    expect(describeApiKeyProblem('AIza' + 'y'.repeat(35))).toBe('');
+    expect(describeApiKeyProblem('')).toContain('請先貼上');
+    expect(describeApiKeyProblem('Bearer ' + aq)).toContain('Bearer');
+    expect(describeApiKeyProblem(`"${aq}"`)).toContain('引號');
+    expect(describeApiKeyProblem('AQ.abc def' + 'x'.repeat(60))).toContain('空格');
+    expect(describeApiKeyProblem('AQ。' + 'x'.repeat(80))).toContain('全形');
+    expect(describeApiKeyProblem('AQ.short')).toContain('截斷');
+    expect(describeApiKeyProblem('AIzaShort')).toContain('不完整');
+    expect(describeApiKeyProblem('sk-openai-style-key-1234567890')).toContain('AQ.');
+  });
+
   it('formats API errors clearly', () => {
+    expect(formatApiError(401, { error: { message: 'Expected OAuth 2 access token' } })).toContain('AQ.');
     expect(formatApiError(401, {})).toContain('401');
+    expect(formatApiError(400, { error: { message: 'API key not valid. Please pass a valid API key.' } })).toContain('重新複製');
     expect(formatApiError(404, { error: { message: 'use models/gemini-3.6-flash' } })).toContain('gemini-3.6-flash');
     expect(formatApiError(429, {})).toContain('429');
     expect(formatApiError(503, { error: { message: 'high demand' } })).toContain('flash-lite');

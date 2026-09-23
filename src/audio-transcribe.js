@@ -5,7 +5,7 @@
  * - 大檔走 Gemini File API（resumable upload → 等待 ACTIVE → file_data 引用 → 用完刪除）。
  * 全模組不碰 DOM，方便單元測試；UI 在 dev-audio-upload.js。
  */
-import { callGeminiResilient } from './gemini.js';
+import { callGeminiResilient, formatApiError } from './gemini.js';
 
 export const AUDIO_EXTENSIONS = ['m4a', 'mp3', 'wav', 'ogg', 'oga', 'opus', 'webm', 'aac', 'flac', 'aiff', 'aif', 'amr', 'wma'];
 export const AUDIO_ACCEPT = `${AUDIO_EXTENSIONS.map((e) => `.${e}`).join(',')},audio/*`;
@@ -199,7 +199,9 @@ function apiHeaders(apiKey, extra = {}) {
 
 async function readError(res, fallback) {
   const body = await res.json().catch(() => ({}));
-  const msg = body?.error?.message || `${fallback}（HTTP ${res.status}）`;
+  const msg = body?.error?.message
+    ? `${fallback}：${formatApiError(res.status, body)}`
+    : `${fallback}（HTTP ${res.status}）`;
   const err = new Error(msg);
   err.status = res.status;
   return err;
@@ -245,11 +247,11 @@ export async function uploadToGeminiFiles({ apiKey, file, mimeType, signal, fetc
   const finalize = await fetchImpl(uploadUrl, {
     method: 'POST',
     signal,
-    headers: {
+    headers: apiHeaders(apiKey, {
       'X-Goog-Upload-Offset': '0',
       'X-Goog-Upload-Command': 'upload, finalize',
       'Content-Type': mimeType,
-    },
+    }),
     body: file,
   });
   if (!finalize.ok) throw await readError(finalize, '上傳錄音到 Gemini 失敗');

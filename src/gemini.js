@@ -26,6 +26,29 @@ export function pickPreferredModel(models, current) {
   return list.find((m) => !isDeprecatedModel(m)) || DEFAULT_MODEL;
 }
 
+/**
+ * 送出前先檢查 API Key 字串本身；回傳問題描述，沒問題回傳空字串。
+ * AI Studio 新式 Key 為「AQ.」開頭且很長，最常見的 401 就是複製時被截斷。
+ */
+export function describeApiKeyProblem(rawKey) {
+  const key = String(rawKey ?? '');
+  const trimmed = key.trim();
+  if (!trimmed) return '請先貼上 Gemini API Key';
+  if (/^bearer\s+/i.test(trimmed)) return 'Key 前面不要加「Bearer」，只貼 Key 本身';
+  if (/^["'`]|["'`]$/.test(trimmed)) return 'Key 前後不要有引號，請只貼 Key 本身';
+  if (/\s/.test(trimmed)) return 'Key 中間有空格或換行，請回 AI Studio 用「複製」按鈕整串重貼';
+  if (/[^\x21-\x7e]/.test(trimmed)) return 'Key 含有全形或非英數字元（例如「。」），請重新複製貼上';
+  if (/^AQ\./.test(trimmed)) {
+    if (trimmed.length < 60) return `這把「AQ.」Key 只有 ${trimmed.length} 個字元，看起來被截斷了，請整串重新複製`;
+    return '';
+  }
+  if (/^AIza/.test(trimmed)) {
+    if (trimmed.length < 35) return `這把 Key 只有 ${trimmed.length} 個字元，看起來不完整，請整串重新複製`;
+    return '';
+  }
+  return 'Gemini API Key 應以「AQ.」或「AIza」開頭，請確認貼的是 aistudio.google.com/apikey 產生的 Key';
+}
+
 /** Parse Google error text e.g. "use models/gemini-3.6-flash" */
 export function extractSuggestedModel(message) {
   const m = String(message || '').match(/models\/(gemini-[\w.-]+)/i);
@@ -123,7 +146,13 @@ export async function listGeminiModels(apiKey, fetchImpl = fetch) {
 
 export function formatApiError(status, errBody) {
   const msg = errBody?.error?.message || `HTTP ${status}`;
-  if (status === 401) return `API Key 無效或未授權（401）：${msg}`;
+  if (status === 401) {
+    // Google 的 401 文字會提到 OAuth，實際上用 API Key 時幾乎都是 Key 字串不完整／複製錯
+    return `API Key 無效或未授權（401）：Google 不接受這把 Key。新式 Key 以「AQ.」開頭且很長，請回 aistudio.google.com/apikey 用「複製」按鈕整串重貼（不要手打、前後不要有空格或引號），或重新建立一把 Key 後按「驗證模型」測試。原始訊息：${msg}`;
+  }
+  if (status === 400 && /api key not valid/i.test(msg)) {
+    return `API Key 無效（400）：這把 Key 不存在或已被刪除，請到 aistudio.google.com/apikey 重新複製或建立。原始訊息：${msg}`;
+  }
   if (status === 403) return `API Key 沒有權限使用此模型（403）：${msg}`;
   if (status === 404) {
     const hint = extractSuggestedModel(msg);
