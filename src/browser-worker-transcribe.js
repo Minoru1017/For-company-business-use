@@ -1,6 +1,7 @@
 /**
- * DEMO 轉錄：瀏覽器直連遠端 Worker（不需本機 Call Coach 助手）。
- * 適合公司電腦無法安裝／執行 .exe 時，將 MP4 上傳到新竹 GPU Worker，收回 SRT 後在網頁分析。
+ * 瀏覽器直連遠端 Worker（不需本機 Call Coach 助手）。
+ * 適合公司電腦無法安裝／執行 .exe 時，將 MP4（DEMO）或錄音檔（開發電訪）上傳到新竹 GPU Worker，
+ * 收回 SRT 後在網頁分析。可在同一頁多次掛載（idPrefix 區分）。
  */
 import { safeWorkerJobName } from './audio-transcribe.js';
 import { escapeHTML } from './utils.js';
