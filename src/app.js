@@ -36,6 +36,7 @@ import {
 import { initDemoPlayer, refreshDemoPlayerFromBridge, seekDemoTo, updateDemoPlayerSegments } from './demo-player.js';
 import { mountDevAudioUpload } from './dev-audio-upload.js';
 import { initModeChooser, resolveMode } from './mode.js';
+import { initSymptomLog } from './symptom-log.js';
 import { bindLabelCollapseHandlers, createLabelController } from './labels.js';
 import { applyBuiltinSpeakerLabels, enrichSegments, parse, parseVibeJson } from './parser.js';
 import { bumpUsage, checkQuotaBefore, getLimit, getUsage, quotaPercent, saveUsage } from './quota.js';
@@ -56,6 +57,7 @@ let aiSummary = '';
 let sourceName = 'transcript.srt';
 let currentHistoryId = null;
 let devAudio = null;
+let symptomLog = null;
 
 const keyStorage = {
   get remember() {
@@ -509,6 +511,7 @@ function bindApiKey() {
   $('apiKey').onchange = () => {
     keyStorage.save($('apiKey').value.trim());
     devAudio?.syncApiKey($('apiKey').value.trim());
+    symptomLog?.syncApiKey($('apiKey').value.trim());
   };
   $('quotaLimit').value = localStorage.getItem('gemini_limit') || 250;
   $('quotaLimit').onchange = () => {
@@ -742,6 +745,7 @@ function init() {
   initModeChooser({
     onModeChange: (mode) => {
       if (mode === 'demo') window.__refreshBridge?.();
+      if (mode === 'log') symptomLog?.activate();
     },
   });
 
@@ -766,6 +770,7 @@ function init() {
     $('apiKey').value = value;
     keyStorage.save(value);
     devAudio?.syncApiKey(value);
+    symptomLog?.syncApiKey(value);
   };
   const getModel = () => {
     const m = $('aiModel').value.trim() || DEFAULT_MODEL;
@@ -794,6 +799,23 @@ function init() {
     onGeminiUsed,
     showToast,
   });
+
+  // 開發症狀紀錄：日曆／漏斗／當天錄音批次分析；「完整分析」把某通逐字稿送進標記→分析流程
+  symptomLog = initSymptomLog($('symptomLogPanel'), {
+    getApiKey,
+    setApiKey,
+    getModel,
+    onGeminiUsed,
+    showToast,
+    onOpenCall: (parsed, filename) => {
+      if (loadParsedSegments(parsed, filename, '症狀紀錄')) {
+        $('analyze').click();
+        $('labelCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+      }
+    },
+  });
+  // 從網址直接進入 #log 時 initModeChooser 已先觸發 onModeChange，此時 symptomLog 尚未建立
+  if (resolveMode() === 'log') symptomLog.activate();
 
   initDrill({
     // 陪練逐字稿已含說話者標籤，直接跑分析並跳到結果
