@@ -68,6 +68,10 @@ function fmtDateLabel(key) {
   return `${d.getMonth() + 1}/${d.getDate()}（${WEEKDAYS[d.getDay()]}）`;
 }
 
+function startKey(settings) {
+  return parseDateKey(settings?.startDate) ? settings.startDate : '';
+}
+
 /** 用 <audio> 讀出長度（公司電話系統的 wav 檔名通常沒有秒數）。讀不到回 0。 */
 function probeDuration(blob) {
   return new Promise((resolve) => {
@@ -214,7 +218,8 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
             <summary>門檻設定</summary>
             <label>「超過 N 分」的 N <input type="number" min="1" max="60" data-setting="shortMin"></label>
             <label>「長 Call」≥ 幾分 <input type="number" min="1" max="180" data-setting="longMin"></label>
-            <span class="hint">留空的欄位會依匯入錄音的長度自動計算；手填會覆蓋自動值。</span>
+            <label>入職日（日曆從這天開始） <input type="date" data-setting="startDate"></label>
+            <span class="hint">留空的欄位會依匯入錄音的長度自動計算；手填會覆蓋自動值。入職日之前的日期不會顯示。</span>
           </details>
         </div>
 
@@ -359,11 +364,18 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
       state.monthSummary = {};
     }
     monthLabel.textContent = `${state.year} 年 ${state.month} 月`;
+    const start = startKey(state.settings);
+    const prevBtn = q('.slog-nav[data-nav="-1"]');
+    if (prevBtn) prevBtn.disabled = !!start && `${state.year}-${String(state.month).padStart(2, '0')}` <= start.slice(0, 7);
     gridEl.innerHTML = cells
       .map((c) => {
+        if (start && c.key < start) {
+          return `<span class="slog-cell before-start ${c.inMonth ? '' : 'out'}" aria-hidden="true"></span>`;
+        }
         const s = state.monthSummary[c.key];
         const cls = ['slog-cell'];
         if (!c.inMonth) cls.push('out');
+        if (start && c.key === start) cls.push('start');
         if (c.key === today) cls.push('today');
         if (c.key === state.selected) cls.push('selected');
         if (c.weekday === 0 || c.weekday === 6) cls.push('weekend');
@@ -376,7 +388,8 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
             : '') + (selfN ? `<span class="slog-dot self" title="自評 ${selfN} 項病症"></span>` : '');
         const n = s?.calls ? `<span class="slog-cell-n">${s.calls}</span>` : '';
         const inv = s?.invites != null && s.invites > 0 ? `<span class="slog-cell-inv" title="進邀約 ${s.invites}">約 ${s.invites}</span>` : '';
-        return `<button type="button" class="${cls.join(' ')}" data-date="${c.key}"><span class="slog-cell-d">${c.day}</span>${n}${inv}<span class="slog-dots">${dots}</span></button>`;
+        const startTag = start && c.key === start ? '<span class="slog-cell-start">入職</span>' : '';
+        return `<button type="button" class="${cls.join(' ')}" data-date="${c.key}"><span class="slog-cell-d">${c.day}</span>${n}${inv}${startTag}<span class="slog-dots">${dots}</span></button>`;
       })
       .join('');
     refreshStorage();
@@ -407,8 +420,10 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
     }
     const dayMap = Object.fromEntries((days || []).map((d) => [d.date, d]));
     const rows = [];
+    const hired = startKey(state.settings);
     for (let i = 6; i >= 0; i--) {
       const k = shiftDateKey(end, -i);
+      if (hired && k < hired) continue;
       const s = summary[k];
       const d = dayMap[k];
       const f = d || s ? funnelFromCalls(d || {}, (s?.durations || []).map((sec) => ({ durationSec: sec })), state.settings) : null;
@@ -445,6 +460,8 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
   container.querySelectorAll('.slog-nav').forEach((b) =>
     b.addEventListener('click', () => {
       const d = new Date(state.year, state.month - 1 + Number(b.dataset.nav), 1);
+      const start = startKey(state.settings);
+      if (start && dateKey(d).slice(0, 7) < start.slice(0, 7)) return;
       state.year = d.getFullYear();
       state.month = d.getMonth() + 1;
       refreshMonth();
@@ -460,6 +477,11 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
 
   async function selectDay(key) {
     if (!parseDateKey(key)) return;
+    const start = startKey(state.settings);
+    if (start && key < start) {
+      toast(`${fmtDateLabel(start)} 入職前的日期不在紀錄範圍`);
+      return;
+    }
     stopPlayback();
     state.selected = key;
     state.selection = new Set();
@@ -549,15 +571,23 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
 
   container.querySelectorAll('[data-setting]').forEach((inp) =>
     inp.addEventListener('change', async () => {
-      const v = Math.max(1, Math.floor(Number(inp.value)) || 1);
-      state.settings = { ...state.settings, [inp.dataset.setting]: v };
+      const k = inp.dataset.setting;
+      const v = k === 'startDate' ? (parseDateKey(inp.value) ? inp.value : '') : Math.max(1, Math.floor(Number(inp.value)) || 1);
+      state.settings = { ...state.settings, [k]: v };
       try {
-        state.settings = await saveSettings({ [inp.dataset.setting]: v });
+        state.settings = await saveSettings({ [k]: v });
       } catch {
         /* keep in-memory */
       }
       renderFunnelInputs();
       renderFunnelBar();
+      if (k === 'startDate') {
+        if (v && state.selected && state.selected < v) {
+          await selectDay(v <= today ? today : v);
+          return;
+        }
+        refreshMonth();
+      }
       refreshWeek();
     })
   );

@@ -960,6 +960,11 @@ button.primary:hover { background:linear-gradient(180deg,#ffffff,#e6e0d1);
 .slog-cell-d { font-family:var(--mono); font-size:.8rem; }
 .slog-cell-n { position:absolute; top:6px; right:8px; font-family:var(--mono); font-size:.66rem; color:var(--warn); }
 .slog-cell-inv { font-family:var(--mono); font-size:.62rem; letter-spacing:.04em; color:var(--muted); }
+.slog-cell.before-start { border-style:dashed; border-color:rgba(53,64,79,.5); background:transparent; cursor:default; pointer-events:none; }
+.slog-cell.start { border-color:var(--tab-paper); }
+.slog-cell-start { position:absolute; right:8px; bottom:6px; font-family:var(--mono); font-size:.58rem; letter-spacing:.14em; color:var(--tab-paper); }
+.slog-cell.selected .slog-cell-start { color:var(--ink); }
+.slog-nav:disabled { opacity:.35; cursor:not-allowed; }
 /* 邀約成效：≥2 綠、0 紅（只對有填漏斗的日子上色） */
 .slog-cell.invite-good { background:rgba(141,195,155,.22); border-color:var(--ok); }
 .slog-cell.invite-good .slog-cell-d, .slog-cell.invite-good .slog-cell-inv { color:var(--ok); }
@@ -1006,6 +1011,7 @@ button.primary:hover { background:linear-gradient(180deg,#ffffff,#e6e0d1);
 .slog-settings[open] summary { margin-bottom:8px; color:var(--text); }
 .slog-settings label { display:inline-flex; flex-direction:row; align-items:center; gap:8px; margin:0 14px 6px 0; }
 .slog-settings input { width:80px; }
+.slog-settings input[type="date"] { width:160px; color-scheme:dark; }
 .slog-settings .hint { display:block; margin-top:4px; }
 .slog-calls-head { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px; }
 .slog-calls-head h2 { margin:0; }

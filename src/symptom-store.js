@@ -144,6 +144,8 @@ export const DEFAULT_SETTINGS = {
   shortMin: 5,
   longMin: 15,
   engine: 'gemini',
+  // 入職日：日曆從這天開始，之前的日期不顯示
+  startDate: '2026-08-04',
   // 使用者自己維護的病症試算表（讀取只需「知道連結可檢視」）
   sheetUrl: 'https://docs.google.com/spreadsheets/d/1c7W5vfpQPGqm8urKqd-fM-qt3x2Xz5fvhpt5eGgp3pA/edit',
   scriptUrl: '',
