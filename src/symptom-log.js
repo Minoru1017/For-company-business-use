@@ -20,6 +20,7 @@ import {
   extractSymptoms,
   formatDuration,
   funnelFromCalls,
+  inviteTone,
   parseDateFromFilename,
   parseDateKey,
   parseDiagnosis,
@@ -143,7 +144,7 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
           </div>
           <div class="slog-weekdays">${WEEKDAYS.map((w) => `<span>${w}</span>`).join('')}</div>
           <div class="slog-grid" id="slGrid"></div>
-          <p class="hint slog-legend"><span class="slog-dot calls"></span>有錄音 <span class="slog-dot analyzed"></span>已分析 <span class="slog-dot note"></span>有筆記 ・ 點日期進入當天</p>
+          <p class="hint slog-legend"><span class="slog-dot calls"></span>有錄音 <span class="slog-dot analyzed"></span>已分析 <span class="slog-dot note"></span>有筆記 ・ <span class="slog-swatch good"></span>邀約 ≥ 2 <span class="slog-swatch zero"></span>邀約 0 ・ 點日期進入當天</p>
           <div class="hint" id="slStorage"></div>
           <div class="bridge-upload-status err hidden" id="slDbError"></div>
         </div>
@@ -300,11 +301,14 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
         if (c.key === today) cls.push('today');
         if (c.key === state.selected) cls.push('selected');
         if (c.weekday === 0 || c.weekday === 6) cls.push('weekend');
+        const tone = inviteTone(s);
+        if (tone) cls.push(`invite-${tone}`);
         const dots = s
           ? `${s.calls ? `<span class="slog-dot calls" title="${s.calls} 通錄音"></span>` : ''}${s.analyzed ? '<span class="slog-dot analyzed" title="已分析"></span>' : ''}${s.hasNote ? '<span class="slog-dot note" title="有筆記"></span>' : ''}`
           : '';
         const n = s?.calls ? `<span class="slog-cell-n">${s.calls}</span>` : '';
-        return `<button type="button" class="${cls.join(' ')}" data-date="${c.key}"><span class="slog-cell-d">${c.day}</span>${n}<span class="slog-dots">${dots}</span></button>`;
+        const inv = s?.invites != null && s.invites > 0 ? `<span class="slog-cell-inv" title="進邀約 ${s.invites}">約 ${s.invites}</span>` : '';
+        return `<button type="button" class="${cls.join(' ')}" data-date="${c.key}"><span class="slog-cell-d">${c.day}</span>${n}${inv}<span class="slog-dots">${dots}</span></button>`;
       })
       .join('');
     refreshStorage();

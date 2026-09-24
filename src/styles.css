@@ -959,6 +959,20 @@ button.primary:hover { background:linear-gradient(180deg,#ffffff,#e6e0d1);
 .slog-cell.selected .slog-cell-d, .slog-cell.selected .slog-cell-n { color:var(--ink); }
 .slog-cell-d { font-family:var(--mono); font-size:.8rem; }
 .slog-cell-n { position:absolute; top:6px; right:8px; font-family:var(--mono); font-size:.66rem; color:var(--warn); }
+.slog-cell-inv { font-family:var(--mono); font-size:.62rem; letter-spacing:.04em; color:var(--muted); }
+/* 邀約成效：≥2 綠、0 紅（只對有填漏斗的日子上色） */
+.slog-cell.invite-good { background:rgba(141,195,155,.22); border-color:var(--ok); }
+.slog-cell.invite-good .slog-cell-d, .slog-cell.invite-good .slog-cell-inv { color:var(--ok); }
+.slog-cell.invite-zero { background:rgba(226,87,63,.2); border-color:var(--bad); }
+.slog-cell.invite-zero .slog-cell-d { color:var(--bad); }
+.slog-cell.invite-good.selected { background:var(--ok); color:var(--ink); box-shadow:0 0 0 2px var(--ok); }
+.slog-cell.invite-good.selected .slog-cell-d, .slog-cell.invite-good.selected .slog-cell-inv, .slog-cell.invite-good.selected .slog-cell-n { color:var(--ink); }
+.slog-cell.invite-zero.selected { background:var(--bad); color:#fff; box-shadow:0 0 0 2px var(--bad); }
+.slog-cell.invite-zero.selected .slog-cell-d, .slog-cell.invite-zero.selected .slog-cell-n { color:#fff; }
+.slog-cell.invite-good:hover { border-color:var(--ok); } .slog-cell.invite-zero:hover { border-color:var(--bad); }
+.slog-swatch { display:inline-block; width:12px; height:9px; border-radius:2px; vertical-align:middle; margin:0 4px 0 6px; border:1px solid transparent; }
+.slog-swatch.good { background:rgba(141,195,155,.35); border-color:var(--ok); }
+.slog-swatch.zero { background:rgba(226,87,63,.3); border-color:var(--bad); }
 .slog-dots { display:flex; gap:3px; margin-top:auto; }
 .slog-dot { display:inline-block; width:6px; height:6px; border-radius:50%; background:var(--muted); vertical-align:middle; margin:0 4px 0 0; }
 .slog-dot.calls { background:var(--warn); }

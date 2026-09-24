@@ -354,6 +354,18 @@ export function parseDiagnosis(raw) {
   };
 }
 
+/**
+ * 日曆格顏色：邀約 ≥ 2 → 'good'（綠）；有填漏斗但邀約 0（或沒填）→ 'zero'（紅）；其餘 ''。
+ * 沒填任何數字的日子不上色，避免整個月都變紅。
+ */
+export function inviteTone(summary) {
+  if (!summary) return '';
+  const invites = summary.invites == null ? null : Number(summary.invites) || 0;
+  if (invites != null && invites >= 2) return 'good';
+  if (summary.hasFunnel && !invites) return 'zero';
+  return '';
+}
+
 /** 月曆格：回傳 6×7 的 dateKey 陣列（前後月補齊），週日開頭 */
 export function calendarGrid(year, month /* 1-12 */) {
   const first = new Date(year, month - 1, 1);

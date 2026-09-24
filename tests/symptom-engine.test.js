@@ -10,6 +10,7 @@ import {
   extractSymptoms,
   formatDuration,
   funnelFromCalls,
+  inviteTone,
   parseDateFromFilename,
   parseDiagnosis,
   shiftDateKey,
@@ -95,6 +96,18 @@ describe('date helpers', () => {
   it('formatDuration', () => {
     expect(formatDuration(65)).toBe('1:05');
     expect(formatDuration(0)).toBe('0:00');
+  });
+});
+
+describe('inviteTone', () => {
+  it('green when invites ≥ 2, red when funnel filled but invites 0 or empty, neutral otherwise', () => {
+    expect(inviteTone({ hasFunnel: true, invites: 2 })).toBe('good');
+    expect(inviteTone({ hasFunnel: true, invites: 5 })).toBe('good');
+    expect(inviteTone({ hasFunnel: true, invites: 0 })).toBe('zero');
+    expect(inviteTone({ hasFunnel: true, invites: null })).toBe('zero');
+    expect(inviteTone({ hasFunnel: true, invites: 1 })).toBe('');
+    expect(inviteTone({ hasFunnel: false, invites: null, calls: 3 })).toBe('');
+    expect(inviteTone(undefined)).toBe('');
   });
 });
 
