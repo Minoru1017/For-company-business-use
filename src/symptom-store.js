@@ -140,7 +140,15 @@ export function deleteAudio(id) {
 
 /* ---------- settings ---------- */
 
-export const DEFAULT_SETTINGS = { shortMin: 5, longMin: 15, engine: 'gemini' };
+export const DEFAULT_SETTINGS = {
+  shortMin: 5,
+  longMin: 15,
+  engine: 'gemini',
+  // 使用者自己維護的病症試算表（讀取只需「知道連結可檢視」）
+  sheetUrl: 'https://docs.google.com/spreadsheets/d/1c7W5vfpQPGqm8urKqd-fM-qt3x2Xz5fvhpt5eGgp3pA/edit',
+  scriptUrl: '',
+  scriptToken: '',
+};
 
 export function getSettings() {
   return withStore(STORE_SETTINGS, 'readonly', (s) => req(s.get('main'))).then((r) => ({ ...DEFAULT_SETTINGS, ...(r?.value || {}) }));

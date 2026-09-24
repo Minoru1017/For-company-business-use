@@ -287,7 +287,7 @@ const fmtNum = (v, unit = '') => (v == null ? '—' : `${Math.round(v * 10) / 10
 /**
  * AI 診斷 prompt：只送彙總數字、症狀次數與 ≤3 句客戶／業務原話，不送整份逐字稿。
  */
-export function buildDiagnosisPrompt(aggregate, { funnel, date, recentNotes = [] } = {}) {
+export function buildDiagnosisPrompt(aggregate, { funnel, date, recentNotes = [], selfSymptoms = [], followThrough = '' } = {}) {
   const lines = [];
   lines.push('你是電話業務教練。以下是一位業務「同一天多通開發電訪」的規則分析彙總（依公司顧問式銷售手冊：理解需求→判斷適配→幫助決策；讓客戶多說、先挖到困擾再談方案、強化只能放大客戶自述不能製造恐懼）。');
   lines.push('請找出他「跨通共同」的核心病症（不是逐通列缺點），並給明天只改一個動作的具體建議。');
@@ -307,6 +307,10 @@ export function buildDiagnosisPrompt(aggregate, { funnel, date, recentNotes = []
     const ev = s.evidence?.length ? `；例：${s.evidence.map((e) => `「${e.text}」`).join(' ')}` : '';
     lines.push(`- ${s.label}（${s.hint}）：${s.count}/${aggregate.total}${ev}`);
   });
+  if (selfSymptoms.length) {
+    lines.push(`他自己在當天勾的病症（自評，含心態面）：${selfSymptoms.join('、')}。請對照上面的偵測結果：自評與錄音是否一致？有沒有他沒察覺的？`);
+  }
+  if (followThrough) lines.push(`「昨天說要改的動作」他自評：${followThrough}`);
   if (recentNotes.length) {
     lines.push('他前幾天自己寫的改善動作（請判斷是否有做到、是否該換方向）：');
     recentNotes.forEach((n) => lines.push(`- ${n.date}：${n.action || n.free || ''}`));

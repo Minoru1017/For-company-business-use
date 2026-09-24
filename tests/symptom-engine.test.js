@@ -205,6 +205,10 @@ describe('diagnosis prompt / parse', () => {
     expect(p).toContain('每問一句就閉嘴');
     expect(p).toContain('core_symptoms');
     expect(p).not.toContain('那我發連結給你');
+    expect(p).not.toContain('自評');
+    const p2 = buildDiagnosisPrompt(agg, { selfSymptoms: ['破冰目的性太強', '跟其他業務比較'], followThrough: '沒做到但有即時調整' });
+    expect(p2).toContain('破冰目的性太強、跟其他業務比較');
+    expect(p2).toContain('沒做到但有即時調整');
   });
   it('parses fenced JSON and truncates to 3 symptoms', () => {
     const raw = '```json\n' + JSON.stringify({

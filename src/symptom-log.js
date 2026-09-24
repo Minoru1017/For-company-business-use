@@ -43,6 +43,16 @@ import {
   storageEstimate,
   summarizeRange,
 } from './symptom-store.js';
+import {
+  APPS_SCRIPT_TEMPLATE,
+  FOLLOW_THROUGH_OPTIONS,
+  a1ToCol,
+  buildSheetModel,
+  fetchSheetModel,
+  markIsOn,
+  planDayWrites,
+  writeSheetCells,
+} from './sheet-sync.js';
 import { escapeHTML } from './utils.js';
 
 const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六'];
@@ -130,6 +140,7 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
     playingUrl: null,
     activated: false,
     dbError: '',
+    sheet: { rows: null, model: null, loadedAt: 0, error: '', busy: false, writing: false, flash: false },
   };
 
   container.innerHTML = `
@@ -144,7 +155,7 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
           </div>
           <div class="slog-weekdays">${WEEKDAYS.map((w) => `<span>${w}</span>`).join('')}</div>
           <div class="slog-grid" id="slGrid"></div>
-          <p class="hint slog-legend"><span class="slog-dot calls"></span>有錄音 <span class="slog-dot analyzed"></span>已分析 <span class="slog-dot note"></span>有筆記 ・ <span class="slog-swatch good"></span>邀約 ≥ 2 <span class="slog-swatch zero"></span>邀約 0 ・ 點日期進入當天</p>
+          <p class="hint slog-legend"><span class="slog-dot calls"></span>有錄音 <span class="slog-dot analyzed"></span>已分析 <span class="slog-dot note"></span>有筆記 <span class="slog-dot self"></span>自評病症 ・ <span class="slog-swatch good"></span>邀約 ≥ 2 <span class="slog-swatch zero"></span>邀約 0 ・ 點日期進入當天</p>
           <div class="hint" id="slStorage"></div>
           <div class="bridge-upload-status err hidden" id="slDbError"></div>
         </div>
@@ -153,6 +164,40 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
           <div id="slWeek" class="slog-week-list"></div>
         </div>
       </div>
+
+      <details class="card slog-sheet" id="slSheetCard">
+        <summary><h2>Google 試算表同步 <span class="slog-count" id="slSheetState"></span></h2></summary>
+        <p class="hint">你的病症試算表：第 1 列是病症名稱、A 欄是日期、格子填「有」。這裡會把它讀進來當「自評病症」，勾選會寫回同一格；漏斗數字與筆記可寫到右側新欄。</p>
+        <label class="slog-sheet-field">試算表網址（共用設定：知道連結的使用者可檢視）
+          <input type="text" id="slSheetUrl" class="bridge-token" placeholder="https://docs.google.com/spreadsheets/d/…/edit" autocomplete="off"></label>
+        <div class="bridge-actions">
+          <button type="button" class="btn" id="slSheetReload">重新讀取</button>
+          <a class="btn slog-link" id="slSheetOpen" href="#" target="_blank" rel="noopener noreferrer">在 Google 開啟</a>
+        </div>
+        <div class="bridge-upload-status hidden" id="slSheetStatus"></div>
+        <label class="slog-sheet-field">Apps Script 網頁應用程式網址（要「寫回」試算表才需要；空白＝唯讀）
+          <input type="text" id="slScriptUrl" class="bridge-token" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off"></label>
+        <label class="slog-sheet-field">Token（與 Apps Script 裡的 TOKEN 一樣）
+          <input type="password" id="slScriptToken" class="bridge-token" placeholder="CHANGE_ME" autocomplete="off"></label>
+        <div class="bridge-actions">
+          <button type="button" class="btn" id="slTestWrite">測試寫入</button>
+        </div>
+        <div class="bridge-upload-status hidden" id="slScriptStatus"></div>
+        <details class="slog-settings">
+          <summary>怎麼取得 Apps Script 網址（一次設定，約 2 分鐘）</summary>
+          <ol class="slog-steps">
+            <li>開試算表 → 上方「擴充功能」→「Apps Script」</li>
+            <li>把下面整段貼上取代原本內容，把 <code>CHANGE_ME</code> 改成你自己的一串字，存檔</li>
+            <li>右上「部署」→「新增部署」→ 類型選「網頁應用程式」→ 執行身分「我」→ 存取權「所有人」→ 部署（第一次會要你授權）</li>
+            <li>複製「網頁應用程式 URL」（<code>/exec</code> 結尾）貼到上面，Token 填同一串字，按「測試寫入」</li>
+          </ol>
+          <textarea class="slog-code" id="slScriptCode" readonly rows="10"></textarea>
+          <div class="bridge-actions">
+            <button type="button" class="btn" id="slCopyScript">複製程式碼</button>
+          </div>
+          <p class="hint">存取權選「所有人」只代表任何人可以「呼叫這支程式」，不是公開試算表；Token 不符會被程式擋下。只寫得到你部署時所在的那張試算表。</p>
+        </details>
+      </details>
 
       <div class="slog-day" id="slDay" hidden>
         <div class="card slog-funnel">
@@ -171,6 +216,19 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
             <label>「長 Call」≥ 幾分 <input type="number" min="1" max="180" data-setting="longMin"></label>
             <span class="hint">留空的欄位會依匯入錄音的長度自動計算；手填會覆蓋自動值。</span>
           </details>
+        </div>
+
+        <div class="card slog-self" id="slSelfCard" hidden>
+          <h2>自評病症 <span class="slog-count">來自試算表</span></h2>
+          <div id="slSelfList" class="slog-self-list"></div>
+          <div class="slog-self-status">
+            <span class="slog-self-label">昨天說要改的動作，今天有做到嗎？</span>
+            <div id="slFollow" class="slog-follow"></div>
+          </div>
+          <div class="bridge-actions">
+            <button type="button" class="btn" id="slPushDay">把今天的漏斗＋筆記寫入試算表</button>
+          </div>
+          <div class="bridge-upload-status hidden" id="slSelfStatus"></div>
         </div>
 
         <div class="card slog-calls">
@@ -264,6 +322,14 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
   const diagnosisEl = q('#slDiagnosis');
 
   const toast = (m) => showToast?.(m);
+  const sheetUrlEl = q('#slSheetUrl');
+  const scriptUrlEl = q('#slScriptUrl');
+  const scriptTokenEl = q('#slScriptToken');
+  const sheetStatusEl = q('#slSheetStatus');
+  const selfCard = q('#slSelfCard');
+  const selfListEl = q('#slSelfList');
+  const followEl = q('#slFollow');
+  const selfStatusEl = q('#slSelfStatus');
 
   const setStatus = (el, msg, kind = 'busy') => {
     if (!el) return;
@@ -303,9 +369,11 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
         if (c.weekday === 0 || c.weekday === 6) cls.push('weekend');
         const tone = inviteTone(s);
         if (tone) cls.push(`invite-${tone}`);
-        const dots = s
-          ? `${s.calls ? `<span class="slog-dot calls" title="${s.calls} 通錄音"></span>` : ''}${s.analyzed ? '<span class="slog-dot analyzed" title="已分析"></span>' : ''}${s.hasNote ? '<span class="slog-dot note" title="有筆記"></span>' : ''}`
-          : '';
+        const selfN = selfMarkNames(c.key).length;
+        const dots =
+          (s
+            ? `${s.calls ? `<span class="slog-dot calls" title="${s.calls} 通錄音"></span>` : ''}${s.analyzed ? '<span class="slog-dot analyzed" title="已分析"></span>' : ''}${s.hasNote ? '<span class="slog-dot note" title="有筆記"></span>' : ''}`
+            : '') + (selfN ? `<span class="slog-dot self" title="自評 ${selfN} 項病症"></span>` : '');
         const n = s?.calls ? `<span class="slog-cell-n">${s.calls}</span>` : '';
         const inv = s?.invites != null && s.invites > 0 ? `<span class="slog-cell-inv" title="進邀約 ${s.invites}">約 ${s.invites}</span>` : '';
         return `<button type="button" class="${cls.join(' ')}" data-date="${c.key}"><span class="slog-cell-d">${c.day}</span>${n}${inv}<span class="slog-dots">${dots}</span></button>`;
@@ -344,14 +412,16 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
       const s = summary[k];
       const d = dayMap[k];
       const f = d || s ? funnelFromCalls(d || {}, (s?.durations || []).map((sec) => ({ durationSec: sec })), state.settings) : null;
-      const top = s?.symptoms?.length
+      const detected = s?.symptoms?.length
         ? s.symptoms
             .slice(0, 2)
             .map((key) => SYMPTOM_DEFS[key]?.label)
             .filter(Boolean)
             .join('、')
         : '';
-      const empty = !s && !d;
+      const self = selfMarkNames(k).slice(0, 2).join('、');
+      const top = [detected, self ? `自評：${self}` : ''].filter(Boolean).join(' ・ ');
+      const empty = !s && !d && !self;
       rows.push(
         `<button type="button" class="slog-week-row ${k === state.selected ? 'selected' : ''} ${empty ? 'empty' : ''}" data-date="${k}">
           <span class="slog-week-date">${fmtDateLabel(k)}</span>
@@ -393,6 +463,7 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
     stopPlayback();
     state.selected = key;
     state.selection = new Set();
+    state.sheet.flash = false;
     const d = parseDateKey(key);
     if (d.getFullYear() !== state.year || d.getMonth() + 1 !== state.month) {
       state.year = d.getFullYear();
@@ -414,7 +485,9 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
     renderCalls();
     renderAggregate();
     renderNotes();
+    renderSelf();
     await Promise.all([refreshMonth(), refreshWeek(), refreshStreaks()]);
+    if (state.sheet.model && Date.now() - state.sheet.loadedAt > 60000) loadSheet({ quiet: true });
     if (typeof dayEl.scrollIntoView === 'function' && key !== today) dayEl.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
@@ -1054,7 +1127,13 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
         if (d?.note?.action || d?.note?.free) recentNotes.push({ date: k, action: d.note.action, free: d.note.free });
       }
       const funnel = funnelFromCalls(state.day || {}, state.calls, state.settings);
-      const prompt = buildDiagnosisPrompt(agg, { funnel, date: state.selected, recentNotes });
+      const prompt = buildDiagnosisPrompt(agg, {
+        funnel,
+        date: state.selected,
+        recentNotes,
+        selfSymptoms: selfMarkNames(state.selected),
+        followThrough: state.sheet.model?.days?.[state.selected]?.status || '',
+      });
       let model = getModel?.();
       const { parsed, usedTokens, modelUsed } = await callGeminiResilient({
         apiKey,
@@ -1107,7 +1186,8 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
     const y = state.yesterdayNote;
     const yEl = q('#slYesterday');
     if (y?.action) {
-      yEl.innerHTML = `昨天你說要改的動作：<strong>${escapeHTML(y.action)}</strong>${y.verify ? `（驗證：${escapeHTML(y.verify)}）` : ''}——今天的錄音有做到嗎？`;
+      const st = state.sheet.model?.days?.[state.selected]?.status;
+      yEl.innerHTML = `昨天你說要改的動作：<strong>${escapeHTML(y.action)}</strong>${y.verify ? `（驗證：${escapeHTML(y.verify)}）` : ''}——${st ? `你在試算表填的是「${escapeHTML(st)}」` : '今天的錄音有做到嗎？'}`;
       yEl.hidden = false;
     } else {
       yEl.hidden = true;
@@ -1122,6 +1202,216 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
       persistNote();
     })
   );
+
+  /* ---------------- 試算表同步 ---------------- */
+
+  function selfMarkNames(key) {
+    const m = state.sheet.model;
+    const day = m?.days?.[key];
+    if (!m || !day) return [];
+    return m.headers.filter((h) => markIsOn(day.marks[h.col])).map((h) => h.name);
+  }
+
+  function canWrite() {
+    return !!(state.settings.scriptUrl || '').trim();
+  }
+
+  function renderSheetState() {
+    const el = q('#slSheetState');
+    const m = state.sheet.model;
+    if (state.sheet.error) el.textContent = '讀取失敗';
+    else if (!m) el.textContent = state.settings.sheetUrl ? '尚未讀取' : '未設定';
+    else el.textContent = `${m.headers.length} 個病症 · ${Object.keys(m.days).length} 天${canWrite() ? ' · 可寫回' : ' · 唯讀'}`;
+    const open = q('#slSheetOpen');
+    if (open) open.href = state.settings.sheetUrl || '#';
+  }
+
+  async function loadSheet({ quiet = false } = {}) {
+    const url = (state.settings.sheetUrl || '').trim();
+    if (!url) {
+      state.sheet.model = null;
+      renderSheetState();
+      renderSelf();
+      return;
+    }
+    if (state.sheet.busy) return;
+    state.sheet.busy = true;
+    if (!quiet) setStatus(sheetStatusEl, '讀取試算表…');
+    try {
+      const { model, rows } = await fetchSheetModel({ sheetUrl: url });
+      state.sheet.model = model;
+      state.sheet.rows = rows;
+      state.sheet.loadedAt = Date.now();
+      state.sheet.error = '';
+      if (!quiet) setStatus(sheetStatusEl, `已讀取：${model.headers.length} 個病症欄、${Object.keys(model.days).length} 天${model.statusCol >= 0 ? '、找到「有沒有做到」欄' : ''}`, 'ok');
+    } catch (e) {
+      state.sheet.error = e.message || '讀取失敗';
+      if (!quiet) setStatus(sheetStatusEl, state.sheet.error, 'err');
+    } finally {
+      state.sheet.busy = false;
+    }
+    renderSheetState();
+    renderSelf();
+    refreshMonth();
+    refreshWeek();
+  }
+
+  /** 寫入成功後先把本地的 rows 依 cells 改掉再重建模型，不用等 Google 的 CSV 快取更新 */
+  function applyCellsLocally(cells) {
+    const rows = state.sheet.rows || [[]];
+    cells.forEach(({ a1, value }) => {
+      const m = /^([A-Z]+)(\d+)$/.exec(a1);
+      if (!m) return;
+      const c = a1ToCol(m[1]);
+      const r = Number(m[2]) - 1;
+      while (rows.length <= r) rows.push([]);
+      const row = rows[r];
+      while (row.length <= c) row.push('');
+      row[c] = value == null ? '' : String(value);
+      if (rows[0].length < row.length) while (rows[0].length < row.length) rows[0].push('');
+    });
+    state.sheet.rows = rows;
+    state.sheet.model = buildSheetModel(rows);
+  }
+
+  async function writeDay(changes, { label = '寫入' } = {}) {
+    if (!state.sheet.model || !state.selected) return false;
+    if (!canWrite()) {
+      setStatus(selfStatusEl, '目前是唯讀：要從這裡寫回試算表，請在上方「Google 試算表同步」填 Apps Script 網址', 'err');
+      return false;
+    }
+    if (state.sheet.writing) return false;
+    state.sheet.writing = true;
+    state.sheet.flash = true;
+    setStatus(selfStatusEl, `${label}中…`);
+    try {
+      const plan = planDayWrites(state.sheet.model, state.selected, changes);
+      await writeSheetCells({ scriptUrl: state.settings.scriptUrl.trim(), token: state.settings.scriptToken || '', cells: plan.cells });
+      applyCellsLocally(plan.cells);
+      state.sheet.loadedAt = Date.now();
+      setStatus(selfStatusEl, `${label}完成（${plan.newRow ? `新增 ${fmtDateLabel(state.selected)} 這一列，` : ''}${plan.cells.length} 格）`, 'ok');
+      renderSheetState();
+      refreshMonth();
+      refreshWeek();
+      setTimeout(() => loadSheet({ quiet: true }), 2500);
+      return true;
+    } catch (e) {
+      setStatus(selfStatusEl, e.message || `${label}失敗`, 'err');
+      toast(e.message || `${label}失敗`);
+      return false;
+    } finally {
+      state.sheet.writing = false;
+      renderSelf();
+    }
+  }
+
+  function renderSelf() {
+    const m = state.sheet.model;
+    if (!selfCard) return;
+    if (!m || !state.selected) {
+      selfCard.hidden = true;
+      return;
+    }
+    selfCard.hidden = false;
+    const day = m.days[state.selected];
+    const ro = !canWrite();
+    const writing = state.sheet.writing;
+    selfListEl.innerHTML = m.headers.length
+      ? m.headers
+          .map((h) => {
+            const on = day ? markIsOn(day.marks[h.col]) : false;
+            return `<label class="slog-self-item ${on ? 'on' : ''}"><input type="checkbox" data-self-col="${h.col}" ${on ? 'checked' : ''} ${ro || writing ? 'disabled' : ''}><span>${escapeHTML(h.name)}</span></label>`;
+          })
+          .join('')
+      : '<p class="hint">試算表第 1 列還沒有病症名稱（B 欄起每欄填一個）。</p>';
+    const status = day?.status || '';
+    followEl.innerHTML =
+      FOLLOW_THROUGH_OPTIONS.map(
+        (o) => `<label class="slog-follow-opt ${status === o ? 'on' : ''}"><input type="radio" name="slFollow" value="${escapeHTML(o)}" ${status === o ? 'checked' : ''} ${ro || writing ? 'disabled' : ''}>${escapeHTML(o)}</label>`
+      ).join('') + (status && !FOLLOW_THROUGH_OPTIONS.includes(status) ? `<span class="hint">試算表目前填：${escapeHTML(status)}</span>` : '');
+    q('#slPushDay').disabled = ro || writing;
+    q('#slPushDay').title = ro ? '需先填 Apps Script 網址' : '';
+    if (state.sheet.flash) return;
+    if (ro) {
+      setStatus(selfStatusEl, day ? '唯讀：顯示試算表裡這一天的內容。填 Apps Script 網址後可直接在這裡勾選寫回。' : '試算表裡還沒有這一天；填 Apps Script 網址後，第一次勾選會自動新增這一列。', 'busy');
+    } else if (!day) {
+      setStatus(selfStatusEl, '試算表裡還沒有這一天，第一次勾選會自動新增這一列。', 'busy');
+    } else hideStatus(selfStatusEl);
+  }
+
+  selfListEl?.addEventListener('change', (e) => {
+    const cb = e.target.closest('[data-self-col]');
+    if (!cb) return;
+    const col = Number(cb.dataset.selfCol);
+    const name = state.sheet.model?.headers.find((h) => h.col === col)?.name || '';
+    writeDay({ marks: { [col]: cb.checked } }, { label: `「${name}」${cb.checked ? '記為有' : '記為無'}` });
+  });
+  followEl?.addEventListener('change', (e) => {
+    const r = e.target.closest('input[name="slFollow"]');
+    if (r) writeDay({ status: r.value }, { label: '「有沒有做到」' });
+  });
+  q('#slPushDay')?.addEventListener('click', () => {
+    const f = funnelFromCalls(state.day || {}, state.calls, state.settings);
+    const agg = currentAggregate();
+    const detected = agg.symptoms.filter((s) => s.count >= Math.max(1, Math.ceil(agg.total / 2))).slice(0, 5).map((s) => s.label).join('、');
+    writeDay(
+      {
+        tool: {
+          撥出: f.dialed,
+          接通: f.connected,
+          超過5分: f.over,
+          長Call: f.long,
+          進邀約: f.invites,
+          工具偵測病症: agg.total ? `${detected || '無'}（${agg.total} 通）` : '',
+          明天只改一個動作: state.day?.note?.action || '',
+        },
+      },
+      { label: '漏斗＋筆記寫入' }
+    );
+  });
+
+  const persistSheetSettings = (() => {
+    let t = null;
+    return () => {
+      clearTimeout(t);
+      t = setTimeout(async () => {
+        const patch = { sheetUrl: sheetUrlEl.value.trim(), scriptUrl: scriptUrlEl.value.trim(), scriptToken: scriptTokenEl.value.trim() };
+        state.settings = { ...state.settings, ...patch };
+        try {
+          state.settings = await saveSettings(patch);
+        } catch {
+          /* keep in-memory */
+        }
+        renderSheetState();
+        renderSelf();
+      }, 300);
+    };
+  })();
+  [sheetUrlEl, scriptUrlEl, scriptTokenEl].forEach((el) => el?.addEventListener('input', persistSheetSettings));
+  sheetUrlEl?.addEventListener('change', () => setTimeout(() => loadSheet(), 350));
+  q('#slSheetReload')?.addEventListener('click', () => loadSheet());
+  q('#slCopyScript')?.addEventListener('click', async () => {
+    try {
+      await navigator.clipboard.writeText(APPS_SCRIPT_TEMPLATE);
+      toast('已複製 Apps Script 程式碼');
+    } catch {
+      q('#slScriptCode')?.select();
+      toast('請按 Ctrl+C 複製');
+    }
+  });
+  q('#slTestWrite')?.addEventListener('click', async () => {
+    const scriptStatusEl = q('#slScriptStatus');
+    const scriptUrl = scriptUrlEl.value.trim();
+    if (!scriptUrl) return setStatus(scriptStatusEl, '請先貼 Apps Script 網址', 'err');
+    setStatus(scriptStatusEl, '測試寫入（只碰空格子 ZZ1000，寫完立刻清空）…');
+    try {
+      await writeSheetCells({ scriptUrl, token: scriptTokenEl.value.trim(), cells: [{ a1: 'ZZ1000', value: 'call-coach-test' }] });
+      await writeSheetCells({ scriptUrl, token: scriptTokenEl.value.trim(), cells: [{ a1: 'ZZ1000', value: '' }] });
+      setStatus(scriptStatusEl, '寫入測試成功，之後勾選會直接寫回試算表', 'ok');
+    } catch (e) {
+      setStatus(scriptStatusEl, e.message || '測試失敗', 'err');
+    }
+  });
 
   /* ---------------- 啟動 ---------------- */
 
@@ -1140,9 +1430,16 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
     keyEl.value = getApiKey?.() || '';
     renderKeyHint();
     renderEngine();
+    sheetUrlEl.value = state.settings.sheetUrl || '';
+    scriptUrlEl.value = state.settings.scriptUrl || '';
+    scriptTokenEl.value = state.settings.scriptToken || '';
+    const codeEl = q('#slScriptCode');
+    if (codeEl) codeEl.value = APPS_SCRIPT_TEMPLATE;
+    renderSheetState();
     await refreshMonth();
     await refreshWeek();
     await selectDay(today);
+    loadSheet({ quiet: true });
   }
 
   return {
