@@ -22,7 +22,8 @@ import { DRILL_COMMON, DRILL_OPENING, getPersona } from '../src/drill-personas.j
 import { applyBuiltinSpeakerLabels, enrichSegments, parse } from '../src/parser.js';
 import { labeledRatio } from '../src/speaker-labels.js';
 
-const rand = () => 0;
+/** 預設避開 mid-call 情境插入（rand < 0.11）；要測情境時傳 rand: () => 0 */
+const rand = () => 0.99;
 
 function session(key = 'wang', opts = {}) {
   const s = newSession({ persona: getPersona(key), difficulty: 'gentle', limitSec: 30, rand, ...opts });
@@ -35,6 +36,13 @@ function connect(s) {
 }
 
 describe('drill engine: session flow', () => {
+  it('may add a situational line after connect (busy, abroad, etc.)', () => {
+    const s = session('wang', { rand: () => 0 });
+    const r = connect(s);
+    expect(r.replies.length).toBeGreaterThanOrEqual(2);
+    expect(r.replies.some((x) => x.kind === 'situation')).toBe(true);
+  });
+
   it('customer picks up first; a proper opener gets the greeting, a stranger gets pushed back', () => {
     const s = session();
     expect(s.turns[0]).toMatchObject({ who: 'C', text: DRILL_OPENING, kind: 'opening' });

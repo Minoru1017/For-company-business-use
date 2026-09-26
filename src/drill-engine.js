@@ -5,7 +5,7 @@
  * 訓練目標：不慌（限時接話）、不亂套話（套話／恐嚇／太早推）、不講不出話（卡住）。
  * 每個判定都對應手冊規則（rules.js / purpose-types.js），結束後可直接送進正式分析。
  */
-import { DRILL_COMMON, DRILL_OPENING } from './drill-personas.js';
+import { DRILL_COMMON, DRILL_OPENING, DRILL_SITUATION_AFTER_CONNECT, DRILL_SITUATION_MID } from './drill-personas.js';
 import { sharesDiscoveryTerms } from './manual-check.js';
 import { PURPOSE_TYPES, TYPE_DISCOVERY_LAYERS, detectWrongProbes } from './purpose-types.js';
 import { RULES } from './rules.js';
@@ -344,7 +344,21 @@ export function respond(state, text, reactionMs = 0) {
   bumpMood(state, MOOD_DELTA[c.kind] ?? 0);
   if (c.flags.includes('tooLong')) bumpMood(state, -4);
 
-  if (!skipMain) replies.push(main);
+  if (!skipMain) {
+    replies.push(main);
+    if (c.kind === 'connect' && state.rand() < 0.32) {
+      replies.push({ text: pick(DRILL_SITUATION_AFTER_CONNECT, state.rand), kind: 'situation', reword: true });
+    } else if (
+      state.connected &&
+      c.kind !== 'connect' &&
+      c.kind !== 'noConnect' &&
+      state.salesTurns > 1 &&
+      state.rand() < 0.11 &&
+      !['hangup', 'accept', 'notYet'].includes(main.kind)
+    ) {
+      replies.unshift({ text: pick(DRILL_SITUATION_MID, state.rand), kind: 'situation', reword: true });
+    }
+  }
 
   if (main.kind === 'accept' && !skipMain) {
     endSession(state, 'closed');
@@ -440,6 +454,7 @@ export function buildCustomerPrompt(state, classification, reply) {
     repeat: '業務問了剛剛已經講過的事，語氣略帶不耐。',
     tooLong: '業務一次講太多，你跟不上。',
     ack: '簡短回應一兩個字，等業務繼續。',
+    situation: '電話情境干擾（聽不清、在忙、在開會、在國外等），語氣自然、一兩句，不要解釋原因太久。',
   };
   return `你在扮演一位接到電訪的潛在客戶，讓業務練習臨場反應。請完全用客戶口吻、繁體中文口語、一到兩句、不超過 45 字，不要教學、不要幫業務。
 【你的人設（業務看不到）】${p.name}，${p.brief} 學 AI 的真正目的屬「${TIER_LABELS[p.tier]}」這一級。只有被具體問到才透露對應資訊；問得模糊就答得模糊。
@@ -610,6 +625,12 @@ export function buildCoaching(state, stats, quiz) {
   if (stats.endReason === 'hangup') bad.push('<b>客戶掛電話了</b>——耐心耗盡。看一下上面哪幾句把耐心值打下去的');
   if (stats.endReason === 'closed') good.push('客戶答應下一步——判斷＋對接都到位才會有這個結果');
   if (!stats.connected && stats.salesLines) bad.push('開場沒建立連結（表明身分、確認方便）——客戶不會跟陌生人說真話');
+  const situational = state.turns.filter((t) => t.who === 'C' && t.kind === 'situation').length;
+  if (situational) {
+    bad.push(
+      `客戶有 <b>${situational} 次</b>電話情境（聽不清、在忙、在開會／國外等）——先確認方便與聽得清楚，<b>縮短重述重點</b>，不要照稿念`
+    );
+  }
 
   if (quiz) {
     if (quiz.tierAnswer) {

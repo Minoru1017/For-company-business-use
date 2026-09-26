@@ -148,7 +148,7 @@ function renderSetup() {
       <span class="hint">撥出後不會有任何提示，跟真的電話一樣。所有回饋在掛電話後才看。</span>
     </div>
   </div>
-  <div class="hint">練三件事：<b>不慌</b>——限時內一定要開口；<b>不亂套話</b>——罐頭話術、恐嚇、太早推方案、問錯方向會被客戶當場打回；<b>不講不出話</b>——連續兩次沒接上，客戶會掛電話。結束後可一鍵送進完整分析（六步驟／五層／五字口訣）。</div>`;
+    <div class="hint">通話中<b>看不到逐字稿</b>（像真電話），結束後才回放。客戶可能說聽不清、在忙、在開會或在國外。練三件事：<b>不慌</b>——限時內一定要開口；<b>不亂套話</b>；<b>不講不出話</b>。建議開啟客戶語音。結束後可一鍵送進完整分析。</div>`;
 
   const root = panel();
   root.querySelectorAll('input[name="drillPersona"]').forEach((r) => {
@@ -239,7 +239,7 @@ function renderLive() {
     </div>
     <div class="drill-timer-track"><div id="drillTimerBar" style="width:100%"></div></div>
     <div class="drill-mood"><span>客戶耐心</span><div class="drill-mood-track"><div id="drillMoodBar"></div></div><span id="drillMoodNum" class="mono"></span></div>
-    <div id="drillLog" class="drill-log" aria-live="polite"></div>
+    <div id="drillLog" class="drill-log drill-live-blind" aria-live="off"></div>
     <div class="drill-input">
       <textarea id="drillInput" rows="2" placeholder="你要說什麼？Enter 送出，Shift+Enter 換行" autocomplete="off"></textarea>
       <div class="drill-input-btns">
@@ -248,7 +248,7 @@ function renderLive() {
         <button id="drillEnd" type="button">結束通話</button>
       </div>
     </div>
-    <div class="hint drill-live-hint">第 <b id="drillTurnNum">0</b> 句 · 通話中不給提示，掛電話後才看回饋 · 連續兩次沒接上會被掛電話</div>
+    <div class="hint drill-live-hint">第 <b id="drillTurnNum">0</b> 句 · <b>通話中看不到逐字稿</b>（結束後才回放）· 建議開啟「客戶台詞用語音唸出」或戴耳機 · 連續兩次沒接上會被掛電話</div>
   </div>`;
   updateMood();
   const input = $('drillInput');
@@ -271,12 +271,29 @@ function renderLive() {
   setTimeout(() => input.focus(), 50);
 }
 
+const LIVE_CUE = {
+  situation: '🔊 客戶（情境干擾）…',
+  hangup: '客戶已掛電話',
+  objection: '🔊 客戶突襲…',
+  pressure: '🔊 客戶在等你的回應…',
+  pushback: '🔊 客戶語氣轉硬…',
+  default: '🔊 客戶正在說話…',
+};
+
+function liveCueFor(who, { blank = false, kind = '' } = {}) {
+  if (who === 'S') return blank ? '（限時內沒接上話）' : '✓ 已送出你的回應';
+  if (kind === 'hangup') return LIVE_CUE.hangup;
+  return LIVE_CUE[kind] || LIVE_CUE.default;
+}
+
+/** 通話進行中不顯示逐字稿，只留聲音提示；完整文字在 session.turns，結束後回放。 */
 function appendBubble(who, text, { blank = false, kind = '' } = {}) {
   const log = $('drillLog');
   if (!log) return;
   const div = document.createElement('div');
   div.className = `drill-msg ${who === 'S' ? 's' : 'c'}${blank ? ' blank' : ''}${kind ? ` k-${kind}` : ''}`;
-  div.innerHTML = `<span class="drill-who">${who === 'S' ? '你' : '客戶'}</span><div class="drill-text">${escapeHTML(text)}</div>`;
+  const cue = liveCueFor(who, { blank, kind });
+  div.innerHTML = `<span class="drill-who">${who === 'S' ? '你' : '客戶'}</span><div class="drill-text drill-audio-cue">${escapeHTML(cue)}</div>`;
   log.appendChild(div);
   log.scrollTop = log.scrollHeight;
 }
@@ -542,7 +559,7 @@ function flagBadges(flags = []) {
     .join('');
 }
 
-const C_KIND_LABEL = { objection: '突襲', pressure: '催促', hangup: '掛電話', pushback: '打回', deflect: '帶開', repeat: '不耐', vague: '敷衍' };
+const C_KIND_LABEL = { objection: '突襲', pressure: '催促', hangup: '掛電話', pushback: '打回', deflect: '帶開', repeat: '不耐', vague: '敷衍', situation: '情境' };
 
 function renderDebrief(quiz) {
   const stats = sessionStats(session);
