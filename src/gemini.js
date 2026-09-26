@@ -112,12 +112,13 @@ export function parseAIResponse(raw) {
 }
 
 export function mergeAIResults(results) {
-  const merged = { good: [], bad: [], suggest: [], purpose_reasoning: [], summary: '' };
+  const merged = { good: [], bad: [], suggest: [], purpose_reasoning: [], reflection_crosscheck: null, summary: '' };
   for (const r of results) {
     merged.good.push(...(r.good || []));
     merged.bad.push(...(r.bad || []));
     merged.suggest.push(...(r.suggest || []));
     merged.purpose_reasoning.push(...(r.purpose_reasoning || []));
+    if (r.reflection_crosscheck) merged.reflection_crosscheck = r.reflection_crosscheck;
     if (r.summary) merged.summary += (merged.summary ? ' ' : '') + r.summary;
   }
   return merged;
