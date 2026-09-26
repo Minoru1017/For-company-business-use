@@ -12,6 +12,33 @@ import { disclosureLevel } from './trust.js';
 
 export const DEFAULT_THRESHOLDS = { shortMin: 5, longMin: 15 };
 
+/** 短通：全通時長 < 3 分鐘（破冰失敗常見樣本） */
+export const SHORT_CALL_SEC = 180;
+
+export function retentionThresholdSec(settings = DEFAULT_THRESHOLDS) {
+  const m = Number(settings?.shortMin ?? DEFAULT_THRESHOLDS.shortMin);
+  return Math.max(1, m) * 60;
+}
+
+/** @returns {'short'|'no-retention'|'ok'|'unknown'} */
+export function classifyCallDuration(durationSec, settings = DEFAULT_THRESHOLDS) {
+  const sec = Number(durationSec) || 0;
+  if (sec <= 0) return 'unknown';
+  if (sec < SHORT_CALL_SEC) return 'short';
+  if (sec < retentionThresholdSec(settings)) return 'no-retention';
+  return 'ok';
+}
+
+export function isShortCall(durationSec) {
+  const sec = Number(durationSec) || 0;
+  return sec > 0 && sec < SHORT_CALL_SEC;
+}
+
+export function isBelowRetention(durationSec, settings = DEFAULT_THRESHOLDS) {
+  const sec = Number(durationSec) || 0;
+  return sec > 0 && sec < retentionThresholdSec(settings);
+}
+
 const pad2 = (n) => String(n).padStart(2, '0');
 
 /** 本地日期 → 'YYYY-MM-DD' */
@@ -96,7 +123,9 @@ export function funnelFromCalls(day = {}, calls = [], thresholds = DEFAULT_THRES
     shortMin,
     longMin,
     connectRate: ratio(connected, dialed),
+    /** 留存率 KPI：>N 分通數 ÷ 接通（破冰＋留客） */
     overRate: ratio(over, connected),
+    retentionRate: ratio(over, connected),
     longRate: ratio(long, over),
     /** 邀約率：進邀約 ÷ >N 分通數（公司 KPI 分母） */
     inviteRate: ratio(invites, over),
@@ -106,8 +135,19 @@ export function funnelFromCalls(day = {}, calls = [], thresholds = DEFAULT_THRES
   };
 }
 
+/** 破冰複盤預設顯示的症狀（其餘在面板可展開） */
+export const ICEBREAK_SYMPTOM_KEYS = [
+  'early_hangup',
+  'step_missing_connect',
+  'talk_too_much',
+  'short_replies',
+  'stuck_L1',
+  'premature_pitch',
+];
+
 /** 症狀定義：key → 顯示名稱、分組、一句話說明（給彙總面板與 AI prompt 用） */
 export const SYMPTOM_DEFS = {
+  early_hangup: { label: '短通掛斷', group: '破冰', hint: '全通時長 < 3 分鐘，多半沒留到有效對話' },
   talk_too_much: { label: '業務講太多', group: '開口', hint: '客戶說話比例 < 45%' },
   short_replies: { label: '客戶只在附和', group: '開口', hint: '客戶過半句子 ≤ 4 字' },
   stuck_L1: { label: '客戶沒說出困擾', group: '信任', hint: '客戶最深只到「事實」層，沒講到困擾' },
@@ -158,6 +198,7 @@ export function extractSymptoms(result, segs = []) {
   const custRatio = Number(stats.custRatio) || 0;
   const totalDur = Number(stats.totalDur) || (segs.length ? segs[segs.length - 1].end - segs[0].start : 0);
 
+  if (totalDur > 0 && totalDur < SHORT_CALL_SEC) add('early_hangup');
   if (custRatio < 0.45) add('talk_too_much');
   const shortReplies = C.filter((s) => (s.chars ?? s.text?.length ?? 0) <= 4).length;
   if (C.length && shortReplies / C.length > 0.5) add('short_replies', C.find((s) => (s.chars ?? 0) <= 4));
@@ -297,7 +338,7 @@ export function buildDiagnosisPrompt(aggregate, { funnel, date, recentNotes = []
   if (date) lines.push(`日期：${date}`);
   if (funnel) {
     lines.push(
-      `漏斗：撥出 ${funnel.dialed}、接通 ${funnel.connected}（${fmtPct(funnel.connectRate)}）、超過 ${funnel.shortMin} 分 ${funnel.over}（接通的 ${fmtPct(funnel.overRate)}）、長 Call（≥${funnel.longMin} 分）${funnel.long}、進邀約（客戶同意時間）${funnel.invites}、邀約率 ${fmtPct(funnel.inviteRate)}（進邀約÷>${funnel.shortMin} 分通數）`
+      `漏斗：撥出 ${funnel.dialed}、接通 ${funnel.connected}（${fmtPct(funnel.connectRate)}）、超過 ${funnel.shortMin} 分 ${funnel.over}、留存率 ${fmtPct(funnel.retentionRate ?? funnel.overRate)}（>${funnel.shortMin} 分÷接通）、長 Call（≥${funnel.longMin} 分）${funnel.long}、進邀約（客戶同意時間）${funnel.invites}、邀約率 ${fmtPct(funnel.inviteRate)}（進邀約÷>${funnel.shortMin} 分通數）`
     );
   }
   const mt = aggregate?.metrics || {};

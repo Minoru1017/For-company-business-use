@@ -19,6 +19,28 @@ export const DIFFICULTIES = {
 };
 export const TIME_LIMITS = [15, 30, 45];
 export const MAX_SALES_TURNS = 30;
+export const ICEBREAK_MAX_TURNS = 8;
+
+export const DRILL_TRACKS = {
+  full: {
+    key: 'full',
+    label: '完整通話',
+    desc: '六步驟、突襲、適配判斷——跟真實電訪一樣長',
+    maxTurns: MAX_SALES_TURNS,
+    objections: true,
+    quiz: true,
+  },
+  icebreak: {
+    key: 'icebreak',
+    label: '破冰 90 秒',
+    desc: '只練接起→連結→第一個開放問題；不突襲、不評邀約',
+    maxTurns: ICEBREAK_MAX_TURNS,
+    objections: false,
+    quiz: false,
+    defaultLimitSec: 30,
+    defaultDifficulty: 'gentle',
+  },
+};
 export const TOO_LONG_CHARS = 70;
 export const TIER_LABELS = Object.fromEntries(PURPOSE_TYPES.map((t) => [t.key, t.label]));
 export const FIT_LABELS = { A: 'A 高度適合', B: 'B 部分適合', C: 'C 不適合' };
@@ -37,13 +59,17 @@ const DECISION_STRONG_RE = /安排|約(個|一個|在|時間)|發(連結|資料)
 /** 明講判斷的字眼——「很適合你」這種帶產品的句子算推銷，不算判斷 */
 const JUDGE_RE = /判斷|評估|我認為|依(照)?(你|您)的|適不適合|不適合|高度適合|部分適合/;
 
-export function newSession({ persona, difficulty = 'normal', limitSec = 30, engine = 'script', rand = Math.random }) {
+export function newSession({ persona, difficulty = 'normal', limitSec = 30, engine = 'script', track = 'full', rand = Math.random }) {
   if (!persona) throw new Error('persona required');
-  const diff = DIFFICULTIES[difficulty] || DIFFICULTIES.normal;
+  const trackDef = DRILL_TRACKS[track] || DRILL_TRACKS.full;
+  const diffKey = trackDef.defaultDifficulty || difficulty;
+  const diff = DIFFICULTIES[diffKey] || DIFFICULTIES.normal;
+  const lim = trackDef.defaultLimitSec ?? limitSec;
   return {
     persona,
+    track: trackDef.key,
     difficulty: diff.key,
-    limitSec,
+    limitSec: lim,
     engine,
     rand,
     turns: [],
@@ -325,9 +351,17 @@ export function respond(state, text, reactionMs = 0) {
   } else if (state.mood < 15) {
     replies.push({ text: DRILL_COMMON.hangup, kind: 'hangup', reword: false });
     endSession(state, 'hangup');
-  } else if (state.salesTurns >= MAX_SALES_TURNS) {
-    endSession(state, 'maxTurns');
+  } else if (state.salesTurns >= (DRILL_TRACKS[state.track]?.maxTurns || MAX_SALES_TURNS)) {
+    endSession(state, state.track === 'icebreak' ? 'icebreakTime' : 'maxTurns');
   } else if (
+    state.track === 'icebreak' &&
+    state.connected &&
+    state.mood >= 45 &&
+    (c.kind === 'layer' || c.kind === 'tierLayer' || c.kind === 'fact' || (infoCount(state) >= 1 && state.salesTurns >= 3))
+  ) {
+    endSession(state, 'icebreakWin');
+  } else if (
+    (DRILL_TRACKS[state.track]?.objections !== false) &&
     state.salesTurns >= state.nextObjectionAt &&
     c.kind !== 'connect' &&
     c.kind !== 'noConnect' &&
@@ -483,13 +517,49 @@ export function sessionStats(state) {
   score += Math.min(10, stats.generalLayers * 2);
   if (stats.endReason === 'hangup') score -= 15;
   if (stats.endReason === 'closed') score += 5;
+  if (stats.endReason === 'icebreakWin') score += 12;
   if (!stats.connected) score -= 5;
   stats.score = Math.max(0, Math.min(100, Math.round(score)));
   stats.verdict = stats.score >= 80 ? '穩' : stats.score >= 60 ? '還可以' : '需要再練';
+  if (state.track === 'icebreak') {
+    stats.verdict = stats.endReason === 'icebreakWin' ? '破冰成功' : stats.connected ? '有連結，再練深一點' : '先練開場';
+  }
   return stats;
 }
 
+function buildIcebreakCoaching(state, stats) {
+  const good = [];
+  const bad = [];
+  const limit = state.limitSec;
+  if (stats.timeouts) {
+    bad.push(`<b>卡住 ${stats.timeouts} 次</b>——破冰前先背好開場＋一個開放問題，限時內一定要開口`);
+  } else if (stats.salesLines >= 2) {
+    good.push(`沒有卡住——${stats.salesLines} 句都在 ${limit} 秒內接上`);
+  }
+  if (stats.connected) good.push('有建立<b>連結</b>（表明身分、確認方便）——客戶才會跟你說話');
+  else bad.push('<b>沒有連結</b>——第一句要先讓對方知道你是誰、為什麼打來、現在方不方便');
+  if (stats.canned) bad.push(`<b>套話 ${stats.canned} 句</b>——破冰階段忌背稿，用一句真誠的確認代替`);
+  if (stats.fear || stats.tooEarly) bad.push('破冰階段不要恐嚇或推方案——目標是讓對方<b>願意多講一句</b>');
+  if (stats.tooLong) bad.push(`有 ${stats.tooLong} 句太長——電話開場一次只講一件事`);
+  if (stats.vague >= 1) bad.push('問題太籠統，客戶只會敷衍——改成具體情境：<span class="q">「你現在在工作上哪一段最花時間？」</span>');
+  if (stats.goodQuestions) good.push(`有問到<b>具體層次</b>（${stats.goodQuestions} 次）——客戶開始透露現況`);
+  if (stats.followUps && stats.salesLines >= 2) {
+    if (stats.followUpRate >= 0.5) good.push('有接住客戶上一句再問——不像在背題庫');
+    else bad.push('問題跟客戶剛講的無關——下一句一定要用到對方剛才的字');
+  }
+  if (stats.endReason === 'icebreakWin') {
+    good.push('<b>破冰成功</b>——客戶願意講出資訊，真實電話下一步是繼續挖，不要急著約');
+  } else if (stats.endReason === 'hangup') {
+    bad.push('客戶掛電話——通常是沒連結、套話、或一次講太多');
+  } else if (stats.endReason === 'icebreakTime') {
+    bad.push('達到破冰回合上限——練到「連結＋一個好問題＋客戶多講一句」就夠，明天再練下一通');
+  }
+  if (!good.length) good.push('再練一次：先連結，再問一個開放問題，然後閉嘴等答案');
+  return { good, bad };
+}
+
 export function buildCoaching(state, stats, quiz) {
+  if (state.track === 'icebreak') return buildIcebreakCoaching(state, stats);
   const p = state.persona;
   const tierLabel = TIER_LABELS[p.tier];
   const good = [];
@@ -580,7 +650,7 @@ export function sessionToSrt(state) {
 export function sessionToText(state, stats, coaching, quiz) {
   const strip = (h) => String(h).replace(/<[^>]+>/g, '');
   const lines = [];
-  lines.push(`【臨場反應陪練】劇本：${state.persona.name}（${state.persona.brief}）`);
+  lines.push(`【臨場反應陪練】${DRILL_TRACKS[state.track]?.label || '完整通話'}｜劇本：${state.persona.name}（${state.persona.brief}）`);
   lines.push(`難度：${DIFFICULTIES[state.difficulty].label}｜限時：${state.limitSec} 秒｜引擎：${state.engine === 'ai' ? 'Gemini AI 客戶' : '離線劇本'}`);
   lines.push(`分數：${stats.score}（${stats.verdict}）｜卡住 ${stats.timeouts}｜套話 ${stats.canned}｜恐嚇 ${stats.fear}｜太早推 ${stats.tooEarly}｜突襲 ${stats.objectionsHandled}/${stats.objectionsThrown}`);
   if (quiz) lines.push(`分級：${quiz.tierAnswer ? TIER_LABELS[quiz.tierAnswer] : '未答'} → 正解 ${quiz.expectedTierLabel}｜適配：${quiz.fitAnswer || '未答'} → 正解 ${quiz.expectedFit}`);

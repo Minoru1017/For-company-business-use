@@ -9,8 +9,11 @@ import {
   dateKey,
   extractSymptoms,
   formatDuration,
+  classifyCallDuration,
   funnelFromCalls,
   inviteTone,
+  isShortCall,
+  SHORT_CALL_SEC,
   parseDateFromFilename,
   parseDiagnosis,
   shiftDateKey,
@@ -112,6 +115,17 @@ describe('inviteTone', () => {
   });
 });
 
+describe('call duration / retention helpers', () => {
+  it('classifies short (<3min), no-retention, and ok', () => {
+    expect(SHORT_CALL_SEC).toBe(180);
+    expect(isShortCall(120)).toBe(true);
+    expect(classifyCallDuration(120)).toBe('short');
+    expect(classifyCallDuration(240)).toBe('no-retention');
+    expect(classifyCallDuration(400)).toBe('ok');
+    expect(classifyCallDuration(0)).toBe('unknown');
+  });
+});
+
 describe('funnelFromCalls', () => {
   const calls = [{ durationSec: 120 }, { durationSec: 400 }, { durationSec: 1000 }, { durationSec: 0 }];
   it('auto-counts >N min and long calls from durations', () => {
@@ -122,6 +136,7 @@ describe('funnelFromCalls', () => {
     expect(f.long).toBe(1);
     expect(f.connectRate).toBeCloseTo(0.25);
     expect(f.inviteRate).toBeCloseTo(0.5);
+    expect(f.retentionRate).toBeCloseTo(f.overRate);
   });
   it('manual counts override auto', () => {
     const f = funnelFromCalls({ dialed: 40, connected: 10, over5Manual: 5, longManual: '2', invites: 2 }, calls);
@@ -158,6 +173,14 @@ describe('extractSymptoms', () => {
   it('works without a full analysis result (fallback disclosure levels)', () => {
     const s = extractSymptoms({}, MONOLOGUE);
     expect(s.keys).toContain('stuck_L1');
+  });
+  it('flags early_hangup when total duration is under 3 minutes', () => {
+    const short = [
+      { spk: 'S', text: '您好我是顧問，請問方便嗎？', start: 0, end: 20, chars: 12 },
+      { spk: 'C', text: '不方便', start: 20, end: 45, chars: 3 },
+    ];
+    const s = extractSymptoms(runAnalysis(short), short);
+    expect(s.keys).toContain('early_hangup');
   });
 });
 

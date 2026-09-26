@@ -22,6 +22,7 @@ import {
   TIER_LABELS,
   TIME_LIMITS,
   timeoutTurn,
+  DRILL_TRACKS,
 } from './drill-engine.js';
 import { DRILL_PERSONAS, getPersona, randomPersona } from './drill-personas.js';
 import { callGemini, DEFAULT_MODEL } from './gemini.js';
@@ -34,6 +35,8 @@ const END_LABELS = {
   hangup: '客戶掛電話了',
   closed: '客戶答應下一步',
   maxTurns: '達到最大句數',
+  icebreakWin: '破冰成功——客戶願意多聊',
+  icebreakTime: '破冰回合結束',
 };
 
 let deps = {};
@@ -49,9 +52,9 @@ let quizAnswer = { tier: null, fit: null };
 
 function loadPrefs() {
   try {
-    return { personaKey: 'random', limitSec: 30, difficulty: 'normal', engine: 'script', tts: false, mic: false, ...JSON.parse(localStorage.getItem(PREFS_KEY) || '{}') };
+    return { personaKey: 'random', limitSec: 30, difficulty: 'normal', engine: 'script', track: 'icebreak', tts: false, mic: false, ...JSON.parse(localStorage.getItem(PREFS_KEY) || '{}') };
   } catch {
-    return { personaKey: 'random', limitSec: 30, difficulty: 'normal', engine: 'script', tts: false, mic: false };
+    return { personaKey: 'random', limitSec: 30, difficulty: 'normal', engine: 'script', track: 'icebreak', tts: false, mic: false };
   }
 }
 
@@ -96,9 +99,20 @@ function renderSetup() {
       )
       .join('');
 
+  const trackRadios = Object.values(DRILL_TRACKS)
+    .map(
+      (t) =>
+        `<label class="drill-opt ${prefs.track === t.key ? 'on' : ''}"><input type="radio" name="drillTrack" value="${t.key}" ${prefs.track === t.key ? 'checked' : ''}><span><b>${t.label}</b><small>${t.desc}</small></span></label>`
+    )
+    .join('');
+
   panel().innerHTML = `
   <div class="card drill-setup">
     <div class="drill-setup-grid">
+      <div class="drill-track-block">
+        <h3 class="drill-h">0 · 練什麼</h3>
+        <div class="drill-opts drill-tracks">${trackRadios}</div>
+      </div>
       <div>
         <h3 class="drill-h">1 · 誰會接電話</h3>
         <div class="drill-personas">${personaCards}</div>
@@ -107,8 +121,8 @@ function renderSetup() {
       <div>
         <h3 class="drill-h">2 · 每句限時</h3>
         <div class="drill-opts">${radios('drillLimit', TIME_LIMITS.map((s) => ({ value: s, label: `${s} 秒` })), prefs.limitSec)}</div>
-        <h3 class="drill-h">3 · 突襲頻率</h3>
-        <div class="drill-opts">${radios('drillDiff', Object.values(DIFFICULTIES).map((d) => ({ value: d.key, label: d.label, desc: d.desc })), prefs.difficulty)}</div>
+        <h3 class="drill-h drill-diff-h">3 · 突襲頻率</h3>
+        <div class="drill-opts drill-diff-opts">${radios('drillDiff', Object.values(DIFFICULTIES).map((d) => ({ value: d.key, label: d.label, desc: d.desc })), prefs.difficulty)}</div>
         <h3 class="drill-h">4 · 客戶由誰扮演</h3>
         <div class="drill-opts">${radios(
           'drillEngine',
@@ -157,6 +171,16 @@ function renderSetup() {
   bindOpt('drillLimit', 'limitSec', Number);
   bindOpt('drillDiff', 'difficulty');
   bindOpt('drillEngine', 'engine');
+  bindOpt('drillTrack', 'track');
+  const syncTrackUi = () => {
+    const ice = prefs.track === 'icebreak';
+    root.querySelector('.drill-diff-h')?.classList.toggle('muted', ice);
+    root.querySelector('.drill-diff-opts')?.classList.toggle('muted', ice);
+  };
+  syncTrackUi();
+  root.querySelectorAll('input[name="drillTrack"]').forEach((r) => {
+    r.addEventListener('change', syncTrackUi);
+  });
   $('drillTts').onchange = (e) => {
     prefs.tts = e.target.checked;
     savePrefs();
@@ -189,7 +213,13 @@ function startDrill() {
     }
   }
   const persona = prefs.personaKey === 'random' ? randomPersona() : getPersona(prefs.personaKey) || randomPersona();
-  session = newSession({ persona, difficulty: prefs.difficulty, limitSec: prefs.limitSec, engine: prefs.engine });
+  session = newSession({
+    persona,
+    track: prefs.track || 'full',
+    difficulty: prefs.difficulty,
+    limitSec: prefs.limitSec,
+    engine: prefs.engine,
+  });
   quizAnswer = { tier: null, fit: null };
   aiWarned = false;
   renderLive();
@@ -469,6 +499,10 @@ function renderQuiz() {
   stopTimer();
   stopMic();
   if (ttsSupported()) window.speechSynthesis.cancel();
+  if (session.track === 'icebreak') {
+    renderDebrief(null);
+    return;
+  }
   const reason = END_LABELS[session.endReason] || '通話結束';
   panel().innerHTML = `
   <div class="card drill-quiz">
@@ -514,6 +548,7 @@ function renderDebrief(quiz) {
   const stats = sessionStats(session);
   const coaching = buildCoaching(session, stats, quiz);
   const p = session.persona;
+  const trackLabel = DRILL_TRACKS[session.track]?.label || '完整通話';
   const scoreColor = stats.score >= 80 ? 'var(--ok)' : stats.score >= 60 ? 'var(--warn)' : 'var(--bad)';
   const avg = stats.salesLines ? `${(stats.avgReactionMs / 1000).toFixed(1)}s` : '—';
   const timeline = session.turns
@@ -542,6 +577,7 @@ function renderDebrief(quiz) {
       <div class="stat"><div class="num">${stats.objectionsHandled}／${stats.objectionsThrown}</div><div class="lbl">突襲接住</div></div>
       <div class="stat"><div class="num">${stats.generalLayers}＋${stats.tierLayers}</div><div class="lbl">一般層＋分級層</div></div>
     </div>
+    <p class="hint drill-track-badge">模式：${escapeHTML(trackLabel)}</p>
     <div class="card drill-reveal">
       <h3 class="drill-h">劇本揭曉：${escapeHTML(p.name)}</h3>
       <p><b>隱藏分級：</b>${TIER_LABELS[p.tier]}（${escapeHTML(PURPOSE_TYPES.find((t) => t.key === p.tier)?.aiPurpose || '')}）</p>

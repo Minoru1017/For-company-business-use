@@ -338,3 +338,19 @@ describe('drill engine: scoring, coaching, export', () => {
     expect(prompt).not.toMatch(/undefined/);
   });
 });
+
+describe('icebreak drill track', () => {
+  it('wins after connect and a layer question without objections', () => {
+    const s = session('wang', { track: 'icebreak' });
+    connect(s);
+    expect(s.track).toBe('icebreak');
+    const r = respond(s, '想先了解一下你現在大概是什麼狀況？', 2000);
+    expect(r.classification.kind).toBe('layer');
+    expect(s.endReason).toBe('icebreakWin');
+    expect(s.objectionsThrown).toBe(0);
+    const stats = sessionStats(s);
+    expect(stats.verdict).toBe('破冰成功');
+    const coach = buildCoaching(s, stats, null);
+    expect(coach.good.some((g) => g.includes('破冰成功'))).toBe(true);
+  });
+});

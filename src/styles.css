@@ -1037,6 +1037,18 @@ button.primary:hover { background:linear-gradient(180deg,#ffffff,#e6e0d1);
 .slog-item-tags { grid-area:tags; display:flex; flex-wrap:wrap; gap:4px; }
 .slog-item-tags:empty { display:none; }
 .slog-tag { font-size:.68rem; padding:2px 8px; border:1px solid var(--border); border-radius:3px; color:var(--muted); }
+.slog-tag.bad { border-color:var(--bad); color:var(--bad); }
+.slog-tag.warn { border-color:var(--warn); color:var(--warn); }
+.slog-tag.ok { border-color:var(--ok); color:var(--ok); }
+.slog-call-filters { flex-wrap:wrap; align-items:center; gap:8px; margin:10px 0 6px; }
+.slog-filter-label { font-size:.78rem; color:var(--muted); margin-right:4px; }
+.slog-filter.on { border-color:var(--accent); color:var(--text); }
+.slog-ice-stats { margin-top:8px; }
+.slog-ice-line { margin:0; }
+.drill-track-block { grid-column:1 / -1; margin-bottom:4px; }
+.drill-tracks .drill-opt { flex:1 1 220px; }
+.drill-setup-grid .muted { opacity:.45; pointer-events:none; }
+.drill-track-badge { margin:0 0 10px; }
 .slog-item-actions { grid-area:actions; display:flex; gap:6px; justify-content:flex-end; }
 .slog-mini { padding:5px 10px; font-size:.72rem; border-radius:4px; }
 .slog-mini.danger:hover { border-color:var(--bad); color:var(--bad); }
