@@ -916,6 +916,16 @@ button.primary:hover { background:linear-gradient(180deg,#ffffff,#e6e0d1);
 .dev-notes-dialog h2 { font-family:var(--disp); font-size:1.1rem; margin:0 0 8px; }
 .dev-notes-agent { display:block; margin:12px 0 8px; font-size:.85rem; }
 .dev-notes-agent input { width:100%; margin-top:6px; }
+.reflection-journal-panel { margin-top:14px; padding:14px 16px; }
+.rj-summary .rj-lock { color:var(--warn); }
+.rj-summary .rj-ok { color:var(--ok,#6bc06b); }
+.reflection-journal-dialog { width:min(720px,100%); }
+.rj-entry { border:1px solid var(--line,#333); border-radius:10px; padding:12px 14px; margin:0 0 14px; }
+.rj-entry legend { font-family:var(--disp); padding:0 6px; }
+.rj-field { display:block; margin:10px 0; font-size:.85rem; }
+.rj-field textarea, .rj-field input { width:100%; margin-top:6px; }
+.ai-reflection-lock { margin:0 0 12px; padding:10px 12px; border:1px solid var(--warn); border-radius:8px; color:var(--warn); }
+
 .dev-notes-out { width:100%; margin:8px 0 12px; font-family:var(--mono); font-size:.78rem; line-height:1.55;
   background:rgba(0,0,0,.35); border:1px solid var(--border); border-radius:8px; color:var(--text); padding:12px; resize:vertical; }
 

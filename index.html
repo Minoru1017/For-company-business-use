@@ -72,6 +72,12 @@
     <input type="file" id="file" accept=".vibe.json,.json,.srt,.vtt,.txt,text/plain,application/json,.m4a,.mp3,.wav,.ogg,.oga,.opus,.webm,.aac,.flac,audio/*" hidden>
     <p class="hint" style="margin-top:10px">已有逐字稿：Vibe 匯出的 <code>transcript.vibe.json</code>（見 <a href="https://github.com/Minoru1017/For-company-business-use/blob/main/docs/vibe-export-checklist.md" target="_blank" rel="noopener noreferrer">Vibe 檢查清單</a>）或 SRT 全程在本機解析、不上傳。只有錄音檔：用下方面板由 AI 轉錄。</p>
     <div id="devAudioMount" class="dev-audio-mount"></div>
+    <div id="reflectionJournalPanel" class="reflection-journal-panel card">
+      <div class="sec-head" style="margin-bottom:8px"><span class="num">◎</span><h2>每日三通自寫複盤</h2><span class="tag">解鎖 AI 單通分析</span></div>
+      <p class="hint">先自己寫：做了什麼／客戶回應／你的語氣與反應／客戶可能在想什麼。完成今日 <b>3 通</b> 後，才會解鎖「AI 深度分析」與「開發重點」自動產生，並與你的自寫交叉對照。</p>
+      <p id="rjSummary" class="rj-summary hint"></p>
+      <button type="button" class="btn primary" id="rjOpen">開啟今日複盤筆記</button>
+    </div>
     <div class="sample-actions">
       <button type="button" class="btn" data-load-sample>載入範例逐字稿</button>
       <span class="hint">沒有檔案也能先體驗：內建一段 3 分鐘的虛構 AI 課程 DEMO 電訪。</span>
@@ -205,6 +211,7 @@
     <section class="sec">
       <div class="sec-head"><span class="num">09</span><h2>AI 深度分析</h2><span class="tag">Optional / Gemini API</span></div>
       <div class="card">
+        <p id="aiReflectionLock" class="ai-reflection-lock hint" hidden></p>
         <div class="row">
           <input type="password" id="apiKey" class="field" placeholder="貼上 Gemini API Key" style="flex:1;min-width:240px" autocomplete="off">
           <input id="aiModel" class="field" list="modelList" value="gemini-3.6-flash" style="width:190px">
@@ -236,6 +243,7 @@
         <div id="aiStatus" style="margin-top:8px;font-size:.88rem;color:var(--warn);min-height:1.2em"></div>
         <div id="aiOut" hidden>
           <div id="aiPurposeReasoning" hidden></div>
+          <div id="aiReflectionCrosscheck" hidden></div>
           <h2 style="margin-top:16px">AI 判讀 — 做得好</h2><ul class="report" id="aiGood"></ul>
           <h2 style="margin-top:16px">AI 判讀 — 待加強</h2><ul class="report" id="aiBad"></ul>
           <h2 style="margin-top:16px">AI 判讀 — 建議怎麼聊</h2><ul class="report" id="aiSug"></ul>
@@ -281,6 +289,18 @@
 </div>
 
 <div id="toast"><span class="dot"></span><span id="toastMsg"></span></div>
+<div id="reflectionJournalModal" class="dev-notes-modal reflection-journal-modal" hidden>
+  <div class="dev-notes-dialog reflection-journal-dialog">
+    <h2>今日三通自寫複盤</h2>
+    <p class="hint">每通四欄都要寫滿（各至少 12 字）。可「綁定目前這通逐字稿」方便之後 AI 交叉對照。</p>
+    <div id="rjFormHost"></div>
+    <div class="btns">
+      <button type="button" class="primary" id="rjSave">儲存今日複盤</button>
+      <button type="button" id="rjClose">關閉</button>
+    </div>
+  </div>
+</div>
+
 <div id="devNotesModal" class="dev-notes-modal" hidden>
   <div class="dev-notes-dialog">
     <h2>開發重點（電訪複盤筆記）</h2>

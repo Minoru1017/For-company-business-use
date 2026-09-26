@@ -43,6 +43,15 @@ import { bumpUsage, checkQuotaBefore, getLimit, getUsage, quotaPercent, saveUsag
 import { labeledRatio } from './speaker-labels.js';
 import { appendAIReportSection } from './report-format.js';
 import { buildDevNotesAI, buildDevNotesLocal, formatDevNotesText } from './dev-notes.js';
+import {
+  appendReflectionToPrompt,
+  findEntryForSource,
+  formatEntryForPrompt,
+  getDayJournal,
+  renderReflectionCrosscheckHtml,
+  unlockStatusMessage,
+} from './reflection-journal.js';
+import { initReflectionJournal } from './reflection-journal-ui.js';
 import { SAMPLE_TRANSCRIPT_NAME, SAMPLE_TRANSCRIPT_SRT } from './sample-transcript.js';
 import { autoGuess } from './speaker.js';
 import { animateStats, bindUI, renderAnalysisUI, showQuotaModal, showToast } from './ui.js';
@@ -262,6 +271,51 @@ function refreshExportBar() {
   if (group) group.hidden = !bridgeSupports('report-save');
 }
 
+/** 開發模式：未完成每日三通自寫複盤時，鎖 AI 單通分析與自動開發重點 */
+function reflectionGateForDev() {
+  if (resolveMode() !== 'dev') return { ok: true };
+  const st = unlockStatusMessage();
+  return st.unlocked ? { ok: true } : { ok: false, message: st.message };
+}
+
+let reflectionJournalCtrl = null;
+
+function refreshReflectionGateUI() {
+  const lockEl = $('aiReflectionLock');
+  const st = unlockStatusMessage();
+  const gate = reflectionGateForDev();
+  const locked = !gate.ok;
+  if (lockEl) {
+    lockEl.hidden = !locked || resolveMode() !== 'dev';
+    lockEl.textContent = locked ? `${gate.message} 請在「01 上傳」區的「每日三通自寫複盤」填寫。` : '';
+  }
+  const aiBtn = $('aiBtn');
+  const devAi = $('genDevNotesAI');
+  const devLocal = $('genDevNotes');
+  const title = locked ? gate.message : '';
+  for (const btn of [aiBtn, devAi, devLocal]) {
+    if (!btn) continue;
+    if (resolveMode() === 'dev') {
+      btn.disabled = locked;
+      if (locked) btn.title = title;
+      else btn.removeAttribute('title');
+    } else {
+      btn.disabled = false;
+      btn.removeAttribute('title');
+    }
+  }
+  reflectionJournalCtrl?.refresh?.();
+}
+
+function requireReflectionUnlock(toastMsg = true) {
+  const gate = reflectionGateForDev();
+  if (gate.ok) return true;
+  if (toastMsg) showToast(gate.message);
+  reflectionJournalCtrl?.openModal?.();
+  refreshReflectionGateUI();
+  return false;
+}
+
 function devNotesAgentName() {
   const el = $('devNotesAgentName');
   const v = (el?.value || localStorage.getItem('dev_notes_agent_name') || '').trim();
@@ -285,6 +339,7 @@ function closeDevNotesModal() {
 
 function bindDevNotes() {
   $('genDevNotes')?.addEventListener('click', () => {
+    if (!requireReflectionUnlock()) return;
     if (!segs.length) return showToast('請先載入並標記逐字稿');
     const name = devNotesAgentName();
     if (name) localStorage.setItem('dev_notes_agent_name', name);
@@ -314,6 +369,7 @@ function bindDevNotes() {
 }
 
 async function runDevNotesAI() {
+  if (!requireReflectionUnlock()) return;
   if (!segs.length) return showToast('請先載入並標記逐字稿');
   const key = $('apiKey').value.trim();
   if (!key) {
@@ -590,6 +646,17 @@ function renderAIResults(j) {
           .join('')}`
       : '';
   }
+  const xcEl = $('aiReflectionCrosscheck');
+  if (xcEl) {
+    const html = renderReflectionCrosscheckHtml(j.reflection_crosscheck);
+    if (html) {
+      xcEl.innerHTML = html;
+      xcEl.hidden = false;
+    } else {
+      xcEl.innerHTML = '';
+      xcEl.hidden = true;
+    }
+  }
   $('aiOut').hidden = false;
 }
 
@@ -606,6 +673,12 @@ function hideAIProgress() {
 }
 
 async function runAIAnalysis() {
+  if (!requireReflectionUnlock(false)) {
+    $('aiStatus').textContent = reflectionGateForDev().message || '請先完成今日三通自寫複盤';
+    reflectionJournalCtrl?.openModal?.();
+    refreshReflectionGateUI();
+    return;
+  }
   const key = $('apiKey').value.trim();
   if (!key) {
     $('aiStatus').textContent = '請先貼上你自己的 API Key（aistudio.google.com/apikey 免費申請）';
@@ -641,6 +714,15 @@ async function runAIAnalysis() {
 
   const transcript = buildTranscript(segs, fmt);
   const chunks = chunkTranscript(transcript);
+  const dayJournal = getDayJournal();
+  const matchedReflection = findEntryForSource(dayJournal, sourceName);
+  let analysisPrompt = MANUAL_PROMPT;
+  if (matchedReflection) {
+    analysisPrompt = appendReflectionToPrompt(MANUAL_PROMPT, formatEntryForPrompt(matchedReflection));
+    showToast('已帶入今日自寫複盤，AI 會做交叉對照');
+  } else if (resolveMode() === 'dev') {
+    showToast('此通尚未綁定今日複盤，AI 仍會分析但不會交叉對照');
+  }
   let model = $('aiModel').value.trim() || DEFAULT_MODEL;
   if (isDeprecatedModel(model)) model = DEFAULT_MODEL;
   saveModelPreference(model);
@@ -665,7 +747,7 @@ async function runAIAnalysis() {
       const { parsed, usedTokens, modelUsed } = await callGeminiResilient({
         apiKey: key,
         model,
-        text: MANUAL_PROMPT + prefix + chunks[i],
+        text: analysisPrompt + prefix + chunks[i],
         signal: aiAbort.signal,
         onRetry: ({ attempt, maxAttempts, delayMs, status }) => {
           setAIProgress(
@@ -706,7 +788,7 @@ async function runAIAnalysis() {
     const extra503 = e.status === 503 ? ' 可改選模型「gemini-3.6-flash-lite」或稍後再試。' : '';
     $('aiStatus').textContent = cancelled ? '已取消 AI 分析' : `分析失敗：${e.message}${extra503}`;
   } finally {
-    $('aiBtn').disabled = false;
+    refreshReflectionGateUI();
     $('aiCancel').hidden = true;
     hideAIProgress();
     aiAbort = null;
@@ -732,6 +814,12 @@ function init() {
   bindHistory();
   bindApiKey();
   bindAI();
+  reflectionJournalCtrl = initReflectionJournal({
+    showToast,
+    getLinkedSource: () => sourceName,
+    onChange: () => refreshReflectionGateUI(),
+  });
+  refreshReflectionGateUI();
   labelCtrl = createLabelController({ segs, onToast: showToast });
   bindLabelCollapseHandlers(() => labelCtrl.collapseLabels());
   renderQuota();
@@ -746,6 +834,7 @@ function init() {
     onModeChange: (mode) => {
       if (mode === 'demo') window.__refreshBridge?.();
       if (mode === 'log') symptomLog?.activate();
+      refreshReflectionGateUI();
     },
   });
 
