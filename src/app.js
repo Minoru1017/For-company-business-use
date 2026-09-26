@@ -805,6 +805,15 @@ function bindAI() {
 }
 
 function init() {
+  // 首頁模式入口最先綁定，避免後續模組初始化失敗時四顆按鈕全失效
+  initModeChooser({
+    onModeChange: (mode) => {
+      if (mode === 'demo') window.__refreshBridge?.();
+      if (mode === 'log') symptomLog?.activate();
+      refreshReflectionGateUI();
+    },
+  });
+
   bindUI();
   bindUpload();
   bindLabels();
@@ -813,12 +822,16 @@ function init() {
   bindHistory();
   bindApiKey();
   bindAI();
-  reflectionJournalCtrl = initReflectionJournal({
-    showToast,
-    getLinkedSource: () => sourceName,
-    onChange: () => refreshReflectionGateUI(),
-  });
-  refreshReflectionGateUI();
+  try {
+    reflectionJournalCtrl = initReflectionJournal({
+      showToast,
+      getLinkedSource: () => sourceName,
+      onChange: () => refreshReflectionGateUI(),
+    });
+    refreshReflectionGateUI();
+  } catch (e) {
+    console.error('reflection journal init failed', e);
+  }
   labelCtrl = createLabelController({ segs, onToast: showToast });
   bindLabelCollapseHandlers(() => labelCtrl.collapseLabels());
   renderQuota();
@@ -827,14 +840,6 @@ function init() {
     const opt = document.createElement('option');
     opt.value = m;
     $('modelList').appendChild(opt);
-  });
-
-  initModeChooser({
-    onModeChange: (mode) => {
-      if (mode === 'demo') window.__refreshBridge?.();
-      if (mode === 'log') symptomLog?.activate();
-      refreshReflectionGateUI();
-    },
   });
 
   initDemoPlayer({ fetchApiToken: getBridgeApiToken });
