@@ -304,7 +304,6 @@ function refreshReflectionGateUI() {
       btn.removeAttribute('title');
     }
   }
-  reflectionJournalCtrl?.refresh?.();
 }
 
 function requireReflectionUnlock(toastMsg = true) {
