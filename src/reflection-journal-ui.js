@@ -96,7 +96,6 @@ export function initReflectionJournal(deps = {}) {
         ? `<span class="rj-ok">今日 ${st.complete}/${st.required} 通自寫複盤已完成</span> — AI 單通分析已解鎖`
         : `<span class="rj-lock">今日 ${st.complete}/${st.required} 通</span> — 完成三通自寫複盤後，才會解鎖「AI 深度分析／AI 精修開發重點／一鍵開發重點」`;
     }
-    onChange?.(st);
   }
 
   function openModal() {
