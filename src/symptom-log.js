@@ -19,8 +19,11 @@ import {
   dateKey,
   extractSymptoms,
   formatDuration,
+  classifyCallDuration,
   funnelFromCalls,
+  ICEBREAK_SYMPTOM_KEYS,
   inviteTone,
+  isShortCall,
   parseDateFromFilename,
   parseDateKey,
   parseDiagnosis,
@@ -145,6 +148,7 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
     activated: false,
     dbError: '',
     sheet: { rows: null, model: null, loadedAt: 0, error: '', busy: false, writing: false, flash: false },
+    callFilter: 'all',
   };
 
   container.innerHTML = `
@@ -213,8 +217,9 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
             <label>長 Call（≥<span id="slLongMinLabel">15</span> 分）<input type="number" min="0" inputmode="numeric" data-day="longManual" placeholder="自動"></label>
             <label>進邀約（客戶同意時間）<input type="number" min="0" inputmode="numeric" data-day="invites" placeholder="0" title="客戶明確同意某個諮詢／見面時間才計入，僅開口約不算"></label>
           </div>
-          <p class="hint">邀約率 KPI：進邀約 ÷ 當日「超過 N 分」通數（不是接通數）。只填有同意時間的通數。</p>
+          <p class="hint">留存率＝超過 N 分通 ÷ 接通（破冰留客）｜邀約率＝進邀約（客戶同意時間）÷ 超過 N 分通。</p>
           <div class="slog-funnel-bar" id="slFunnelBar"></div>
+          <div class="slog-ice-stats" id="slIceStats"></div>
           <details class="slog-settings">
             <summary>門檻設定</summary>
             <label>「超過 N 分」的 N <input type="number" min="1" max="60" data-setting="shortMin"></label>
@@ -248,6 +253,13 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
             <input type="file" id="slFile" accept="${escapeHTML(IMPORT_ACCEPT)}" multiple hidden>
           </div>
           <div class="slog-drop" id="slDrop">把公司電話系統匯出的 wav／mp3 拖到這裡（可多檔）。檔名有日期（如 <code>20260923_1430_0912xxx.wav</code>）會自動歸到那一天，沒有就歸到目前選的日期。錄音只存在這台電腦。</div>
+          <div class="slog-call-filters bridge-actions" id="slCallFilters">
+            <span class="slog-filter-label">錄音篩選</span>
+            <button type="button" class="btn slog-filter on" data-call-filter="all">全部</button>
+            <button type="button" class="btn slog-filter" data-call-filter="short">短通 (&lt;3 分)</button>
+            <button type="button" class="btn slog-filter" data-call-filter="no-retention">未留存 (&lt;N 分)</button>
+            <button type="button" class="btn" id="slSelectShort">全選目前篩選</button>
+          </div>
           <ul class="slog-list" id="slList"></ul>
 
           <div class="slog-engine">
@@ -540,9 +552,28 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
     el.innerHTML =
       step('撥出', f.dialed, null) +
       step('接通', f.connected, f.connectRate, '接通率') +
-      step(`>${f.shortMin} 分`, f.over, f.overRate, '接通中') +
+      step(`>${f.shortMin} 分`, f.over, f.retentionRate ?? f.overRate, '留存率') +
       step(`長 Call ≥${f.longMin} 分`, f.long, f.longRate, `>${f.shortMin} 分中`) +
       step('同意時間', f.invites, f.inviteRate, '邀約率');
+    renderIceStats(f);
+  }
+
+  function callsForFilter(list = state.calls) {
+    if (state.callFilter === 'all') return list;
+    return list.filter((c) => classifyCallDuration(c.durationSec, state.settings) === state.callFilter);
+  }
+
+  function renderIceStats(f) {
+    const el = q('#slIceStats');
+    if (!el) return;
+    const shortN = state.calls.filter((c) => isShortCall(c.durationSec)).length;
+    const noRetN = state.calls.filter((c) => classifyCallDuration(c.durationSec, state.settings) === 'no-retention').length;
+    const okN = state.calls.filter((c) => classifyCallDuration(c.durationSec, state.settings) === 'ok').length;
+    const unkN = state.calls.length - shortN - noRetN - okN;
+    el.innerHTML = `<p class="hint slog-ice-line">本機錄音：<b>${shortN}</b> 通短通（&lt;3 分）· <b>${noRetN}</b> 通未留存（&lt;${state.settings.shortMin} 分）· <b>${okN}</b> 通已留存${unkN ? ` · ${unkN} 通時長未知（匯入後可自動讀取）` : ''}。破冰複盤請先篩「短通」批次分析。</p>`;
+    if (f?.connected) {
+      el.innerHTML += `<p class="hint">當日留存率 ${fmtPct(f.retentionRate ?? f.overRate)}（${f.over}/${f.connected} 接通聊滿 &gt;${f.shortMin} 分）</p>`;
+    }
   }
 
   let daySaveTimer = null;
@@ -602,12 +633,30 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
   }
 
   function renderCalls() {
-    q('#slCallCount').textContent = state.calls.length ? `${state.calls.length} 通` : '';
-    if (!state.calls.length) {
+    const visible = callsForFilter();
+    const total = state.calls.length;
+    q('#slCallCount').textContent = total
+      ? state.callFilter === 'all'
+        ? `${total} 通`
+        : `顯示 ${visible.length}/${total} 通`
+      : '';
+    container.querySelectorAll('[data-call-filter]').forEach((b) => b.classList.toggle('on', b.dataset.callFilter === state.callFilter));
+    if (!total) {
       listEl.innerHTML = '<li class="slog-empty">這天還沒有錄音。按「匯入錄音檔」或把檔案拖到上面。</li>';
+    } else if (!visible.length) {
+      listEl.innerHTML = '<li class="slog-empty">此篩選沒有符合的錄音。試試「全部」或匯入更多 wav。</li>';
     } else {
-      listEl.innerHTML = state.calls
+      listEl.innerHTML = visible
         .map((c) => {
+          const durCls = classifyCallDuration(c.durationSec, state.settings);
+          const durTag =
+            durCls === 'short'
+              ? '<span class="slog-tag bad">短通</span>'
+              : durCls === 'no-retention'
+                ? '<span class="slog-tag warn">未留存</span>'
+                : durCls === 'ok'
+                  ? '<span class="slog-tag ok">已留存</span>'
+                  : '';
           const st = callStatus(c);
           const checked = state.selection.has(c.id) ? 'checked' : '';
           const playing = state.playingId === c.id;
@@ -620,7 +669,7 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
               <span class="slog-item-dur">${c.durationSec ? formatDuration(c.durationSec) : ''}${c.size ? ` · ${describeSize(c.size)}` : ''}</span>
             </button>
             <span class="slog-item-status ${st.cls}">${st.text}</span>
-            <span class="slog-item-tags">${top}</span>
+            <span class="slog-item-tags">${durTag}${top}</span>
             <span class="slog-item-actions">
               ${c.transcript?.length ? `<button type="button" class="btn slog-mini" data-open="${c.id}" title="載入逐字稿並跑完整分析">完整分析</button>` : ''}
               ${c.hasAudio === false ? '' : `<button type="button" class="btn slog-mini" data-del-audio="${c.id}" title="只刪錄音，保留逐字稿與分析">刪錄音</button>`}
@@ -748,6 +797,17 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
   });
   q('#slSelectNone').addEventListener('click', () => {
     state.selection.clear();
+    renderCalls();
+  });
+  container.querySelectorAll('[data-call-filter]').forEach((btn) =>
+    btn.addEventListener('click', () => {
+      state.callFilter = btn.dataset.callFilter || 'all';
+      renderCalls();
+      renderAggregate();
+    })
+  );
+  q('#slSelectShort')?.addEventListener('click', () => {
+    callsForFilter().forEach((c) => state.selection.add(c.id));
     renderCalls();
   });
 
@@ -1047,7 +1107,8 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
   }
 
   function currentAggregate() {
-    return aggregateSymptoms(state.calls);
+    const pool = state.callFilter === 'all' ? state.calls : callsForFilter();
+    return aggregateSymptoms(pool);
   }
 
   function renderAggregate() {
@@ -1074,7 +1135,16 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
     if (!agg.symptoms.length) {
       sEl.innerHTML = '<p class="hint">這幾通沒有偵測到共同病症。</p>';
     } else {
-      sEl.innerHTML = agg.symptoms
+      const iceMode = state.callFilter !== 'all';
+      const sorted = [...agg.symptoms].sort((a, b) => {
+        const ai = ICEBREAK_SYMPTOM_KEYS.indexOf(a.key);
+        const bi = ICEBREAK_SYMPTOM_KEYS.indexOf(b.key);
+        if (iceMode && ai >= 0 && bi >= 0) return ai - bi;
+        if (iceMode && ai >= 0) return -1;
+        if (iceMode && bi >= 0) return 1;
+        return b.count - a.count;
+      });
+      sEl.innerHTML = sorted
         .map((s) => {
           const streak = symptomStreak(state.streakHistory, s.key, state.selected);
           const common = agg.total >= 2 && s.ratio >= 0.5;
