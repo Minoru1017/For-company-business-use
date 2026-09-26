@@ -1,6 +1,6 @@
 /**
  * 開發症狀紀錄（純瀏覽器版）
- *   日曆 → 點一天 → 填漏斗（撥出／接通／>N 分／長 Call／邀約）→ 匯入公司電話系統的 wav
+ *   日曆 → 點一天 → 填漏斗（撥出／接通／>N 分／長 Call／進邀約＝客戶同意時間）→ 匯入公司電話系統的 wav
  *   → 點檔名直接播放、全選 → 批次分析（先轉錄再跑規則分析）→ 共同病症 → AI 診斷 → 改善筆記。
  * 錄音與逐字稿都存在這台電腦的 IndexedDB；只有轉錄／AI 診斷會把資料送到你選的引擎。
  */
@@ -159,7 +159,7 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
           </div>
           <div class="slog-weekdays">${WEEKDAYS.map((w) => `<span>${w}</span>`).join('')}</div>
           <div class="slog-grid" id="slGrid"></div>
-          <p class="hint slog-legend"><span class="slog-dot calls"></span>有錄音 <span class="slog-dot analyzed"></span>已分析 <span class="slog-dot note"></span>有筆記 <span class="slog-dot self"></span>自評病症 ・ <span class="slog-swatch good"></span>邀約 ≥ 2 <span class="slog-swatch zero"></span>邀約 0 ・ 點日期進入當天</p>
+          <p class="hint slog-legend"><span class="slog-dot calls"></span>有錄音 <span class="slog-dot analyzed"></span>已分析 <span class="slog-dot note"></span>有筆記 <span class="slog-dot self"></span>自評病症 ・ <span class="slog-swatch good"></span>同意時間 ≥ 2 <span class="slog-swatch zero"></span>有 &gt;N 分通但同意 0 ・ 邀約率＝同意時間÷&gt;N 分通 ・ 點日期進入當天</p>
           <div class="hint" id="slStorage"></div>
           <div class="bridge-upload-status err hidden" id="slDbError"></div>
         </div>
@@ -211,8 +211,9 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
             <label>接通<input type="number" min="0" inputmode="numeric" data-day="connected" placeholder="0"></label>
             <label>超過 <span id="slShortMinLabel">5</span> 分<input type="number" min="0" inputmode="numeric" data-day="over5Manual" placeholder="自動"></label>
             <label>長 Call（≥<span id="slLongMinLabel">15</span> 分）<input type="number" min="0" inputmode="numeric" data-day="longManual" placeholder="自動"></label>
-            <label>進邀約<input type="number" min="0" inputmode="numeric" data-day="invites" placeholder="0"></label>
+            <label>進邀約（客戶同意時間）<input type="number" min="0" inputmode="numeric" data-day="invites" placeholder="0" title="客戶明確同意某個諮詢／見面時間才計入，僅開口約不算"></label>
           </div>
+          <p class="hint">邀約率 KPI：進邀約 ÷ 當日「超過 N 分」通數（不是接通數）。只填有同意時間的通數。</p>
           <div class="slog-funnel-bar" id="slFunnelBar"></div>
           <details class="slog-settings">
             <summary>門檻設定</summary>
@@ -387,7 +388,7 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
             ? `${s.calls ? `<span class="slog-dot calls" title="${s.calls} 通錄音"></span>` : ''}${s.analyzed ? '<span class="slog-dot analyzed" title="已分析"></span>' : ''}${s.hasNote ? '<span class="slog-dot note" title="有筆記"></span>' : ''}`
             : '') + (selfN ? `<span class="slog-dot self" title="自評 ${selfN} 項病症"></span>` : '');
         const n = s?.calls ? `<span class="slog-cell-n">${s.calls}</span>` : '';
-        const inv = s?.invites != null && s.invites > 0 ? `<span class="slog-cell-inv" title="進邀約 ${s.invites}">約 ${s.invites}</span>` : '';
+        const inv = s?.invites != null && s.invites > 0 ? `<span class="slog-cell-inv" title="客戶同意時間 ${s.invites} 通">約 ${s.invites}</span>` : '';
         const startTag = start && c.key === start ? '<span class="slog-cell-start">入職</span>' : '';
         return `<button type="button" class="${cls.join(' ')}" data-date="${c.key}"><span class="slog-cell-d">${c.day}</span>${n}${inv}${startTag}<span class="slog-dots">${dots}</span></button>`;
       })
@@ -541,7 +542,7 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
       step('接通', f.connected, f.connectRate, '接通率') +
       step(`>${f.shortMin} 分`, f.over, f.overRate, '接通中') +
       step(`長 Call ≥${f.longMin} 分`, f.long, f.longRate, `>${f.shortMin} 分中`) +
-      step('進邀約', f.invites, f.inviteRate, `>${f.shortMin} 分中`);
+      step('同意時間', f.invites, f.inviteRate, '邀約率');
   }
 
   let daySaveTimer = null;

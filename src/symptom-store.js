@@ -3,6 +3,8 @@
  * localStorage 的 callCoachHistory 只有幾 MB 上限，放不下多天多通的錄音，所以另開一個 DB。
  * 載入模組本身不碰 indexedDB（node 測試／module-smoke 可安全 import）。
  */
+import { funnelFromCalls } from './symptom-engine.js';
+
 const DB_NAME = 'callCoachSymptomLog';
 const DB_VERSION = 1;
 const STORE_DAYS = 'days';
@@ -171,10 +173,11 @@ export async function saveSettings(patch) {
 export async function summarizeRange(fromKey, toKey) {
   const [days, calls] = await Promise.all([listDays(fromKey, toKey), listCallsBetween(fromKey, toKey)]);
   const out = {};
-  const ensure = (k) => (out[k] ||= { calls: 0, analyzed: 0, hasFunnel: false, hasNote: false, invites: null, symptoms: [], durations: [] });
+  const dayByKey = Object.fromEntries((days || []).map((d) => [d.date, d]));
+  const ensure = (k) => (out[k] ||= { calls: 0, analyzed: 0, hasFunnel: false, hasNote: false, invites: null, over: 0, symptoms: [], durations: [] });
   (days || []).forEach((d) => {
     const e = ensure(d.date);
-    e.hasFunnel = [d.dialed, d.connected, d.invites].some((v) => v != null && v !== '' && Number(v) > 0);
+    e.hasFunnel = [d.dialed, d.connected, d.invites, d.over5Manual].some((v) => v != null && v !== '' && Number(v) > 0);
     e.invites = d.invites == null || d.invites === '' ? null : Number(d.invites) || 0;
     const n = d.note || {};
     e.hasNote = !!(n.symptom || n.action || n.verify || n.free);
@@ -190,6 +193,10 @@ export async function summarizeRange(fromKey, toKey) {
       });
     }
   });
+  for (const k of Object.keys(out)) {
+    const f = funnelFromCalls(dayByKey[k] || {}, out[k].durations.map((sec) => ({ durationSec: sec })));
+    out[k].over = f.over;
+  }
   return out;
 }
 
