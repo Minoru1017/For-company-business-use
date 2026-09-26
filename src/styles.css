@@ -965,7 +965,7 @@ button.primary:hover { background:linear-gradient(180deg,#ffffff,#e6e0d1);
 .slog-cell-start { position:absolute; right:8px; bottom:6px; font-family:var(--mono); font-size:.58rem; letter-spacing:.14em; color:var(--tab-paper); }
 .slog-cell.selected .slog-cell-start { color:var(--ink); }
 .slog-nav:disabled { opacity:.35; cursor:not-allowed; }
-/* 邀約成效：≥2 綠、0 紅（只對有填漏斗的日子上色） */
+/* 邀約成效：同意時間 ≥2 綠；當日 >N 分通 >0 但同意 0 紅 */
 .slog-cell.invite-good { background:rgba(141,195,155,.22); border-color:var(--ok); }
 .slog-cell.invite-good .slog-cell-d, .slog-cell.invite-good .slog-cell-inv { color:var(--ok); }
 .slog-cell.invite-zero { background:rgba(226,87,63,.2); border-color:var(--bad); }

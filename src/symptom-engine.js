@@ -1,7 +1,8 @@
 /**
  * 開發症狀紀錄——純函式引擎（不碰 DOM／IndexedDB，可在 node 測試）。
  *   - 公司電話系統匯出的錄音檔：從檔名解析日期時間，解析不到就退回檔案修改時間
- *   - 每日漏斗：撥出 → 接通 → 超過 N 分 → 長 Call → 進邀約
+ *   - 每日漏斗：撥出 → 接通 → 超過 N 分 → 長 Call → 進邀約（客戶同意某個時間）
+ *   - 邀約率＝進邀約 ÷ 當日「超過 N 分」通數（分母不是接通數）
  *   - 從單通 runAnalysis 結果萃取「症狀 key」，跨多通彙總找共同病症
  *   - AI 診斷 prompt／解析（只把彙總數字與少量客戶原話送出去，不送整份逐字稿）
  */
@@ -97,7 +98,9 @@ export function funnelFromCalls(day = {}, calls = [], thresholds = DEFAULT_THRES
     connectRate: ratio(connected, dialed),
     overRate: ratio(over, connected),
     longRate: ratio(long, over),
+    /** 邀約率：進邀約 ÷ >N 分通數（公司 KPI 分母） */
     inviteRate: ratio(invites, over),
+    /** 僅供對照，不作 KPI */
     inviteRateConnected: ratio(invites, connected),
     callsImported: (calls || []).length,
   };
@@ -294,7 +297,7 @@ export function buildDiagnosisPrompt(aggregate, { funnel, date, recentNotes = []
   if (date) lines.push(`日期：${date}`);
   if (funnel) {
     lines.push(
-      `漏斗：撥出 ${funnel.dialed}、接通 ${funnel.connected}（${fmtPct(funnel.connectRate)}）、超過 ${funnel.shortMin} 分 ${funnel.over}（接通的 ${fmtPct(funnel.overRate)}）、長 Call（≥${funnel.longMin} 分）${funnel.long}、進邀約 ${funnel.invites}（>${funnel.shortMin} 分的 ${fmtPct(funnel.inviteRate)}）`
+      `漏斗：撥出 ${funnel.dialed}、接通 ${funnel.connected}（${fmtPct(funnel.connectRate)}）、超過 ${funnel.shortMin} 分 ${funnel.over}（接通的 ${fmtPct(funnel.overRate)}）、長 Call（≥${funnel.longMin} 分）${funnel.long}、進邀約（客戶同意時間）${funnel.invites}、邀約率 ${fmtPct(funnel.inviteRate)}（進邀約÷>${funnel.shortMin} 分通數）`
     );
   }
   const mt = aggregate?.metrics || {};
@@ -359,14 +362,15 @@ export function parseDiagnosis(raw) {
 }
 
 /**
- * 日曆格顏色：邀約 ≥ 2 → 'good'（綠）；有填漏斗但邀約 0（或沒填）→ 'zero'（紅）；其餘 ''。
- * 沒填任何數字的日子不上色，避免整個月都變紅。
+ * 日曆格顏色：進邀約 ≥ 2 → 'good'（綠）；當日 >N 分通數 > 0 但進邀約 0 → 'zero'（紅）；其餘 ''。
+ * 分母與 KPI 一致：以「>N 分通數」判斷當日是否有資格算邀約率，避免只填撥出卻整格變紅。
  */
 export function inviteTone(summary) {
   if (!summary) return '';
-  const invites = summary.invites == null ? null : Number(summary.invites) || 0;
-  if (invites != null && invites >= 2) return 'good';
-  if (summary.hasFunnel && !invites) return 'zero';
+  const invites = summary.invites == null ? 0 : Number(summary.invites) || 0;
+  const over = Number(summary.over) || 0;
+  if (invites >= 2) return 'good';
+  if (over > 0 && invites === 0) return 'zero';
   return '';
 }
 

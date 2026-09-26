@@ -100,13 +100,14 @@ describe('date helpers', () => {
 });
 
 describe('inviteTone', () => {
-  it('green when invites ≥ 2, red when funnel filled but invites 0 or empty, neutral otherwise', () => {
-    expect(inviteTone({ hasFunnel: true, invites: 2 })).toBe('good');
-    expect(inviteTone({ hasFunnel: true, invites: 5 })).toBe('good');
-    expect(inviteTone({ hasFunnel: true, invites: 0 })).toBe('zero');
-    expect(inviteTone({ hasFunnel: true, invites: null })).toBe('zero');
-    expect(inviteTone({ hasFunnel: true, invites: 1 })).toBe('');
-    expect(inviteTone({ hasFunnel: false, invites: null, calls: 3 })).toBe('');
+  it('green when agreed-time invites ≥ 2; red when >N-min calls exist but 0 agreed; neutral otherwise', () => {
+    expect(inviteTone({ over: 4, invites: 2 })).toBe('good');
+    expect(inviteTone({ over: 1, invites: 5 })).toBe('good');
+    expect(inviteTone({ over: 3, invites: 0 })).toBe('zero');
+    expect(inviteTone({ over: 2, invites: null })).toBe('zero');
+    expect(inviteTone({ over: 3, invites: 1 })).toBe('');
+    expect(inviteTone({ over: 0, invites: 0, hasFunnel: true })).toBe('');
+    expect(inviteTone({ hasFunnel: true, invites: 0, over: 0 })).toBe('');
     expect(inviteTone(undefined)).toBe('');
   });
 });
