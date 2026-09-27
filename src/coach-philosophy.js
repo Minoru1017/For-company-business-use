@@ -99,10 +99,10 @@ export function renderHeroBarHtml(mode) {
   const role = MODE_ROLES[mode];
   if (!role) return '';
   const pace = monthPaceMessage();
+  // 模式標題與 blurb 已在頁首 tagline 出現，這裡只留每月節奏提醒，避免重複
   return `
-    <div class="coach-hero-bar">
-      <span class="coach-hero-mode">${role.title}</span>
-      <span class="coach-hero-blurb">${role.blurb}</span>
+    <div class="coach-hero-bar coach-pace-${pace.tone}">
+      <span class="coach-hero-mode">${role.step === 'do' ? '做' : role.step === 'listen' ? '聽自己' : '找問題'}</span>
       <span class="coach-pace coach-pace-${pace.tone}">${pace.text}</span>
     </div>`;
 }

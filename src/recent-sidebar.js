@@ -39,9 +39,17 @@ export function initRecentSidebar({
       .join('');
   }
 
+  function setDrawer(open) {
+    document.body.classList.toggle('sidebar-open', open);
+    const scrim = document.getElementById('sidebarScrim');
+    if (scrim) scrim.hidden = !open;
+    document.getElementById('sidebarMenu')?.setAttribute('aria-expanded', open ? 'true' : 'false');
+  }
+
   listEl.addEventListener('click', (e) => {
     const btn = e.target.closest('[data-id]');
     if (!btn) return;
+    setDrawer(false);
     onOpen?.(btn.dataset.id);
   });
 
@@ -61,8 +69,23 @@ export function initRecentSidebar({
     render();
   });
 
-  document.getElementById('sidebarHome')?.addEventListener('click', () => onGoHome?.());
-  document.getElementById('sidebarNew')?.addEventListener('click', () => onNewUpload?.());
+  document.getElementById('sidebarHome')?.addEventListener('click', () => {
+    setDrawer(false);
+    onGoHome?.();
+  });
+  const newUpload = () => {
+    setDrawer(false);
+    onNewUpload?.();
+  };
+  document.getElementById('sidebarNew')?.addEventListener('click', newUpload);
+  document.getElementById('topbarNew')?.addEventListener('click', newUpload);
+  document.getElementById('sidebarMenu')?.addEventListener('click', () => {
+    setDrawer(!document.body.classList.contains('sidebar-open'));
+  });
+  document.getElementById('sidebarScrim')?.addEventListener('click', () => setDrawer(false));
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && document.body.classList.contains('sidebar-open')) setDrawer(false);
+  });
   document.getElementById('sidebarClear')?.addEventListener('click', () => {
     if (!listHistory().length) return;
     if (!confirm('清空所有最近項目？（只影響這台電腦的瀏覽器）')) return;
@@ -73,6 +96,10 @@ export function initRecentSidebar({
   });
 
   document.getElementById('sidebarCollapse')?.addEventListener('click', () => {
+    if (document.body.classList.contains('sidebar-open')) {
+      setDrawer(false);
+      return;
+    }
     document.body.classList.toggle('sidebar-collapsed');
     try {
       localStorage.setItem('callCoachSidebarCollapsed', document.body.classList.contains('sidebar-collapsed') ? '1' : '0');
