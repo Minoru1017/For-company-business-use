@@ -53,6 +53,7 @@ import {
 } from './reflection-journal.js';
 import { initReflectionJournal } from './reflection-journal-ui.js';
 import { mountHomePhilosophy, updateHeroPhilosophyBar } from './coach-philosophy-ui.js';
+import { initDayTypeHome } from './learning-library-ui.js';
 import { SAMPLE_TRANSCRIPT_NAME, SAMPLE_TRANSCRIPT_SRT } from './sample-transcript.js';
 import { autoGuess } from './speaker.js';
 import { animateStats, bindUI, renderAnalysisUI, showQuotaModal, showToast } from './ui.js';
@@ -280,6 +281,7 @@ function reflectionGateForDev() {
 }
 
 let reflectionJournalCtrl = null;
+let dayTypeHomeCtrl = null;
 
 function refreshReflectionGateUI() {
   const lockEl = $('aiReflectionLock');
@@ -807,8 +809,19 @@ function bindAI() {
 
 function init() {
   mountHomePhilosophy();
+  dayTypeHomeCtrl = initDayTypeHome({
+    showToast,
+    onDayTypeChange: () => dayTypeHomeCtrl?.refresh?.(),
+  });
   // 首頁模式入口最先綁定，避免後續模組初始化失敗時四顆按鈕全失效
   initModeChooser({
+    beforeModeSelect: () => {
+      if (dayTypeHomeCtrl?.canEnterWorkModes?.()) return true;
+      showToast('非上班日請先完成 AI 趨勢＋銷售技巧影片心得，或改選「上班日」');
+      document.getElementById('learningOffDayPanel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      dayTypeHomeCtrl?.refresh?.();
+      return false;
+    },
     onModeChange: (mode) => {
       updateHeroPhilosophyBar(mode);
       if (mode === 'demo') window.__refreshBridge?.();
