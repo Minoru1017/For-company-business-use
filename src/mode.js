@@ -1,11 +1,13 @@
 const MODE_KEY = 'call_coach_mode';
 const MODES = new Set(['dev', 'demo', 'drill', 'log']);
 
+import { MODE_ROLES, PHILOSOPHY } from './coach-philosophy.js';
+
 const TAGLINES = {
-  dev: '電訪逐字稿分析工具——把每一通電話變成可複盤的專業判斷。<br><span>每日三通自寫複盤解鎖 AI 單通分析 ・ 錄音 AI 轉錄或 SRT ・ 規則分析全程本地</span>',
-  demo: 'DEMO 錄影本機轉錄 → 自動載入逐字稿 → 銷售分析。<br><span>MP4 不上雲 ・ 轉錄在本機 ・ 分析可選 AI</span>',
-  drill: '電訪開發陪練——你主動問、客戶即時回、限時接話。<br><span>離線劇本口語化更新 ・ 通話中不看逐字稿 ・ 破冰 90 秒／完整通話</span>',
-  log: '開發症狀紀錄——每天的漏斗、當天的錄音、跨通共同病症、明天只改一個動作。<br><span>公司電話系統 wav 直接匯入 ・ 錄音與筆記只存這台電腦 ・ 轉錄與 AI 診斷才會送出</span>',
+  dev: `${MODE_ROLES.dev.title}。<br><span>${MODE_ROLES.dev.blurb} ・ 規則分析本機 ・ 三通自寫複盤解鎖 AI 交叉對照</span>`,
+  demo: `${MODE_ROLES.demo.title}。<br><span>${MODE_ROLES.demo.blurb} ・ MP4 本機轉錄</span>`,
+  drill: `${MODE_ROLES.drill.title}。<br><span>${MODE_ROLES.drill.blurb} ・ 通話中不看逐字稿</span>`,
+  log: `${MODE_ROLES.log.title}。<br><span>${MODE_ROLES.log.blurb} ・ wav 只存本機</span>`,
 };
 
 const TITLES = {

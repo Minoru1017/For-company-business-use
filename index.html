@@ -17,30 +17,31 @@
   <div class="mode-chooser-inner">
     <p class="mode-chooser-kicker">CALL COACH</p>
     <h2 class="mode-chooser-title">選擇工作流程</h2>
-    <p class="mode-chooser-lead">同一套工具，依情境選擇電訪分析、DEMO 錄影轉錄、開發電訪的臨場陪練，或每天的開發症狀紀錄。</p>
+    <p class="mode-chooser-lead">同一套工具，圍繞<b>做 → 聽自己 → 找問題 → 再做</b>——不是用 AI 代替你想。</p>
+    <div id="coachPhilosophyHome"></div>
     <div class="mode-cards">
       <button type="button" class="mode-card" data-mode="dev" data-code="CODE_001 // DRIFT">
         <span class="mode-card-tag">開發 · 電訪</span>
         <h3>電訪逐字稿</h3>
-        <p>直接丟錄音檔（m4a/mp3/wav）由 AI 轉錄，或上傳 Vibe <code>.vibe.json</code>／SRT，分析通話品質。</p>
+        <p><b>找問題</b>：規則分析本機隨時可用；三通自寫複盤後，AI 只做交叉對照。</p>
         <span class="mode-card-cta">上傳分析 →</span>
       </button>
       <button type="button" class="mode-card accent" data-mode="demo" data-code="CODE_002 // SIGNAL">
         <span class="mode-card-tag">DEMO · 錄影</span>
         <h3>錄影轉逐字稿</h3>
-        <p>1～2 小時 MP4 在本機轉錄（不上雲），完成後自動進入分析。</p>
+        <p><b>輸入＋回放</b>：MP4 本機轉錄；要變強仍得回到自己打、自己講。</p>
         <span class="mode-card-cta">本機轉錄 →</span>
       </button>
       <button type="button" class="mode-card drill" data-mode="drill" data-code="CODE_003 // SPAR">
         <span class="mode-card-tag">開發 · 陪練</span>
         <h3>臨場反應陪練</h3>
-        <p>客戶接起電話，<code>你主動問</code>、限時接話。練不慌、不套話、不卡住——不是被動看分析。</p>
+        <p><b>下水練</b>：你主動問、限時接話——被反駁與被掛斷，聽再多分享也替代不了。</p>
         <span class="mode-card-cta">開始撥號 →</span>
       </button>
       <button type="button" class="mode-card log" data-mode="log" data-code="CODE_004 // PULSE">
         <span class="mode-card-tag">開發 · 症狀</span>
         <h3>開發症狀紀錄</h3>
-        <p>日曆點一天 → 填漏斗 → 匯入公司電話的 <code>wav</code> → 全選批次分析 → 找出跨通<code>共同病症</code> → 寫下明天只改的一件事。</p>
+        <p><b>聽自己</b>：漏斗證明有在動 → 批次分析 → 改善筆記只改一件事 → 再去做。</p>
         <span class="mode-card-cta">開始記錄 →</span>
       </button>
     </div>
@@ -55,6 +56,7 @@
       <span class="pill">顧問式銷售 6 步驟</span>
       <span class="pill">理解需求 → 判斷適配 → 幫助決策</span>
     </div>
+    <div id="coachHeroBar" class="coach-hero-wrap" hidden></div>
     <nav class="mode-bar" id="modeBar" hidden>
       <button type="button" class="mode-pill" data-mode="dev">開發 · 電訪</button>
       <button type="button" class="mode-pill" data-mode="demo">DEMO · 轉錄</button>
@@ -74,7 +76,7 @@
     <div id="devAudioMount" class="dev-audio-mount"></div>
     <div id="reflectionJournalPanel" class="reflection-journal-panel card">
       <div class="sec-head" style="margin-bottom:8px"><span class="num">◎</span><h2>每日三通自寫複盤</h2><span class="tag">解鎖 AI 單通分析</span></div>
-      <p class="hint">先自己寫：做了什麼／客戶回應／你的語氣與反應／客戶可能在想什麼。完成今日 <b>3 通</b> 後，才會解鎖「AI 深度分析」與「開發重點」自動產生，並與你的自寫交叉對照。</p>
+      <p class="hint">循環裡的<b>「聽自己＋找問題」</b>：做了什麼／客戶回應／語氣與反應／客戶可能在想什麼。完成今日 <b>3 通</b> 後，才解鎖 AI（第二意見、交叉對照）。</p>
       <p id="rjSummary" class="rj-summary hint"></p>
       <button type="button" class="btn primary" id="rjOpen">開啟今日複盤筆記</button>
     </div>
@@ -209,8 +211,17 @@
     </section>
 
     <section class="sec">
-      <div class="sec-head"><span class="num">09</span><h2>AI 深度分析</h2><span class="tag">Optional / Gemini API</span></div>
+      <div class="sec-head"><span class="num">09</span><h2>AI 深度分析</h2><span class="tag">第二意見 · 交叉對照</span></div>
       <div class="card">
+        <details class="coach-ask-details">
+          <summary class="hint">跑 AI 前先問自己（主管 8/25 重點）</summary>
+          <ul class="coach-ask-ai hint">
+            <li>這通我自己做了什麼、客戶怎麼回？</li>
+            <li>哪一句話可能讓客戶這樣反應？</li>
+            <li>客戶當下可能在想什麼——我的依據是？</li>
+            <li>若不如預期，我先卡在哪（不是先怪名單）？</li>
+          </ul>
+        </details>
         <p id="aiReflectionLock" class="ai-reflection-lock hint" hidden></p>
         <div class="row">
           <input type="password" id="apiKey" class="field" placeholder="貼上 Gemini API Key" style="flex:1;min-width:240px" autocomplete="off">

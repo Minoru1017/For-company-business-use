@@ -2,6 +2,7 @@
  * 每日三通「自寫複盤」——先自己思考，再解鎖 AI 單通分析。
  * 資料只存本機 localStorage。
  */
+import { PHILOSOPHY } from './coach-philosophy.js';
 
 export const JOURNAL_STORAGE_KEY = 'call_coach_reflection_journal_v1';
 export const REQUIRED_CALLS_PER_DAY = 3;
@@ -121,14 +122,27 @@ export function unlockStatusMessage(dateKey = todayKey()) {
   const day = getDayJournal(dateKey);
   const n = countCompleteEntries(day);
   if (n >= REQUIRED_CALLS_PER_DAY) {
-    return { unlocked: true, complete: n, required: REQUIRED_CALLS_PER_DAY, message: '今日三通自寫複盤已完成，可進行 AI 單通分析。' };
+    return {
+      unlocked: true,
+      complete: n,
+      required: REQUIRED_CALLS_PER_DAY,
+      message: '今日三通自寫複盤已完成——AI 可當第二意見做交叉對照。',
+    };
   }
   return {
     unlocked: false,
     complete: n,
     required: REQUIRED_CALLS_PER_DAY,
-    message: `請先完成今日 ${REQUIRED_CALLS_PER_DAY} 通自寫複盤（目前 ${n}/${REQUIRED_CALLS_PER_DAY}）。主管要求：開發分析必須先自己思考，AI 只做交叉對照，不能代替你想。`,
+    message: `請先完成今日 ${REQUIRED_CALLS_PER_DAY} 通自寫複盤（目前 ${n}/${REQUIRED_CALLS_PER_DAY}）。${PHILOSOPHY.headline}——AI 不能代替「聽自己、找問題」。`,
   };
+}
+
+/** 給當日 AI 診斷用的自寫摘要（不含逐字稿） */
+export function summarizeDayJournalForPrompt(dateKey) {
+  const day = getDayJournal(dateKey);
+  const done = day.entries.filter(isEntryComplete);
+  if (!done.length) return '';
+  return done.map((e, i) => `【自寫複盤 ${i + 1}】\n${formatEntryForPrompt(e)}`).join('\n\n');
 }
 
 /** 依檔名／標題找今日最相近的一筆複盤 */
