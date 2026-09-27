@@ -87,7 +87,16 @@ export function mountTimelinePlayer(container, opts) {
     onChange?.(normalizeMarkers(markers, duration));
   }
 
-  function renderMarkers() {
+  function updateSelection() {
+    markersEl.querySelectorAll('.ctp-dot').forEach((dot) => {
+      dot.classList.toggle('sel', dot.dataset.id === selectedId);
+    });
+    notesEl.querySelectorAll('.ctp-note').forEach((li) => {
+      li.classList.toggle('sel', li.dataset.id === selectedId);
+    });
+  }
+
+  function renderTrackDots() {
     markersEl.innerHTML = '';
     if (!duration) return;
     markers.forEach((m) => {
@@ -99,6 +108,9 @@ export function mountTimelinePlayer(container, opts) {
       dot.dataset.id = m.id;
       markersEl.appendChild(dot);
     });
+  }
+
+  function renderNotesList() {
     notesEl.innerHTML =
       markers.length === 0
         ? '<li class="hint ctp-empty">尚無標記——播放後按 M</li>'
@@ -111,6 +123,11 @@ export function mountTimelinePlayer(container, opts) {
       </li>`
             )
             .join('');
+  }
+
+  function renderMarkers() {
+    renderTrackDots();
+    renderNotesList();
   }
 
   function updateProgress() {
@@ -180,7 +197,7 @@ export function mountTimelinePlayer(container, opts) {
     selectedId = dot.dataset.id;
     const m = markers.find((x) => x.id === selectedId);
     if (m) audio.currentTime = m.sec;
-    renderMarkers();
+    updateSelection();
   });
 
   notesEl.addEventListener('click', (e) => {
@@ -212,14 +229,13 @@ export function mountTimelinePlayer(container, opts) {
 
   notesEl.addEventListener('focusin', (e) => {
     const li = e.target.closest('.ctp-note');
-    if (li) {
-      selectedId = li.dataset.id;
-      renderMarkers();
-    }
+    if (!li || li.dataset.id === selectedId) return;
+    selectedId = li.dataset.id;
+    updateSelection();
   });
 
   window.addEventListener('keydown', onKeyDown);
-  container.focus();
+  renderMarkers();
 
   return {
     destroy() {
