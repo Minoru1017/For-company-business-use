@@ -1262,7 +1262,14 @@ button.primary:hover { background:linear-gradient(180deg,#ffffff,#e6e0d1);
 .ctp-now-title { font-size:.82rem; font-weight:600; color:var(--text); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .ctp-now-sub { font-size:.68rem; color:var(--muted); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
 .ctp-main { display:flex; flex-direction:column; gap:6px; min-width:0; justify-self:stretch; }
-.ctp-transport { display:flex; align-items:center; justify-content:center; }
+.ctp-transport { display:flex; align-items:center; justify-content:center; gap:14px; }
+.ctp-skip { display:flex; align-items:center; justify-content:center; width:30px; height:30px; padding:0; border:none; border-radius:50%;
+  background:transparent; color:var(--muted); cursor:pointer; box-shadow:none; transition:color .15s, background .15s, transform .15s; }
+.ctp-skip:hover { color:var(--text); background:rgba(232,228,220,.06); transform:none; box-shadow:none; }
+.ctp-skip:active { transform:scale(.92); box-shadow:none; }
+.ctp-skip .ctp-icon-skip { width:22px; height:22px; }
+.ctp-skip.bump { animation:ctpBump .28s ease; }
+@keyframes ctpBump { 0% { transform:scale(1); } 40% { transform:scale(1.18); color:var(--text); } 100% { transform:scale(1); } }
 .ctp-play { display:flex; align-items:center; justify-content:center; width:36px; height:36px; padding:0; border:none; border-radius:50%;
   background:var(--text); color:var(--bg); cursor:pointer; transition:transform .15s, background .15s; }
 .ctp-play:hover { transform:scale(1.06); background:#fff; }

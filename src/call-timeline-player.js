@@ -20,6 +20,11 @@ const ICON_PLAY =
   '<svg class="ctp-icon" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M8 5.14v14.72a1 1 0 0 0 1.5.86l11.04-7.36a1 1 0 0 0 0-1.72L9.5 4.28a1 1 0 0 0-1.5.86z"/></svg>';
 const ICON_PAUSE =
   '<svg class="ctp-icon" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M6 5h4v14H6V5zm8 0h4v14h-4V5z"/></svg>';
+const ICON_BACK10 =
+  '<svg class="ctp-icon ctp-icon-skip" viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M12 5a8 8 0 1 1-7.4 4.9"/><path fill="currentColor" d="M4 3v6h6L4 3z"/><text x="12" y="16.2" text-anchor="middle" font-size="7.5" font-weight="700" font-family="JetBrains Mono, monospace" fill="currentColor">10</text></svg>';
+const ICON_FWD10 =
+  '<svg class="ctp-icon ctp-icon-skip" viewBox="0 0 24 24" aria-hidden="true"><path fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" d="M12 5a8 8 0 1 0 7.4 4.9"/><path fill="currentColor" d="M20 3v6h-6l6-6z"/><text x="12" y="16.2" text-anchor="middle" font-size="7.5" font-weight="700" font-family="JetBrains Mono, monospace" fill="currentColor">10</text></svg>';
+const SKIP_SEC = 10;
 const ICON_MARK =
   '<svg class="ctp-icon ctp-icon-sm" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2a7 7 0 0 0-7 7c0 5.25 7 13 7 13s7-7.75 7-13a7 7 0 0 0-7-7zm0 9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5z"/></svg>';
 
@@ -51,7 +56,9 @@ export function mountTimelinePlayer(container, opts) {
       </div>
       <div class="ctp-main">
         <div class="ctp-transport">
+          <button type="button" class="ctp-skip ctp-back" aria-label="倒退 ${SKIP_SEC} 秒" title="倒退 ${SKIP_SEC} 秒（←）">${ICON_BACK10}</button>
           <button type="button" class="ctp-play" aria-label="播放或暫停">${ICON_PLAY}</button>
+          <button type="button" class="ctp-skip ctp-fwd" aria-label="快轉 ${SKIP_SEC} 秒" title="快轉 ${SKIP_SEC} 秒（→）">${ICON_FWD10}</button>
         </div>
         <div class="ctp-timeline">
           <span class="ctp-cur">0:00</span>
@@ -67,7 +74,7 @@ export function mountTimelinePlayer(container, opts) {
         <button type="button" class="ctp-m-btn" title="在目前位置標記（快捷鍵 M）">${ICON_MARK}<span class="ctp-m-label">M</span></button>
       </div>
     </div>
-    <p class="hint ctp-hint">播放中按 <kbd>M</kbd> 或右側標記鈕，在下方寫該句複盤筆記。</p>
+    <p class="hint ctp-hint">播放中按 <kbd>M</kbd> 或右側標記鈕，在下方寫該句複盤筆記；<kbd>←</kbd> <kbd>→</kbd> 倒退／快轉 ${SKIP_SEC} 秒。</p>
     <ul class="ctp-notes"></ul>
   `;
   container.appendChild(root);
@@ -82,6 +89,19 @@ export function mountTimelinePlayer(container, opts) {
   const curEl = root.querySelector('.ctp-cur');
   const durEl = root.querySelector('.ctp-dur');
   const mBtn = root.querySelector('.ctp-m-btn');
+  const backBtn = root.querySelector('.ctp-back');
+  const fwdBtn = root.querySelector('.ctp-fwd');
+
+  function skip(delta) {
+    const max = duration || audio.duration || Infinity;
+    const next = Math.max(0, Math.min(max, (audio.currentTime || 0) + delta));
+    audio.currentTime = next;
+    updateProgress();
+    const btn = delta < 0 ? backBtn : fwdBtn;
+    btn.classList.remove('bump');
+    void btn.offsetWidth;
+    btn.classList.add('bump');
+  }
 
   function emit() {
     onChange?.(normalizeMarkers(markers, duration));
@@ -151,14 +171,19 @@ export function mountTimelinePlayer(container, opts) {
   }
 
   function onKeyDown(e) {
-    if (e.key !== 'm' && e.key !== 'M') return;
+    const isMark = e.key === 'm' || e.key === 'M';
+    const isBack = e.key === 'ArrowLeft';
+    const isFwd = e.key === 'ArrowRight';
+    if (!isMark && !isBack && !isFwd) return;
+    if (e.altKey || e.ctrlKey || e.metaKey) return;
     const tag = e.target?.tagName;
-    if (tag === 'INPUT' || tag === 'TEXTAREA' || e.target?.isContentEditable) return;
+    if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || e.target?.isContentEditable) return;
     if (!container.isConnected) return;
     const focusedHere = container === document.activeElement || container.contains(document.activeElement);
     if (audio.paused && !focusedHere) return;
     e.preventDefault();
-    addMarkerAt(audio.currentTime || 0);
+    if (isMark) addMarkerAt(audio.currentTime || 0);
+    else skip(isBack ? -SKIP_SEC : SKIP_SEC);
   }
 
   function setTransportPlaying(playing) {
@@ -170,6 +195,8 @@ export function mountTimelinePlayer(container, opts) {
     if (audio.paused) audio.play();
     else audio.pause();
   });
+  backBtn.addEventListener('click', () => skip(-SKIP_SEC));
+  fwdBtn.addEventListener('click', () => skip(SKIP_SEC));
 
   audio.addEventListener('play', () => setTransportPlaying(true));
   audio.addEventListener('pause', () => setTransportPlaying(false));
