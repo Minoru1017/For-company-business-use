@@ -5,6 +5,16 @@
  * 錄音與逐字稿都存在這台電腦的 IndexedDB；只有轉錄／AI 診斷會把資料送到你選的引擎。
  */
 import { renderMonthPaceHtml } from './coach-philosophy.js';
+import {
+  MONTHLY_REVIEW_FIELDS,
+  buildMonthlyStatsHint,
+  computeMonthlyStats,
+  getMonthlyReviewFromSettings,
+  monthlyReviewFilled,
+  patchMonthlyReviews,
+  q4Label,
+  reviewMonthKey,
+} from './monthly-review.js';
 import { isAiAnalysisUnlocked, summarizeDayJournalForPrompt, unlockStatusMessage } from './reflection-journal.js';
 import { runAnalysis } from './analyze.js';
 import { AUDIO_ACCEPT, describeSize, transcribeAudioWithGemini, validateAudioFile, guessAudioMime } from './audio-transcribe.js';
@@ -39,6 +49,7 @@ import {
   getDay,
   getSettings,
   listCalls,
+  listCallsBetween,
   listDays,
   newId,
   putAudio,
@@ -175,6 +186,14 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
           <div id="slWeek" class="slog-week-list"></div>
         </div>
       </div>
+
+      <details class="card slog-monthly-review" id="slMonthlyReviewCard">
+        <summary><h2>每月總結</h2><span class="slog-count" id="slMonthlyReviewBadge">待填</span></summary>
+        <p class="hint">對照當月日曆與 AI 診斷，<b>自己先寫</b>（主管复盘四问）。數據只輔助，不能代替你的思考。</p>
+        <p class="hint slog-monthly-stats" id="slMonthlyStatsHint"></p>
+        <div id="slMonthlyReviewFields" class="slog-monthly-fields"></div>
+        <p class="hint" id="slMonthlySaved"></p>
+      </details>
 
       <details class="card slog-sheet" id="slSheetCard">
         <summary><h2>Google 試算表同步 <span class="slog-count" id="slSheetState"></span></h2></summary>
@@ -419,6 +438,77 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
       })
       .join('');
     refreshStorage();
+    renderMonthlyReview();
+  }
+
+  let monthlyReviewTimer = null;
+
+  function bindMonthlyReviewFields() {
+    const fieldsHost = q('#slMonthlyReviewFields');
+    if (!fieldsHost) return;
+    const mk = reviewMonthKey(state.year, state.month);
+    if (fieldsHost.dataset.monthKey === mk) return;
+    fieldsHost.dataset.monthKey = mk;
+    fieldsHost.innerHTML = MONTHLY_REVIEW_FIELDS.map((f) => {
+      const label = f.key === 'q4' ? q4Label(state.year, state.month) : f.label;
+      return `<label class="slog-monthly-q"><span class="slog-monthly-q-label">${escapeHTML(label)}</span>
+        <textarea class="field" data-mr="${f.key}" rows="4" placeholder="${escapeHTML(f.placeholder)}"></textarea></label>`;
+    }).join('');
+    fieldsHost.querySelectorAll('[data-mr]').forEach((el) => {
+      el.addEventListener('input', () => {
+        if (!state.settings) return;
+        const key = el.dataset.mr;
+        const cur = getMonthlyReviewFromSettings(state.settings, state.year, state.month);
+        clearTimeout(monthlyReviewTimer);
+        monthlyReviewTimer = setTimeout(async () => {
+          try {
+            const bag = patchMonthlyReviews(state.settings, state.year, state.month, {
+              ...cur,
+              [key]: el.value,
+            });
+            state.settings = await saveSettings({ monthlyReviews: bag });
+            const saved = q('#slMonthlySaved');
+            if (saved) {
+              saved.textContent = `已自動儲存 ${new Date().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' })}`;
+            }
+            const badge = q('#slMonthlyReviewBadge');
+            if (badge) {
+              badge.textContent = monthlyReviewFilled(getMonthlyReviewFromSettings(state.settings, state.year, state.month))
+                ? '已填'
+                : '待填';
+            }
+          } catch (e) {
+            showDbError(e);
+          }
+        }, 400);
+      });
+    });
+  }
+
+  async function renderMonthlyReview() {
+    bindMonthlyReviewFields();
+    const review = getMonthlyReviewFromSettings(state.settings, state.year, state.month);
+    q('#slMonthlyReviewFields')?.querySelectorAll('[data-mr]').forEach((el) => {
+      el.value = review[el.dataset.mr] || '';
+    });
+    const badge = q('#slMonthlyReviewBadge');
+    if (badge) badge.textContent = monthlyReviewFilled(review) ? '已填' : '待填';
+    const statsEl = q('#slMonthlyStatsHint');
+    if (statsEl) {
+      try {
+        const stats = await computeMonthlyStats({
+          year: state.year,
+          month: state.month,
+          summarizeRange,
+          listDays,
+          listCallsBetween,
+        });
+        const tops = stats.topSymptoms.map((k) => SYMPTOM_DEFS[k]?.label || k);
+        statsEl.textContent = buildMonthlyStatsHint({ ...stats, topSymptoms: tops });
+      } catch {
+        statsEl.textContent = '';
+      }
+    }
   }
 
   async function refreshStorage() {
@@ -1555,6 +1645,7 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
     renderSheetState();
     await refreshMonth();
     await refreshWeek();
+    await renderMonthlyReview();
     await selectDay(today);
     loadSheet({ quiet: true });
   }
