@@ -69,6 +69,7 @@ import {
   planDayWrites,
   writeSheetCells,
 } from './sheet-sync.js';
+import { mountTimelinePlayer } from './call-timeline-player.js';
 import { escapeHTML } from './utils.js';
 
 const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六'];
@@ -158,6 +159,7 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
     workerAbort: null,
     playingId: null,
     playingUrl: null,
+    playerCtrl: null,
     activated: false,
     dbError: '',
     sheet: { rows: null, model: null, loadedAt: 0, error: '', busy: false, writing: false, flash: false },
@@ -735,7 +737,13 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
     return { text: '未轉錄', cls: '' };
   }
 
+  function destroyPlayer() {
+    state.playerCtrl?.destroy();
+    state.playerCtrl = null;
+  }
+
   function renderCalls() {
+    destroyPlayer();
     const visible = callsForFilter();
     const total = state.calls.length;
     q('#slCallCount').textContent = total
@@ -764,6 +772,8 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
           const checked = state.selection.has(c.id) ? 'checked' : '';
           const playing = state.playingId === c.id;
           const top = c.symptoms?.keys?.slice(0, 3).map((k) => `<span class="slog-tag">${escapeHTML(SYMPTOM_DEFS[k]?.label || k)}</span>`).join('') || '';
+          const markerN = (c.devMarkers || []).length;
+          const markerTag = markerN ? `<span class="slog-tag ctp-count" title="開發複盤話點">${markerN} 話點</span>` : '';
           return `<li class="slog-item ${playing ? 'playing' : ''}" data-id="${c.id}">
             <label class="slog-item-check"><input type="checkbox" data-select="${c.id}" ${checked}></label>
             <button type="button" class="slog-item-name" data-play="${c.id}" title="點擊播放／暫停">
@@ -772,7 +782,7 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
               <span class="slog-item-dur">${c.durationSec ? formatDuration(c.durationSec) : ''}${c.size ? ` · ${describeSize(c.size)}` : ''}</span>
             </button>
             <span class="slog-item-status ${st.cls}">${st.text}</span>
-            <span class="slog-item-tags">${durTag}${top}</span>
+            <span class="slog-item-tags">${durTag}${markerTag}${top}</span>
             <span class="slog-item-actions">
               ${c.transcript?.length ? `<button type="button" class="btn slog-mini" data-open="${c.id}" title="載入逐字稿並跑完整分析">完整分析</button>` : ''}
               ${c.hasAudio === false ? '' : `<button type="button" class="btn slog-mini" data-del-audio="${c.id}" title="只刪錄音，保留逐字稿與分析">刪錄音</button>`}
@@ -791,19 +801,30 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
     const slot = listEl.querySelector(`[data-player="${id}"]`);
     if (!slot) return;
     slot.hidden = false;
-    slot.innerHTML = '';
-    const a = document.createElement('audio');
-    a.controls = true;
-    a.autoplay = true;
-    a.src = url;
-    a.addEventListener('ended', () => {
-      const item = slot.closest('.slog-item');
-      item?.classList.remove('playing');
+    const call = state.calls.find((x) => x.id === id);
+    state.playerCtrl = mountTimelinePlayer(slot, {
+      src: url,
+      markers: call?.devMarkers,
+      onChange: async (markers) => {
+        const c = state.calls.find((x) => x.id === id);
+        if (!c) return;
+        c.devMarkers = markers;
+        try {
+          await putCall(c);
+        } catch (e) {
+          showDbError(e);
+        }
+      },
     });
-    slot.appendChild(a);
+    const audio = state.playerCtrl.getAudio();
+    audio.autoplay = true;
+    audio.addEventListener('ended', () => {
+      slot.closest('.slog-item')?.classList.remove('playing');
+    });
   }
 
   function stopPlayback() {
+    destroyPlayer();
     if (state.playingUrl) {
       try {
         URL.revokeObjectURL(state.playingUrl);
