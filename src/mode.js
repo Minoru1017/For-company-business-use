@@ -17,6 +17,14 @@ const TITLES = {
   log: 'CALL COACH｜開發症狀紀錄',
 };
 
+/** 工作區頁首：模式短名與檔案碼（對應首頁四張頁籤卡） */
+export const WS_HEADINGS = {
+  dev: { title: '電訪逐字稿', code: 'CODE_001' },
+  demo: { title: 'DEMO 轉錄', code: 'CODE_002' },
+  drill: { title: '臨場反應陪練', code: 'CODE_003' },
+  log: { title: '開發症狀紀錄', code: 'CODE_004' },
+};
+
 export function resolveMode() {
   const hash = location.hash.replace('#', '');
   if (hash === 'demo' || hash === 'transcribe') return 'demo';
@@ -43,6 +51,9 @@ export function applyMode(mode) {
   const logSection = document.getElementById('logSection');
   const modeBar = document.getElementById('modeBar');
   const tagline = document.getElementById('heroTagline');
+  const wsTitle = document.getElementById('wsTitle');
+  const wsCode = document.getElementById('wsCode');
+  const topbarTitle = document.getElementById('topbarTitle');
 
   if (!chooser || !main) return;
 
@@ -50,6 +61,13 @@ export function applyMode(mode) {
   chooser.hidden = active;
   main.hidden = !active;
   document.body.classList.toggle('in-workspace', active);
+  document.body.classList.remove('sidebar-open');
+  document.body.dataset.mode = active ? mode : '';
+
+  const heading = WS_HEADINGS[mode];
+  if (wsTitle && heading) wsTitle.textContent = heading.title;
+  if (wsCode && heading) wsCode.textContent = heading.code;
+  if (topbarTitle) topbarTitle.textContent = heading ? heading.title : 'CALL COACH';
 
   if (devSection) devSection.hidden = mode !== 'dev';
   if (demoSection) demoSection.hidden = mode !== 'demo';

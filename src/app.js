@@ -33,6 +33,7 @@ import {
   upsertRecentTranscript,
 } from './history.js';
 import { initRecentSidebar } from './recent-sidebar.js';
+import { initWorkspaceToc } from './workspace-toc.js';
 import {
   bridgeSupports,
   checkLocalBridge,
@@ -833,6 +834,11 @@ function init() {
   bindHistory();
   bindApiKey();
   bindAI();
+  try {
+    initWorkspaceToc();
+  } catch (e) {
+    console.error('workspace toc init failed', e);
+  }
   try {
     reflectionJournalCtrl = initReflectionJournal({
       showToast,

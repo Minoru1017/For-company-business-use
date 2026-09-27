@@ -20,7 +20,6 @@
     <p class="mode-chooser-lead">同一套工具，圍繞<b>做 → 聽自己 → 找問題 → 再做</b>——不是用 AI 代替你想。</p>
     <div id="dayTypeToggle" class="day-type-toggle card"></div>
     <div id="learningOffDayPanel" class="learning-off-wrap" hidden></div>
-    <div id="coachPhilosophyHome"></div>
     <div class="mode-cards">
       <button type="button" class="mode-card" data-mode="dev" data-code="CODE_001 // DRIFT">
         <span class="mode-card-tag">開發 · 電訪</span>
@@ -47,47 +46,65 @@
         <span class="mode-card-cta">開始記錄 →</span>
       </button>
     </div>
+    <div id="coachPhilosophyHome"></div>
     <p class="hint mode-chooser-hint">首次使用 DEMO：<strong>公司電腦</strong>請下載 <a href="https://github.com/Minoru1017/For-company-business-use/releases/latest/download/CallCoachAssistant-Setup.exe" target="_blank" rel="noopener noreferrer">CallCoachAssistant-Setup.exe</a> 安裝精靈（不需 .cmd）；安裝完成後從開始選單啟動助手。</p>
   </div>
 </section>
 
 <div class="wrap" id="mainApp" hidden>
   <div class="app-shell">
-    <aside class="app-sidebar" id="appSidebar" aria-label="最近項目">
+    <header class="app-topbar" id="appTopbar">
+      <button type="button" class="app-topbar-btn" id="sidebarMenu" aria-label="開啟選單" aria-controls="appSidebar" aria-expanded="false">☰</button>
+      <span class="app-topbar-title" id="topbarTitle">CALL COACH</span>
+      <button type="button" class="app-topbar-btn" id="topbarNew" aria-label="新增逐字稿">＋</button>
+    </header>
+    <div class="app-scrim" id="sidebarScrim" hidden></div>
+    <aside class="app-sidebar" id="appSidebar" aria-label="工作區導覽">
       <div class="app-sidebar-head">
-        <button type="button" class="app-sidebar-brand" id="sidebarHome">CALL COACH</button>
-        <button type="button" class="app-sidebar-toggle" id="sidebarCollapse" aria-label="收合側欄">‹</button>
+        <button type="button" class="app-sidebar-brand" id="sidebarHome" title="回到模式選擇">
+          <span class="app-sidebar-brand-mark" aria-hidden="true">▲</span><span class="app-sidebar-brand-text">CALL COACH</span>
+        </button>
+        <button type="button" class="app-sidebar-toggle" id="sidebarCollapse" aria-label="收合側欄" title="收合側欄">‹</button>
       </div>
-      <button type="button" class="app-sidebar-new" id="sidebarNew">＋ 新增逐字稿</button>
-      <label class="app-sidebar-search">
-        <span class="app-sidebar-search-icon" aria-hidden="true">⌕</span>
-        <input type="search" id="sidebarSearch" placeholder="搜尋最近項目" autocomplete="off">
-      </label>
-      <p class="app-sidebar-section">最近項目</p>
-      <p class="hint app-sidebar-empty" id="sidebarRecentEmpty" hidden>尚無紀錄。上傳或轉錄後會出現在這裡。</p>
-      <ul class="app-sidebar-list" id="sidebarRecentList"></ul>
+      <nav class="app-nav mode-bar" id="modeBar" hidden aria-label="工作模式">
+        <p class="app-sidebar-section">工作模式</p>
+        <button type="button" class="mode-pill app-nav-item" data-mode="dev" title="電訪逐字稿"><span class="app-nav-code">01</span><span class="app-nav-text"><span class="app-nav-label">電訪逐字稿</span><span class="app-nav-sub">找問題</span></span></button>
+        <button type="button" class="mode-pill app-nav-item" data-mode="demo" title="DEMO 轉錄"><span class="app-nav-code">02</span><span class="app-nav-text"><span class="app-nav-label">DEMO 轉錄</span><span class="app-nav-sub">輸入＋回放</span></span></button>
+        <button type="button" class="mode-pill app-nav-item" data-mode="drill" title="臨場反應陪練"><span class="app-nav-code">03</span><span class="app-nav-text"><span class="app-nav-label">臨場陪練</span><span class="app-nav-sub">下水練</span></span></button>
+        <button type="button" class="mode-pill app-nav-item" data-mode="log" title="開發症狀紀錄"><span class="app-nav-code">04</span><span class="app-nav-text"><span class="app-nav-label">症狀紀錄</span><span class="app-nav-sub">聽自己</span></span></button>
+      </nav>
+      <div class="app-sidebar-recent">
+        <button type="button" class="app-sidebar-new" id="sidebarNew" title="新增逐字稿"><span class="app-sidebar-new-icon" aria-hidden="true">＋</span><span class="app-sidebar-new-text">新增逐字稿</span></button>
+        <label class="app-sidebar-search">
+          <span class="app-sidebar-search-icon" aria-hidden="true">⌕</span>
+          <input type="search" id="sidebarSearch" placeholder="搜尋最近項目" autocomplete="off">
+        </label>
+        <p class="app-sidebar-section">最近項目</p>
+        <p class="hint app-sidebar-empty" id="sidebarRecentEmpty" hidden>尚無紀錄。上傳或轉錄後會出現在這裡。</p>
+        <ul class="app-sidebar-list" id="sidebarRecentList"></ul>
+      </div>
       <div class="app-sidebar-foot">
         <button type="button" class="app-sidebar-clear" id="sidebarClear">清空紀錄</button>
+        <span class="app-sidebar-ver mono">VER 11.9 · LOCAL</span>
       </div>
     </aside>
     <div class="app-main">
-  <header class="hero">
-    <div class="hero-meta">
-      <span class="pill red">●●● CALL COACH</span>
-      <span class="pill">顧問式銷售 6 步驟</span>
-      <span class="pill">理解需求 → 判斷適配 → 幫助決策</span>
+  <header class="ws-head">
+    <div class="ws-head-row">
+      <div class="ws-head-text">
+        <p class="ws-kicker"><span class="ws-kicker-code" id="wsCode">CODE_001</span><span class="ws-kicker-sep">//</span><span>CALL COACH</span></p>
+        <h1 class="ws-title" id="wsTitle">電訪逐字稿</h1>
+        <p class="tagline" id="heroTagline">電訪逐字稿分析工具——把每一通電話變成可複盤的專業判斷。<br>
+        <span>VIBE SRT / VTT / TXT ・ 規則分析全程本地 ・ 僅 AI 功能會傳送至 Google</span></p>
+      </div>
+      <div class="hero-meta ws-head-meta">
+        <span class="pill">顧問式銷售 6 步驟</span>
+        <span class="pill">理解需求 → 判斷適配 → 幫助決策</span>
+      </div>
     </div>
     <div id="coachHeroBar" class="coach-hero-wrap" hidden></div>
-    <nav class="mode-bar" id="modeBar" hidden>
-      <button type="button" class="mode-pill" data-mode="dev">開發 · 電訪</button>
-      <button type="button" class="mode-pill" data-mode="demo">DEMO · 轉錄</button>
-      <button type="button" class="mode-pill" data-mode="drill">開發 · 陪練</button>
-      <button type="button" class="mode-pill" data-mode="log">開發 · 症狀</button>
-    </nav>
-    <h1 class="display" data-text="CALL&#10;COACH">CALL<br><span class="ghost">COACH</span></h1>
-    <p class="tagline" id="heroTagline">電訪逐字稿分析工具——把每一通電話變成可複盤的專業判斷。<br>
-    <span>VIBE SRT / VTT / TXT ・ 規則分析全程本地 ・ 僅 AI 功能會傳送至 Google</span></p>
   </header>
+  <nav class="ws-toc" id="wsToc" aria-label="本頁章節" hidden></nav>
 
   <section class="sec" id="devSection" hidden>
     <div class="sec-head"><span class="num">01</span><h2>上傳逐字稿或錄音</h2><span class="tag">錄音檔 / Vibe / SRT・VTT・TXT</span></div>
