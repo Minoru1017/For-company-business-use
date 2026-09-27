@@ -133,3 +133,57 @@ export function formatSavedAt(ts) {
   const pad = (n) => String(n).padStart(2, '0');
   return `${pad(d.getMonth() + 1)}/${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
 }
+
+/** Vibe 式側欄：今天／昨天／N 日前／月日 */
+export function formatRelativeSavedAt(ts) {
+  const t = Number(ts) || 0;
+  if (!t) return '';
+  const now = Date.now();
+  const startToday = new Date();
+  startToday.setHours(0, 0, 0, 0);
+  const startSaved = new Date(t);
+  startSaved.setHours(0, 0, 0, 0);
+  const dayMs = 86400000;
+  const days = Math.round((startToday - startSaved) / dayMs);
+  if (days <= 0) return '今天';
+  if (days === 1) return '昨天';
+  if (days < 7) return `${days} 日前`;
+  return `${startSaved.getMonth() + 1}月${startSaved.getDate()}日`;
+}
+
+const MODE_LABEL = { dev: '電訪', demo: 'DEMO', drill: '陪練', log: '症狀' };
+
+/** 轉錄或載入逐字稿時先記一筆；已有分析摘要的項目不覆寫 summary／reportText。 */
+export function upsertRecentTranscript({ source, segs, mode = '' }) {
+  const list = read();
+  const now = Date.now();
+  const src = source || 'transcript';
+  const idx = list.findIndex((h) => h.source === src);
+  const prev = idx >= 0 ? list[idx] : null;
+  const entry = {
+    id: prev?.id || `${now.toString(36)}-${Math.random().toString(36).slice(2, 7)}`,
+    savedAt: now,
+    source: src,
+    mode: mode || prev?.mode || '',
+    segs: minimalSegs(segs),
+    summary: prev?.summary ?? null,
+    reportText: prev?.reportText || '',
+  };
+  if (idx >= 0) list.splice(idx, 1);
+  list.unshift(entry);
+  write(list.slice(0, HISTORY_LIMIT));
+  return entry;
+}
+
+export function historyItemSubtitle(h) {
+  if (!h) return '';
+  const rel = formatRelativeSavedAt(h.savedAt);
+  const mode = MODE_LABEL[h.mode] || '';
+  const s = h.summary;
+  if (s?.totalDur) {
+    const min = Math.round(s.totalDur / 60);
+    const analyzed = s.steps != null ? ` · 已分析` : '';
+    return [rel, mode, min ? `${min} 分${analyzed}` : ''].filter(Boolean).join(' · ');
+  }
+  return [rel, mode, '逐字稿'].filter(Boolean).join(' · ');
+}

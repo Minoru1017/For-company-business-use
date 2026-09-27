@@ -93,4 +93,22 @@ describe('history', () => {
   it('formatSavedAt is compact', () => {
     expect(hist.formatSavedAt(new Date(2026, 8, 10, 9, 5).getTime())).toBe('09/10 09:05');
   });
+
+  it('formatRelativeSavedAt uses day buckets', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date(2026, 8, 17, 12, 0).getTime());
+    expect(hist.formatRelativeSavedAt(Date.now())).toBe('今天');
+    expect(hist.formatRelativeSavedAt(Date.now() - 86400000)).toBe('昨天');
+    expect(hist.formatRelativeSavedAt(Date.now() - 3 * 86400000)).toBe('3 日前');
+    vi.useRealTimers();
+  });
+
+  it('upsertRecentTranscript keeps summary when updating segs only', () => {
+    hist.saveHistory({ source: 'a.srt', segs, result, reportText: 'R1' });
+    const updated = hist.upsertRecentTranscript({ source: 'a.srt', segs: [...segs, { start: 3, end: 4, text: 'x', spk: 'S' }], mode: 'dev' });
+    expect(updated.summary?.steps).toBe(1);
+    expect(updated.reportText).toBe('R1');
+    expect(updated.segs.length).toBe(3);
+    expect(hist.listHistory().length).toBe(1);
+  });
 });

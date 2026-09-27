@@ -23,7 +23,16 @@ import {
   reportTextToMarkdown,
   segsToSrt,
 } from './export.js';
-import { clearHistory, deleteHistory, formatSavedAt, getHistory, listHistory, saveHistory, updateHistoryReport } from './history.js';
+import {
+  clearHistory,
+  deleteHistory,
+  getHistory,
+  listHistory,
+  saveHistory,
+  updateHistoryReport,
+  upsertRecentTranscript,
+} from './history.js';
+import { initRecentSidebar } from './recent-sidebar.js';
 import {
   bridgeSupports,
   checkLocalBridge,
@@ -35,7 +44,7 @@ import {
 } from './local-transcribe.js';
 import { initDemoPlayer, refreshDemoPlayerFromBridge, seekDemoTo, updateDemoPlayerSegments } from './demo-player.js';
 import { mountDevAudioUpload } from './dev-audio-upload.js';
-import { initModeChooser, resolveMode } from './mode.js';
+import { goToModeHome, initModeChooser, resolveMode } from './mode.js';
 import { initSymptomLog } from './symptom-log.js';
 import { bindLabelCollapseHandlers, createLabelController } from './labels.js';
 import { applyBuiltinSpeakerLabels, enrichSegments, parse, parseVibeJson } from './parser.js';
@@ -69,6 +78,7 @@ let sourceName = 'transcript.srt';
 let currentHistoryId = null;
 let devAudio = null;
 let symptomLog = null;
+let recentSidebar = null;
 
 const keyStorage = {
   get remember() {
@@ -176,6 +186,12 @@ function finishLoad(filename, src) {
   showToast(`已載入 ${segs.length} 句逐字稿`);
   $('labelCard').hidden = false;
   $('result').hidden = true;
+  try {
+    currentHistoryId = upsertRecentTranscript({ source: sourceName, segs, mode: resolveMode() }).id;
+  } catch {
+    /* storage unavailable */
+  }
+  recentSidebar?.refresh();
   return true;
 }
 
@@ -184,9 +200,31 @@ function loadFromHistory(id) {
   const item = getHistory(id);
   if (!item) return showToast('找不到這筆紀錄（可能已被清除）');
   segs = item.segs.map((s) => ({ ...s }));
-  if (!finishLoad(item.source, '最近分析')) return;
+  if (!finishLoad(item.source, '最近項目')) return;
   currentHistoryId = item.id;
-  $('analyze').click();
+  recentSidebar?.refresh();
+  if (item.summary) $('analyze').click();
+  else $('labelCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+}
+
+function scrollToNewUpload() {
+  const mode = resolveMode();
+  if (mode === 'demo') {
+    $('demoSection')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    document.querySelector('#localBridgePanel input[type="file"]')?.click();
+    return;
+  }
+  if (mode === 'log') {
+    $('logSection')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    document.getElementById('slImport')?.click();
+    return;
+  }
+  if (mode === 'drill') {
+    $('drillSection')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    return;
+  }
+  $('devSection')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  $('file')?.click();
 }
 
 function loadFile(f) {
@@ -469,70 +507,26 @@ function bindExports() {
 // ---------- 最近分析 ----------
 
 function renderHistory() {
-  const sec = $('historySection');
-  const list = $('historyList');
-  if (!sec || !list) return;
-  const items = listHistory();
-  sec.hidden = !items.length;
-  const count = $('historyCount');
-  if (count) count.textContent = `${items.length} 筆`;
-  list.innerHTML = items
-    .map((h) => {
-      const s = h.summary || {};
-      const meta = [
-        `${fmt(s.totalDur || 0)}`,
-        `客戶 ${Math.round((s.custRatio || 0) * 100)}%`,
-        `六步驟 ${s.steps ?? 0}/6`,
-        `L${s.deepest ?? 0}`,
-        s.dominant ? `「${s.dominant}」` : '',
-      ]
-        .filter(Boolean)
-        .join('・');
-      return `<li class="history-item ${h.id === currentHistoryId ? 'current' : ''}" data-id="${escapeHTML(h.id)}">
-        <div class="history-main">
-          <span class="history-src">${escapeHTML(h.source || 'transcript')}</span>
-          <span class="history-meta">${escapeHTML(meta)}</span>
-        </div>
-        <span class="history-time">${escapeHTML(formatSavedAt(h.savedAt))}</span>
-        <span class="history-actions">
-          <button type="button" class="btn" data-act="open">回看</button>
-          <button type="button" class="btn" data-act="copy">複製報告</button>
-          <button type="button" class="btn history-del" data-act="del" aria-label="刪除">✕</button>
-        </span>
-      </li>`;
-    })
-    .join('');
-  list.querySelectorAll('[data-act]').forEach((btn) => {
-    btn.onclick = async (e) => {
-      e.stopPropagation();
-      const id = btn.closest('.history-item')?.dataset.id;
-      if (!id) return;
-      if (btn.dataset.act === 'open') loadFromHistory(id);
-      if (btn.dataset.act === 'del') {
-        deleteHistory(id);
-        if (currentHistoryId === id) currentHistoryId = null;
-        renderHistory();
-        showToast('已刪除這筆紀錄');
-      }
-      if (btn.dataset.act === 'copy') {
-        const item = getHistory(id);
-        const ok = item?.reportText ? await copyText(item.reportText) : false;
-        showToast(ok ? '這筆報告已複製' : '這筆紀錄沒有報告內容');
-      }
-    };
-  });
+  recentSidebar?.refresh();
 }
 
 function bindHistory() {
+  recentSidebar = initRecentSidebar({
+    onOpen: (id) => loadFromHistory(id),
+    onGoHome: () => goToModeHome(),
+    onNewUpload: () => scrollToNewUpload(),
+    getCurrentId: () => currentHistoryId,
+    onAfterDelete: (id) => {
+      if (id && currentHistoryId === id) currentHistoryId = null;
+    },
+    showToast,
+  });
   $('historyClear')?.addEventListener('click', () => {
     if (!listHistory().length) return;
-    if (!confirm('清空所有最近分析紀錄？（只影響這台電腦的瀏覽器）')) return;
     clearHistory();
     currentHistoryId = null;
     renderHistory();
-    showToast('已清空最近分析');
   });
-  renderHistory();
 }
 
 function loadModelPreference() {
