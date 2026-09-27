@@ -916,6 +916,32 @@ button.primary:hover { background:linear-gradient(180deg,#ffffff,#e6e0d1);
 .dev-notes-dialog h2 { font-family:var(--disp); font-size:1.1rem; margin:0 0 8px; }
 .dev-notes-agent { display:block; margin:12px 0 8px; font-size:.85rem; }
 .dev-notes-agent input { width:100%; margin-top:6px; }
+.day-type-toggle { margin:0 0 16px; padding:14px 16px; text-align:center; }
+.day-type-label { font-family:var(--mono); font-size:.72rem; letter-spacing:.12em; margin:0 0 10px; color:var(--muted); }
+.day-type-btns { display:flex; gap:10px; justify-content:center; flex-wrap:wrap; }
+.day-type-btn { font-family:var(--disp); padding:10px 22px; border-radius:999px; border:1px solid var(--line,#444); background:transparent; cursor:pointer; }
+.day-type-btn.active { border-color:var(--accent); background:rgba(255,120,80,.12); }
+.day-type-hint { margin:10px 0 0; font-size:.82rem; }
+.learning-off-wrap { margin:0 0 18px; text-align:left; }
+.learning-off { padding:16px 18px; }
+.learning-off-title { font-family:var(--disp); margin:0 0 10px; }
+.learning-off-warn { color:var(--warn); font-size:.88rem; margin:0 0 12px; }
+.learning-off-ok { color:var(--ok,#6bc06b); font-size:.88rem; margin:0 0 12px; }
+.learning-form label { display:block; margin:10px 0; font-size:.85rem; }
+.learning-form .field { width:100%; margin-top:6px; }
+.learning-stats { margin:14px 0 8px; }
+.learning-list { list-style:none; padding:0; margin:8px 0 0; }
+.learning-item { border-top:1px solid var(--line,#333); padding:10px 0; font-size:.82rem; }
+.learning-item-head { display:flex; flex-wrap:wrap; gap:8px; align-items:center; margin-bottom:6px; }
+.learning-item-body { color:var(--muted); margin:4px 0; }
+.learning-item-body .tag { font-size:.7rem; margin-right:6px; color:var(--accent); }
+.mode-cards.day-type-gated { opacity:.45; pointer-events:none; filter:grayscale(.2); }
+.mode-cards.day-type-gated::after {
+  content:'請先完成上方「非上班日」學習紀錄，或改選上班日';
+  display:block; text-align:center; font-size:.85rem; color:var(--warn);
+  margin-top:12px; pointer-events:none;
+}
+
 .coach-home { margin:0 0 20px; padding:16px 18px; text-align:left; }
 .coach-home-head { font-family:var(--disp); font-size:1.05rem; margin:0 0 8px; }
 .coach-home-sub { margin:0 0 12px; }
