@@ -66,16 +66,21 @@ export function applyMode(mode) {
   document.title = TITLES[mode] || TITLES.dev;
 }
 
-export function initModeChooser({ onModeChange } = {}) {
+export function initModeChooser({ onModeChange, beforeModeSelect } = {}) {
   const chooser = document.getElementById('modeChooser');
   if (!chooser) return;
 
+  const go = (mode) => {
+    if (beforeModeSelect && beforeModeSelect(mode) === false) return;
+    setMode(mode, { onChange: onModeChange });
+  };
+
   chooser.querySelectorAll('[data-mode]').forEach((btn) => {
-    btn.addEventListener('click', () => setMode(btn.dataset.mode, { onChange: onModeChange }));
+    btn.addEventListener('click', () => go(btn.dataset.mode));
   });
 
   document.getElementById('modeBar')?.querySelectorAll('[data-mode]').forEach((btn) => {
-    btn.addEventListener('click', () => setMode(btn.dataset.mode, { onChange: onModeChange }));
+    btn.addEventListener('click', () => go(btn.dataset.mode));
   });
 
   window.addEventListener('hashchange', () => {
