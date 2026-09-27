@@ -16,12 +16,19 @@ export function normalizeMarkers(markers, durationSec = Infinity) {
     .sort((a, b) => a.sec - b.sec || a.createdAt - b.createdAt);
 }
 
+const ICON_PLAY =
+  '<svg class="ctp-icon" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M8 5.14v14.72a1 1 0 0 0 1.5.86l11.04-7.36a1 1 0 0 0 0-1.72L9.5 4.28a1 1 0 0 0-1.5.86z"/></svg>';
+const ICON_PAUSE =
+  '<svg class="ctp-icon" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M6 5h4v14H6V5zm8 0h4v14h-4V5z"/></svg>';
+const ICON_MARK =
+  '<svg class="ctp-icon ctp-icon-sm" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M12 2a7 7 0 0 0-7 7c0 5.25 7 13 7 13s7-7.75 7-13a7 7 0 0 0-7-7zm0 9.5a2.5 2.5 0 1 1 0-5 2.5 2.5 0 0 1 0 5z"/></svg>';
+
 /**
  * @param {HTMLElement} container
- * @param {{ src: string, markers?: Array, onChange?: (markers)=>void }} opts
+ * @param {{ src: string, title?: string, subtitle?: string, markers?: Array, onChange?: (markers)=>void }} opts
  */
 export function mountTimelinePlayer(container, opts) {
-  const { src, onChange } = opts;
+  const { src, onChange, title = '錄音', subtitle = '開發複盤 · M 標記話點' } = opts;
   let markers = normalizeMarkers(opts.markers);
   let selectedId = markers.length ? markers[markers.length - 1].id : null;
   let duration = 0;
@@ -34,17 +41,33 @@ export function mountTimelinePlayer(container, opts) {
   root.className = 'ctp';
   root.innerHTML = `
     <audio class="ctp-audio" preload="metadata" src="${escapeHTML(src)}"></audio>
-    <div class="ctp-shell">
-      <button type="button" class="ctp-play" aria-label="播放或暫停">▶</button>
-      <span class="ctp-time"><span class="ctp-cur">0:00</span> / <span class="ctp-dur">0:00</span></span>
-      <div class="ctp-track" role="slider" aria-label="播放位置">
-        <div class="ctp-fill"></div>
-        <div class="ctp-markers"></div>
-        <div class="ctp-head"></div>
+    <div class="ctp-bar">
+      <div class="ctp-now">
+        <span class="ctp-cover" aria-hidden="true"></span>
+        <div class="ctp-now-text">
+          <span class="ctp-now-title">${escapeHTML(title)}</span>
+          <span class="ctp-now-sub">${escapeHTML(subtitle)}</span>
+        </div>
       </div>
-      <button type="button" class="ctp-m-btn" title="在目前位置標記（快捷鍵 M）">M 標記</button>
+      <div class="ctp-main">
+        <div class="ctp-transport">
+          <button type="button" class="ctp-play" aria-label="播放或暫停">${ICON_PLAY}</button>
+        </div>
+        <div class="ctp-timeline">
+          <span class="ctp-cur">0:00</span>
+          <div class="ctp-track" role="slider" aria-label="播放位置">
+            <div class="ctp-fill"></div>
+            <div class="ctp-markers"></div>
+            <div class="ctp-head"></div>
+          </div>
+          <span class="ctp-dur">0:00</span>
+        </div>
+      </div>
+      <div class="ctp-tools">
+        <button type="button" class="ctp-m-btn" title="在目前位置標記（快捷鍵 M）">${ICON_MARK}<span class="ctp-m-label">M</span></button>
+      </div>
     </div>
-    <p class="hint ctp-hint">聚焦此列後，播放中按鍵盤 <kbd>M</kbd> 可標記關鍵話點；在下方寫這一句的複盤筆記。</p>
+    <p class="hint ctp-hint">播放中按 <kbd>M</kbd> 或右側標記鈕，在下方寫該句複盤筆記。</p>
     <ul class="ctp-notes"></ul>
   `;
   container.appendChild(root);
@@ -121,17 +144,18 @@ export function mountTimelinePlayer(container, opts) {
     addMarkerAt(audio.currentTime || 0);
   }
 
+  function setTransportPlaying(playing) {
+    playBtn.classList.toggle('playing', playing);
+    playBtn.innerHTML = playing ? ICON_PAUSE : ICON_PLAY;
+  }
+
   playBtn.addEventListener('click', () => {
     if (audio.paused) audio.play();
     else audio.pause();
   });
 
-  audio.addEventListener('play', () => {
-    playBtn.textContent = '▮▮';
-  });
-  audio.addEventListener('pause', () => {
-    playBtn.textContent = '▶';
-  });
+  audio.addEventListener('play', () => setTransportPlaying(true));
+  audio.addEventListener('pause', () => setTransportPlaying(false));
   audio.addEventListener('timeupdate', updateProgress);
   audio.addEventListener('loadedmetadata', () => {
     duration = audio.duration || 0;

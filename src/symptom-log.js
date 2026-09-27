@@ -804,6 +804,10 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
     const call = state.calls.find((x) => x.id === id);
     state.playerCtrl = mountTimelinePlayer(slot, {
       src: url,
+      title: call?.name || '錄音',
+      subtitle: [call?.startTime, call?.durationSec ? formatDuration(call.durationSec) : '']
+        .filter(Boolean)
+        .join(' · ') || '開發複盤',
       markers: call?.devMarkers,
       onChange: async (markers) => {
         const c = state.calls.find((x) => x.id === id);
