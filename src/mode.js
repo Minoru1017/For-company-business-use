@@ -49,6 +49,7 @@ export function applyMode(mode) {
   const active = MODES.has(mode);
   chooser.hidden = active;
   main.hidden = !active;
+  document.body.classList.toggle('in-workspace', active);
 
   if (devSection) devSection.hidden = mode !== 'dev';
   if (demoSection) demoSection.hidden = mode !== 'demo';
@@ -64,6 +65,16 @@ export function applyMode(mode) {
 
   if (tagline) tagline.innerHTML = TAGLINES[mode] || TAGLINES.dev;
   document.title = TITLES[mode] || TITLES.dev;
+}
+
+export function goToModeHome() {
+  try {
+    sessionStorage.removeItem(MODE_KEY);
+  } catch {
+    /* ignore */
+  }
+  location.hash = '';
+  applyMode('');
 }
 
 export function initModeChooser({ onModeChange, beforeModeSelect } = {}) {

@@ -52,6 +52,25 @@
 </section>
 
 <div class="wrap" id="mainApp" hidden>
+  <div class="app-shell">
+    <aside class="app-sidebar" id="appSidebar" aria-label="最近項目">
+      <div class="app-sidebar-head">
+        <button type="button" class="app-sidebar-brand" id="sidebarHome">CALL COACH</button>
+        <button type="button" class="app-sidebar-toggle" id="sidebarCollapse" aria-label="收合側欄">‹</button>
+      </div>
+      <button type="button" class="app-sidebar-new" id="sidebarNew">＋ 新增逐字稿</button>
+      <label class="app-sidebar-search">
+        <span class="app-sidebar-search-icon" aria-hidden="true">⌕</span>
+        <input type="search" id="sidebarSearch" placeholder="搜尋最近項目" autocomplete="off">
+      </label>
+      <p class="app-sidebar-section">最近項目</p>
+      <p class="hint app-sidebar-empty" id="sidebarRecentEmpty" hidden>尚無紀錄。上傳或轉錄後會出現在這裡。</p>
+      <ul class="app-sidebar-list" id="sidebarRecentList"></ul>
+      <div class="app-sidebar-foot">
+        <button type="button" class="app-sidebar-clear" id="sidebarClear">清空紀錄</button>
+      </div>
+    </aside>
+    <div class="app-main">
   <header class="hero">
     <div class="hero-meta">
       <span class="pill red">●●● CALL COACH</span>
@@ -109,12 +128,9 @@
     <div id="symptomLogPanel"></div>
   </section>
 
-  <section class="sec history-sec" id="historySection" hidden>
-    <details id="historyDetails">
-      <summary class="history-summary"><span class="num">↻</span><h2>最近分析</h2><span class="tag" id="historyCount">0 筆</span><span class="hint history-hint">存在這台電腦的瀏覽器，一鍵回看，不用再找檔案</span></summary>
-      <ul class="history-list" id="historyList"></ul>
-      <div class="btns" style="margin-top:8px"><button id="historyClear" type="button">清空紀錄</button></div>
-    </details>
+  <section class="sec history-sec" id="historySection" hidden aria-hidden="true">
+    <ul class="history-list" id="historyList"></ul>
+    <button id="historyClear" type="button" hidden></button>
   </section>
 
   <section class="sec" id="labelCard" hidden>
@@ -297,6 +313,8 @@
       <span class="mono">CALL COACH — CONSULTATIVE SALES ANALYZER</span>
       <div class="barcode"></div>
       <span class="mono">VITE BUILD / VER 11.9.5 ・ FILE_01 //</span>
+    </div>
+  </div>
     </div>
   </div>
 </div>
