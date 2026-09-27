@@ -4,6 +4,8 @@
  *   → 點檔名直接播放、全選 → 批次分析（先轉錄再跑規則分析）→ 共同病症 → AI 診斷 → 改善筆記。
  * 錄音與逐字稿都存在這台電腦的 IndexedDB；只有轉錄／AI 診斷會把資料送到你選的引擎。
  */
+import { renderMonthPaceHtml } from './coach-philosophy.js';
+import { isAiAnalysisUnlocked, summarizeDayJournalForPrompt, unlockStatusMessage } from './reflection-journal.js';
 import { runAnalysis } from './analyze.js';
 import { AUDIO_ACCEPT, describeSize, transcribeAudioWithGemini, validateAudioFile, guessAudioMime } from './audio-transcribe.js';
 import { loadWorkerSettings, transcribeViaWorker } from './browser-worker-transcribe.js';
@@ -163,6 +165,7 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
           </div>
           <div class="slog-weekdays">${WEEKDAYS.map((w) => `<span>${w}</span>`).join('')}</div>
           <div class="slog-grid" id="slGrid"></div>
+          <div id="slMonthPace"></div>
           <p class="hint slog-legend"><span class="slog-dot calls"></span>有錄音 <span class="slog-dot analyzed"></span>已分析 <span class="slog-dot note"></span>有筆記 <span class="slog-dot self"></span>自評病症 ・ <span class="slog-swatch good"></span>同意時間 ≥ 2 <span class="slog-swatch zero"></span>有 &gt;N 分通但同意 0 ・ 邀約率＝同意時間÷&gt;N 分通 ・ 點日期進入當天</p>
           <div class="hint" id="slStorage"></div>
           <div class="bridge-upload-status err hidden" id="slDbError"></div>
@@ -299,6 +302,7 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
               <input type="checkbox" id="slAiConsent">
               我同意把<strong>當天的彙總數字、症狀次數與最多 3 句原話</strong>（不含整份逐字稿、不含錄音）送到 Google Gemini 做診斷——每次都需重新勾選
             </label>
+            <p class="hint" id="slDiagnoseHint">AI 診斷是第二意見：請先在「開發 · 電訪」完成今日三通自寫複盤，並寫好當天改善筆記。</p>
             <div class="bridge-actions">
               <button type="button" class="btn primary" id="slDiagnose" disabled>AI 診斷共同病症</button>
             </div>
@@ -377,6 +381,15 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
       state.monthSummary = {};
     }
     monthLabel.textContent = `${state.year} 年 ${state.month} 月`;
+    const paceEl = q('#slMonthPace');
+    if (paceEl) {
+      const now = new Date();
+      const ref =
+        state.year === now.getFullYear() && state.month === now.getMonth() + 1
+          ? now
+          : new Date(state.year, state.month - 1, 15);
+      paceEl.innerHTML = renderMonthPaceHtml(ref);
+    }
     const start = startKey(state.settings);
     const prevBtn = q('.slog-nav[data-nav="-1"]');
     if (prevBtn) prevBtn.disabled = !!start && `${state.year}-${String(state.month).padStart(2, '0')}` <= start.slice(0, 7);
@@ -1177,6 +1190,7 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
     else if (!keyEl.value.trim()) reason = '請貼上 Gemini API Key';
     else if (keyProblem()) reason = keyProblem();
     else if (!aiConsentEl.checked) reason = '請勾選知情同意';
+    else if (!isAiAnalysisUnlocked()) reason = unlockStatusMessage().message;
     diagnoseBtn.disabled = !!reason;
     if (reason) diagnoseBtn.title = reason;
     else diagnoseBtn.removeAttribute('title');
@@ -1234,6 +1248,7 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
         recentNotes,
         selfSymptoms: selfMarkNames(state.selected),
         followThrough: state.sheet.model?.days?.[state.selected]?.status || '',
+        userJournal: summarizeDayJournalForPrompt(state.selected),
       });
       let model = getModel?.();
       const { parsed, usedTokens, modelUsed } = await callGeminiResilient({
@@ -1520,6 +1535,7 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
     if (state.activated) {
       refreshMonth();
       refreshWeek();
+      refreshDiagnoseButton();
       return;
     }
     state.activated = true;

@@ -52,6 +52,7 @@ import {
   unlockStatusMessage,
 } from './reflection-journal.js';
 import { initReflectionJournal } from './reflection-journal-ui.js';
+import { mountHomePhilosophy, updateHeroPhilosophyBar } from './coach-philosophy-ui.js';
 import { SAMPLE_TRANSCRIPT_NAME, SAMPLE_TRANSCRIPT_SRT } from './sample-transcript.js';
 import { autoGuess } from './speaker.js';
 import { animateStats, bindUI, renderAnalysisUI, showQuotaModal, showToast } from './ui.js';
@@ -805,14 +806,17 @@ function bindAI() {
 }
 
 function init() {
+  mountHomePhilosophy();
   // 首頁模式入口最先綁定，避免後續模組初始化失敗時四顆按鈕全失效
   initModeChooser({
     onModeChange: (mode) => {
+      updateHeroPhilosophyBar(mode);
       if (mode === 'demo') window.__refreshBridge?.();
       if (mode === 'log') symptomLog?.activate();
       refreshReflectionGateUI();
     },
   });
+  updateHeroPhilosophyBar(resolveMode());
 
   bindUI();
   bindUpload();

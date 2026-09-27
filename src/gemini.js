@@ -1,3 +1,5 @@
+import { AI_PHILOSOPHY_PREAMBLE } from './coach-philosophy.js';
+
 export const DEFAULT_MODEL = 'gemini-3.6-flash';
 export const FALLBACK_MODELS = ['gemini-3.6-flash', 'gemini-3.6-flash-lite', 'gemini-3.6-pro'];
 /** When primary model returns 503/429, try these in order (flash-lite often has spare capacity). */
@@ -56,7 +58,7 @@ export function extractSuggestedModel(message) {
   return m ? m[1] : null;
 }
 
-export const MANUAL_PROMPT = `你是電話業務教練，依據以下公司「顧問式銷售全流程」手冊，分析這通電訪逐字稿。核心理念：理解需求→判斷適配→幫助決策。我們賣的不是方案，而是「真正適合客戶的解決方案」。
+export const MANUAL_PROMPT = `${AI_PHILOSOPHY_PREAMBLE}你是電話業務教練，依據以下公司「顧問式銷售全流程」手冊，分析這通電訪逐字稿。核心理念：理解需求→判斷適配→幫助決策。我們賣的不是方案，而是「真正適合客戶的解決方案」。
 
 【兩大產品核心】1.企業AI落地培訓營:適合需要把AI用在實際工作、把想法變成可運用成果的人(系統化教學/實戰任務產出/團隊共學)。2.真人業界/創業者一對一諮詢:適合有方向但卡關、需要針對個人情況給業界經驗與策略建議的人(精準診斷/可行解法/快速修正方向)。
 【六步驟】(不是鐵軌是地圖,依客戶狀況彈性運用) 1連結Connect(建立安全感讓對方說真話,不是尬聊) 2挖掘Discovery(找到現況/目標/問題/動機/限制,開放式提問挖到本質,不是問滿5題) 3釐清Clarify(幫客戶看清本質與不改變的代價,現況成本vs改變價值,引導客戶自己說出來,不是製造恐懼) 4判斷Diagnose(需求×目標×條件×適配,結論必為A高度適合/B部分適合/C不適合,不是一定要賣) 5對接Recommend(把適合的方案價值對到他的問題,精準對接不介紹全部,講清楚為什麼適合,不是推銷商品) 6決策Decision(處理真實疑慮的真正原因,協助評估比較,給行動建議,不是逼單)。

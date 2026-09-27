@@ -148,7 +148,7 @@ function renderSetup() {
       <span class="hint">撥出後不會有任何提示，跟真的電話一樣。所有回饋在掛電話後才看。</span>
     </div>
   </div>
-    <div class="hint">通話中<b>看不到逐字稿</b>（像真電話），結束後才回放。客戶可能說聽不清、在忙、在開會或在國外。練三件事：<b>不慌</b>——限時內一定要開口；<b>不亂套話</b>；<b>不講不出話</b>。建議開啟客戶語音。結束後可一鍵送進完整分析。</div>`;
+    <div class="hint"><b>業績是做出來的</b>——陪練是「下水」：通話中<b>看不到逐字稿</b>，結束後才回放。練<b>不慌、不亂套、不卡住</b>；聽分享是輸入，這裡才是輸出。建議開啟客戶語音。</div>`;
 
   const root = panel();
   root.querySelectorAll('input[name="drillPersona"]').forEach((r) => {
