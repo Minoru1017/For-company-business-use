@@ -153,6 +153,10 @@ demo-workspace/
 
 需同意三個 pyannote 模型授權（community-1、diarization-3.1、segmentation-3.0）。
 
+### 說話者切句
+
+WhisperX 原始 SRT 是以 Whisper 的分段（常常 20～30 秒、含好幾句一來一往）為單位，整段只標「多數」說話者，客戶的回應容易被併進業務那句。助手在轉錄完成後會讀 WhisperX 的逐字說話者結果，**在說話者切換處重新切句**（單字跳動視為雜訊併回原說話者），再輸出同格式的 `[SPEAKER_NN]:` SRT；本機、分段平行與遠端主機三種路徑都適用。日誌會顯示「依逐字說話者重新切句：N 段 → M 句」。若 JSON 沒有說話者資訊（分軌失敗）則沿用原始 SRT。
+
 ## 疑難排解
 
 - **Smart App Control 已封鎖此應用程式的部分功能**（Windows 11）：SAC 只放行有數位簽章或信譽良好的程式；助手 exe、ffmpeg、WhisperX 未簽章會被擋。做法：① 改用「Azure 雲端轉錄」模式；② 請 IT 關閉 SAC（Windows 安全性 → 應用程式與瀏覽器控制 → Smart App Control 設定；**關閉後無法再開啟**）；③ 由公司提供程式碼簽章憑證，在 GitHub Secrets 設定 `CODESIGN_PFX_BASE64` / `CODESIGN_PFX_PASSWORD`，CI 會自動簽章 Setup.exe、助手與解除安裝程式。**哪種憑證有效、ServBay／自簽憑證的限制、如何申請與佈署**，見 [CODESIGN.md](CODESIGN.md)

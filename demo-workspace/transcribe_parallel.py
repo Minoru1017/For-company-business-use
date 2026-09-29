@@ -11,6 +11,7 @@ from pathlib import Path
 from typing import Callable
 
 from proc_utils import quiet_run
+from speaker_refine import refine_speaker_srt
 from srt_utils import merge_srt_parts
 
 # Late import avoids a cycle: demo_core imports transcribe_parallel for run_parallel_transcribe.
@@ -383,6 +384,7 @@ def run_parallel_transcribe(
             raise _Cancelled()
         if code != 0:
             raise RuntimeError(f"段 {idx + 1} 轉錄失敗（exit {code}）")
+        refine_speaker_srt(out_sub, chunk_wav.stem, part_log)
         srt = _find_srt(out_sub)
         if srt is None:
             raise RuntimeError(f"段 {idx + 1} 未產出 SRT（WhisperX 結束但沒有寫出檔案）")

@@ -36,6 +36,7 @@ from urllib.parse import parse_qs, urlparse
 
 import demo_core
 import security
+from speaker_refine import refine_speaker_srt
 
 ROOT = demo_core.ROOT
 WORKER_DIR = ROOT / "worker"
@@ -206,6 +207,7 @@ def whisperx_runner(job: WorkerJob, log: LogFn, hooks: demo_core.JobHooks, state
     log(f"[Worker] WhisperX {state.model} on {state.device} ({state.compute_type})")
     code = demo_core.run_command(demo_core.whisperx_cmd() + args, log=log, env=demo_core.cache_env(), hooks=hooks)
     if code == 0:
+        refine_speaker_srt(job.dir, job.audio.stem, log)
         srt = job.dir / f"{job.audio.stem}.srt"
         if not srt.is_file():
             candidates = sorted(job.dir.glob("*.srt"))
