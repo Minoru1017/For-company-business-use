@@ -333,7 +333,7 @@ const fmtNum = (v, unit = '') => (v == null ? '—' : `${Math.round(v * 10) / 10
  */
 export function buildDiagnosisPrompt(
   aggregate,
-  { funnel, date, recentNotes = [], selfSymptoms = [], followThrough = '', userJournal = '' } = {}
+  { funnel, date, recentNotes = [], selfSymptoms = [], followThrough = '', userJournal = '', directives = '' } = {}
 ) {
   const lines = [];
   lines.push(
@@ -369,6 +369,7 @@ export function buildDiagnosisPrompt(
     lines.push('他前幾天自己寫的改善動作（請判斷是否有做到、是否該換方向）：');
     recentNotes.forEach((n) => lines.push(`- ${n.date}：${n.action || n.free || ''}`));
   }
+  if (directives && directives.trim()) lines.push(directives.trim());
   lines.push(
     '請只輸出 JSON（繁體中文，台灣用語）：{"core_symptoms":[{"name":"病症名","why":"為什麼這是根因（引用上面的數字或原話）","evidence":"對應的數據或原話","tomorrow_action":"明天在電話裡具體怎麼做（一句可以照講的話）"}],"pattern":"用兩句話說他的整體模式","one_thing":"如果明天只能改一件事，改什麼"}。core_symptoms 最多 3 個，按影響排序。'
   );

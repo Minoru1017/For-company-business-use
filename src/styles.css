@@ -1377,11 +1377,110 @@ button.primary:hover { background:linear-gradient(180deg,#ffffff,#e6e0d1);
   .ctp-cover { width:40px; height:40px; flex-basis:40px; }
 }
 
+/* ---- 主管早會 · 語音紀錄 ---- */
+.mode-card.brief { background-color:var(--tab-card); color:var(--ink); }
+.mode-card.brief:hover { background-color:#d6d1c5; }
+/* 五張卡：寬螢幕排 3 + 2（第二排置中），避免 4 + 1 孤卡 */
+@media (min-width:1000px) {
+  .mode-cards { grid-template-columns:repeat(6,minmax(0,1fr)); }
+  .mode-card { grid-column:span 2; }
+  .mode-card:nth-child(4) { grid-column:2 / span 2; }
+  .mode-card:nth-child(5) { grid-column:4 / span 2; }
+  .mode-card:nth-child(n+4) { margin-top:8px; }
+}
+.brief .card { margin-bottom:14px; }
+.brief-h { display:flex; align-items:baseline; gap:10px; margin:0 0 6px; font-family:var(--disp); font-size:1.05rem; }
+.brief-lead { margin:0; }
+.brief-rec-head { display:flex; justify-content:space-between; align-items:flex-start; gap:var(--s3); flex-wrap:wrap; }
+.brief-status { flex:0 0 auto; font-family:var(--mono); font-size:.64rem; letter-spacing:.16em; text-transform:uppercase; color:var(--muted);
+  padding:4px 10px; border:1px solid var(--border); border-radius:999px; white-space:nowrap; }
+.brief-status.ok { color:var(--ok); border-color:var(--ok); }
+.brief-status.warn { color:var(--warn); border-color:var(--warn); }
+.brief-status.bad { color:var(--bad); border-color:var(--bad); }
+.brief-consent { margin:8px 0 12px; font-size:.74rem; }
+.brief-rec-controls { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
+.brief-rec-btn { display:inline-flex; align-items:center; gap:10px; padding:12px 20px; border-radius:999px; font-weight:700; letter-spacing:.06em;
+  border:1px solid var(--border); background:var(--panel2); color:var(--text); }
+.brief-rec-btn:hover { border-color:var(--accent); }
+.brief-rec-dot { width:12px; height:12px; border-radius:50%; background:var(--accent); box-shadow:0 0 0 0 rgba(255,95,69,.5); transition:transform .2s; }
+.brief-rec-btn.on { background:var(--accent); border-color:var(--accent); color:#fff; }
+.brief-rec-btn.on .brief-rec-dot { background:#fff; animation:briefPulse 1.4s ease-out infinite; }
+@keyframes briefPulse { 0% { box-shadow:0 0 0 0 rgba(255,255,255,.55); } 100% { box-shadow:0 0 0 12px rgba(255,255,255,0); } }
+.brief-timer { font-family:var(--mono); font-size:1.15rem; letter-spacing:.12em; color:var(--text); min-width:5ch; }
+.brief-title { flex:1 1 220px; min-width:180px; }
+.brief-live { display:flex; align-items:center; gap:8px; margin:12px 0 0; padding:8px 12px; border-left:3px solid var(--accent); background:rgba(255,95,69,.08); border-radius:0 6px 6px 0; }
+.brief-live-dot { width:8px; height:8px; border-radius:50%; background:var(--accent); animation:briefBlink 1s steps(2) infinite; }
+@keyframes briefBlink { to { opacity:.25; } }
+.brief-interim { color:var(--muted); font-size:.88rem; line-height:1.5; }
+.brief-lines { list-style:none; margin:12px 0 0; padding:0; max-height:320px; overflow:auto; border:1px solid var(--border); border-radius:8px; background:rgba(0,0,0,.14); }
+.brief-lines:empty { display:none; }
+.brief-lines li { display:grid; grid-template-columns:auto 1fr; gap:12px; padding:8px 12px; border-bottom:1px solid var(--border); font-size:.9rem; line-height:1.6; }
+.brief-lines li:last-child { border-bottom:none; }
+.brief-line-t { font-family:var(--mono); font-size:.68rem; letter-spacing:.08em; color:var(--muted); padding-top:4px; }
+.brief-unsupported { margin-top:10px; color:var(--warn); }
+.brief-text { width:100%; min-height:160px; resize:vertical; line-height:1.7; }
+.brief-actions { margin-top:12px; }
+.brief-extract-hint { flex:1 1 260px; }
+.brief-key-row { margin-top:10px; }
+.brief-live[hidden], .brief-key-row[hidden], .brief-theme[hidden], .brief .card[hidden] { display:none; }
+.brief-points-head { display:flex; flex-direction:column; gap:4px; margin-bottom:10px; }
+.brief-theme { margin:0 0 12px; padding:10px 14px; border-left:3px solid var(--tab-paper); background:rgba(0,0,0,.12); border-radius:0 6px 6px 0; font-size:.9rem; }
+.brief-point-list, .brief-dir-list, .brief-hist-list { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:8px; }
+.brief-point { display:grid; grid-template-columns:auto 1fr; gap:10px; padding:10px 12px; border:1px solid var(--border); border-radius:8px; background:rgba(0,0,0,.12); opacity:.55; transition:opacity .15s, border-color .15s; }
+.brief-point.on { opacity:1; border-color:rgba(255,255,255,.14); }
+.brief-point-check { display:flex; align-items:flex-start; padding-top:8px; }
+.brief-point-check input { width:18px; height:18px; accent-color:var(--accent); cursor:pointer; }
+.brief-point-body { display:flex; flex-direction:column; gap:6px; min-width:0; }
+.brief-point-row { display:grid; grid-template-columns:auto minmax(0,1fr) auto auto; gap:8px; align-items:center; }
+.brief-point-cat { width:auto; padding:6px 8px; font-size:.8rem; }
+.brief-point-text { min-width:0; font-weight:600; }
+.brief-point-action { font-size:.86rem; }
+.brief-point-src { font-family:var(--mono); font-size:.62rem; letter-spacing:.14em; color:var(--muted); text-transform:uppercase; }
+.brief-empty { padding:8px 0; }
+.brief-dir { display:grid; grid-template-columns:auto 1fr auto; gap:12px; align-items:start; padding:10px 12px; border:1px solid var(--border); border-radius:8px; }
+.brief-dir.archived { opacity:.45; }
+.brief-dir-cat, .coach-directive-cat { flex:0 0 auto; font-family:var(--mono); font-size:.62rem; letter-spacing:.14em; padding:3px 8px; border-radius:2px;
+  border:1px solid var(--tab-paper); color:var(--tab-paper); white-space:nowrap; margin-top:2px; }
+.brief-dir-body { display:flex; flex-direction:column; gap:3px; min-width:0; }
+.brief-dir-text { font-weight:600; line-height:1.5; }
+.brief-dir-act { font-size:.84rem; color:var(--text); opacity:.85; }
+.brief-dir-meta { font-family:var(--mono); font-size:.66rem; letter-spacing:.06em; color:var(--muted); }
+.brief-dir-actions, .brief-hist-actions { display:flex; gap:6px; flex-wrap:wrap; }
+.brief-hist { display:flex; justify-content:space-between; align-items:center; gap:12px; padding:10px 12px; border:1px solid var(--border); border-radius:8px; }
+.brief-hist.current { border-color:var(--tab-paper); }
+.brief-hist-main { display:flex; flex-direction:column; gap:3px; min-width:0; }
+.brief-hist-title { font-weight:600; }
+.brief-hist-meta { font-family:var(--mono); font-size:.66rem; letter-spacing:.06em; color:var(--muted); }
+.brief-hist-meta b { color:var(--ok); font-weight:600; }
+@media (max-width:700px) {
+  .brief-point-row { grid-template-columns:1fr auto; }
+  .brief-point-cat { grid-column:1 / -1; }
+  .brief-dir, .brief-hist { grid-template-columns:1fr; flex-direction:column; align-items:stretch; }
+}
+
+/* 專案方向（主管早會確認後）：首頁卡片與工作區頁首 */
+.coach-directives { margin:0 0 16px; padding:14px 18px; text-align:left; border:1px solid var(--border); border-left:3px solid var(--tab-paper); border-radius:6px 14px 6px 6px;
+  background:var(--panel); }
+.coach-directives-head { display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; margin:0 0 8px; }
+.coach-directives-kicker { font-family:var(--mono); font-size:.64rem; letter-spacing:.2em; text-transform:uppercase; color:var(--tab-paper); }
+.coach-directives-kicker::before { content:"● "; font-size:.5rem; vertical-align:middle; }
+.coach-directives-date, .coach-directives-src { font-family:var(--mono); font-size:.66rem; letter-spacing:.06em; color:var(--muted); }
+.coach-directives-list { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:6px; }
+.coach-directive { display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; font-size:.9rem; line-height:1.55; }
+.coach-directive-text { font-weight:600; }
+.coach-directive-act { flex:1 0 100%; padding-left:calc(10px + 4.2em); font-size:.8rem; color:var(--muted); }
+.coach-directive-act::before { content:"做法："; }
+.coach-directives.compact { margin:var(--s2) 0 0; padding:8px 12px; border-radius:4px; background:transparent; }
+.coach-directives.compact .coach-directives-head { margin-bottom:4px; }
+.coach-directives.compact .coach-directive { font-size:.8rem; gap:8px; }
+.coach-directives.compact .coach-directive-text { font-weight:500; }
+.mode-chooser .coach-directives { margin-bottom:20px; }
+
 /* ---- 列印／存成 PDF：只留報告本體，白底黑字 ---- */
 @media print {
   html, body { background:#fff !important; color:#111 !important; }
   body::before, body::after, .hero::after, .report-shell::before, .report-shell::after, .hero .display::before, .hero .display::after { display:none !important; }
-  .app-sidebar, .app-topbar, .app-scrim, .ws-toc, .ws-head, .mode-bar, #modeChooser, #devSection, #demoSection, #drillSection, #labelCard, #historySection,
+  .app-sidebar, .app-topbar, .app-scrim, .ws-toc, .ws-head, .mode-bar, #modeChooser, #devSection, #demoSection, #drillSection, #logSection, #briefSection, #labelCard, #historySection,
   #exportSection, .footer, #toast, #quotaModal, .rnav, .rpager, .rfoot, .ai-progress, .quota-box,
   #aiOut ~ .hint, .sample-actions { display:none !important; }
   #mainApp, #result { display:block !important; }

@@ -47,6 +47,8 @@ import { initDemoPlayer, refreshDemoPlayerFromBridge, seekDemoTo, updateDemoPlay
 import { mountDevAudioUpload } from './dev-audio-upload.js';
 import { goToModeHome, initModeChooser, resolveMode } from './mode.js';
 import { initSymptomLog } from './symptom-log.js';
+import { initMeetingNotes } from './meeting-notes-ui.js';
+import { appendDirectivesToPrompt } from './coach-directives.js';
 import { bindLabelCollapseHandlers, createLabelController } from './labels.js';
 import { applyBuiltinSpeakerLabels, enrichSegments, parse, parseVibeJson } from './parser.js';
 import { bumpUsage, checkQuotaBefore, getLimit, getUsage, quotaPercent, saveUsage } from './quota.js';
@@ -79,6 +81,7 @@ let sourceName = 'transcript.srt';
 let currentHistoryId = null;
 let devAudio = null;
 let symptomLog = null;
+let meetingNotes = null;
 let recentSidebar = null;
 
 const keyStorage = {
@@ -222,6 +225,11 @@ function scrollToNewUpload() {
   }
   if (mode === 'drill') {
     $('drillSection')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    return;
+  }
+  if (mode === 'brief') {
+    $('briefSection')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    document.getElementById('bfToggle')?.focus();
     return;
   }
   $('devSection')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -720,6 +728,8 @@ async function runAIAnalysis() {
   } else if (resolveMode() === 'dev') {
     showToast('此通尚未綁定今日複盤，AI 仍會分析但不會交叉對照');
   }
+  // 主管早會確認過的方向：讓 AI 的建議對齊、並點出與方向衝突之處
+  analysisPrompt = appendDirectivesToPrompt(analysisPrompt);
   let model = $('aiModel').value.trim() || DEFAULT_MODEL;
   if (isDeprecatedModel(model)) model = DEFAULT_MODEL;
   saveModelPreference(model);
@@ -821,6 +831,7 @@ function init() {
       updateHeroPhilosophyBar(mode);
       if (mode === 'demo') window.__refreshBridge?.();
       if (mode === 'log') symptomLog?.activate();
+      if (mode === 'brief') meetingNotes?.activate();
       refreshReflectionGateUI();
     },
   });
@@ -881,6 +892,7 @@ function init() {
     keyStorage.save(value);
     devAudio?.syncApiKey(value);
     symptomLog?.syncApiKey(value);
+    meetingNotes?.syncApiKey(value);
   };
   const getModel = () => {
     const m = $('aiModel').value.trim() || DEFAULT_MODEL;
@@ -926,6 +938,24 @@ function init() {
   });
   // 從網址直接進入 #log 時 initModeChooser 已先觸發 onModeChange，此時 symptomLog 尚未建立
   if (resolveMode() === 'log') symptomLog.activate();
+
+  // 主管早會：即時語音轉文字 → 重點 → 確認後套用為專案方向（首頁／頁首顯示，AI prompt 對齊）
+  try {
+    meetingNotes = initMeetingNotes($('meetingPanel'), {
+      getApiKey,
+      setApiKey,
+      getModel,
+      onGeminiUsed,
+      showToast,
+      onDirectivesChanged: () => {
+        mountHomePhilosophy();
+        updateHeroPhilosophyBar(resolveMode());
+      },
+    });
+    if (resolveMode() === 'brief') meetingNotes.activate();
+  } catch (e) {
+    console.error('meeting notes init failed', e);
+  }
 
   initDrill({
     // 陪練逐字稿已含說話者標籤，直接跑分析並跳到結果
