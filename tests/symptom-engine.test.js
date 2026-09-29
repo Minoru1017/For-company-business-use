@@ -234,19 +234,78 @@ describe('diagnosis prompt / parse', () => {
     expect(p2).toContain('破冰目的性太強、跟其他業務比較');
     expect(p2).toContain('沒做到但有即時調整');
   });
+  it('asks for reason and a better script only when invitations are zero', () => {
+    const agg = { total: 3, metrics: {}, symptoms: [] };
+    const zero = buildDiagnosisPrompt(agg, {
+      funnel: {
+        dialed: 30,
+        connected: 8,
+        shortMin: 3,
+        over: 4,
+        longMin: 8,
+        long: 2,
+        invites: 0,
+        connectRate: 8 / 30,
+        retentionRate: 0.5,
+        inviteRate: 0,
+      },
+    });
+    expect(zero).toContain('聊得下去卻沒有拿到明確時間');
+    expect(zero).toContain('可直接照講');
+    expect(zero).toContain('invite_zero_analysis');
+    expect(zero).toContain('只有進邀約為 0 時才輸出');
+
+    const positive = buildDiagnosisPrompt(agg, {
+      funnel: {
+        dialed: 30,
+        connected: 8,
+        shortMin: 3,
+        over: 4,
+        longMin: 8,
+        long: 2,
+        invites: 1,
+        inviteRate: 0.25,
+      },
+    });
+    expect(positive).not.toContain('聊得下去卻沒有拿到明確時間');
+    expect(positive).not.toContain('請回傳 invite_zero_analysis');
+  });
+  it('does not misdiagnose invitation wording when no call passed retention', () => {
+    const p = buildDiagnosisPrompt(
+      { total: 1, metrics: {}, symptoms: [] },
+      {
+        funnel: { dialed: 20, connected: 4, shortMin: 3, over: 0, longMin: 8, long: 0, invites: 0 },
+      }
+    );
+    expect(p).toContain('卡點是否其實在破冰／留客');
+    expect(p).toContain('不要硬寫成「邀約話術失敗」');
+  });
   it('parses fenced JSON and truncates to 3 symptoms', () => {
     const raw = '```json\n' + JSON.stringify({
       core_symptoms: [1, 2, 3, 4].map((i) => ({ name: `s${i}`, why: 'w', evidence: 'e', tomorrow_action: 'a' })),
       pattern: 'p',
       one_thing: 'o',
+      invite_zero_analysis: {
+        reason: '邀約句太模糊',
+        evidence: '4 通超過 3 分鐘但邀約為 0',
+        better_script: '如果這件事值得再聊，我們週三下午或週四上午找 20 分鐘，哪個比較方便？',
+        why_better: '提出具體下一步與二選一時間。',
+      },
     }) + '\n```';
     const d = parseDiagnosis(raw);
     expect(d.core_symptoms).toHaveLength(3);
     expect(d.core_symptoms[0].name).toBe('s1');
     expect(d.one_thing).toBe('o');
+    expect(d.invite_zero_analysis.reason).toBe('邀約句太模糊');
+    expect(d.invite_zero_analysis.better_script).toContain('週三下午');
   });
   it('salvages JSON wrapped in prose and rejects garbage', () => {
-    expect(parseDiagnosis('好的：{"core_symptoms":[],"pattern":"x","one_thing":"y"} 完')).toEqual({ core_symptoms: [], pattern: 'x', one_thing: 'y' });
+    expect(parseDiagnosis('好的：{"core_symptoms":[],"pattern":"x","one_thing":"y"} 完')).toEqual({
+      core_symptoms: [],
+      pattern: 'x',
+      one_thing: 'y',
+      invite_zero_analysis: null,
+    });
     expect(() => parseDiagnosis('not json')).toThrow();
   });
 });

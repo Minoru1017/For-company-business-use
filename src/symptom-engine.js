@@ -346,6 +346,16 @@ export function buildDiagnosisPrompt(
     lines.push(
       `漏斗：撥出 ${funnel.dialed}、接通 ${funnel.connected}（${fmtPct(funnel.connectRate)}）、超過 ${funnel.shortMin} 分 ${funnel.over}、留存率 ${fmtPct(funnel.retentionRate ?? funnel.overRate)}（>${funnel.shortMin} 分÷接通）、長 Call（≥${funnel.longMin} 分）${funnel.long}、進邀約（客戶同意時間）${funnel.invites}、邀約率 ${fmtPct(funnel.inviteRate)}（進邀約÷>${funnel.shortMin} 分通數）`
     );
+    if (Number(funnel.invites) === 0) {
+      lines.push(
+        funnel.over > 0
+          ? `今天進邀約是 0，但已有 ${funnel.over} 通超過 ${funnel.shortMin} 分，代表不是完全沒有對話機會。請額外判斷「為什麼聊得下去卻沒有拿到明確時間」：可能是困擾未具體、價值橋接不足、邀約時機太早／太晚、邀約句太模糊或沒有提出具體二選一時間；只能用上面的數字與原話下結論，不可猜客戶個性或名單品質。`
+          : `今天進邀約是 0，且沒有任何一通超過 ${funnel.shortMin} 分。請額外判斷卡點是否其實在破冰／留客、還沒走到適合邀約的階段；不要硬寫成「邀約話術失敗」。`
+      );
+      lines.push(
+        '請回傳 invite_zero_analysis：reason 要說最可能卡在哪個環節；evidence 引用一個數字或原話；better_script 給一句符合「先挖困擾→連結價值→提出具體下一步」且可直接照講的完整繁體中文話術，不施壓、不製造恐懼；why_better 說明這句比原本好在哪。'
+      );
+    }
   }
   const mt = aggregate?.metrics || {};
   lines.push(
@@ -371,7 +381,7 @@ export function buildDiagnosisPrompt(
   }
   if (directives && directives.trim()) lines.push(directives.trim());
   lines.push(
-    '請只輸出 JSON（繁體中文，台灣用語）：{"core_symptoms":[{"name":"病症名","why":"為什麼這是根因（引用上面的數字或原話）","evidence":"對應的數據或原話","tomorrow_action":"明天在電話裡具體怎麼做（一句可以照講的話）"}],"pattern":"用兩句話說他的整體模式","one_thing":"如果明天只能改一件事，改什麼"}。core_symptoms 最多 3 個，按影響排序。'
+    '請只輸出 JSON（繁體中文，台灣用語）：{"core_symptoms":[{"name":"病症名","why":"為什麼這是根因（引用上面的數字或原話）","evidence":"對應的數據或原話","tomorrow_action":"明天在電話裡具體怎麼做（一句可以照講的話）"}],"pattern":"用兩句話說他的整體模式","one_thing":"如果明天只能改一件事，改什麼","invite_zero_analysis":{"reason":"邀約數為 0 的最可能原因","evidence":"支持判斷的數字或原話","better_script":"一句可直接照講的完整邀約話術","why_better":"這樣說較好的原因"}}。core_symptoms 最多 3 個，按影響排序。只有進邀約為 0 時才輸出 invite_zero_analysis；否則不要輸出此欄位。'
   );
   return lines.join('\n');
 }
@@ -403,6 +413,16 @@ export function parseDiagnosis(raw) {
   if (!data || typeof data !== 'object') throw new Error('AI 回傳格式不是 JSON，請再試一次');
   const str = (v) => (v == null ? '' : String(v).trim());
   const core = Array.isArray(data.core_symptoms) ? data.core_symptoms : [];
+  const iz = data.invite_zero_analysis;
+  const inviteZero =
+    iz && typeof iz === 'object'
+      ? {
+          reason: str(iz.reason),
+          evidence: str(iz.evidence),
+          better_script: str(iz.better_script),
+          why_better: str(iz.why_better),
+        }
+      : null;
   return {
     core_symptoms: core
       .filter((c) => c && (c.name || c.why))
@@ -410,6 +430,8 @@ export function parseDiagnosis(raw) {
       .map((c) => ({ name: str(c.name), why: str(c.why), evidence: str(c.evidence), tomorrow_action: str(c.tomorrow_action) })),
     pattern: str(data.pattern),
     one_thing: str(data.one_thing),
+    invite_zero_analysis:
+      inviteZero && (inviteZero.reason || inviteZero.better_script) ? inviteZero : null,
   };
 }
 
