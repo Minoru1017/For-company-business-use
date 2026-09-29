@@ -1380,6 +1380,14 @@ button.primary:hover { background:linear-gradient(180deg,#ffffff,#e6e0d1);
 /* ---- 主管早會 · 語音紀錄 ---- */
 .mode-card.brief { background-color:var(--tab-card); color:var(--ink); }
 .mode-card.brief:hover { background-color:#d6d1c5; }
+/* 五張卡：寬螢幕排 3 + 2（第二排置中），避免 4 + 1 孤卡 */
+@media (min-width:1000px) {
+  .mode-cards { grid-template-columns:repeat(6,minmax(0,1fr)); }
+  .mode-card { grid-column:span 2; }
+  .mode-card:nth-child(4) { grid-column:2 / span 2; }
+  .mode-card:nth-child(5) { grid-column:4 / span 2; }
+  .mode-card:nth-child(n+4) { margin-top:8px; }
+}
 .brief .card { margin-bottom:14px; }
 .brief-h { display:flex; align-items:baseline; gap:10px; margin:0 0 6px; font-family:var(--disp); font-size:1.05rem; }
 .brief-lead { margin:0; }
@@ -1414,6 +1422,7 @@ button.primary:hover { background:linear-gradient(180deg,#ffffff,#e6e0d1);
 .brief-actions { margin-top:12px; }
 .brief-extract-hint { flex:1 1 260px; }
 .brief-key-row { margin-top:10px; }
+.brief-live[hidden], .brief-key-row[hidden], .brief-theme[hidden], .brief .card[hidden] { display:none; }
 .brief-points-head { display:flex; flex-direction:column; gap:4px; margin-bottom:10px; }
 .brief-theme { margin:0 0 12px; padding:10px 14px; border-left:3px solid var(--tab-paper); background:rgba(0,0,0,.12); border-radius:0 6px 6px 0; font-size:.9rem; }
 .brief-point-list, .brief-dir-list, .brief-hist-list { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:8px; }
@@ -1460,6 +1469,7 @@ button.primary:hover { background:linear-gradient(180deg,#ffffff,#e6e0d1);
 .coach-directive { display:flex; align-items:baseline; gap:10px; flex-wrap:wrap; font-size:.9rem; line-height:1.55; }
 .coach-directive-text { font-weight:600; }
 .coach-directive-act { flex:1 0 100%; padding-left:calc(10px + 4.2em); font-size:.8rem; color:var(--muted); }
+.coach-directive-act::before { content:"做法："; }
 .coach-directives.compact { margin:var(--s2) 0 0; padding:8px 12px; border-radius:4px; background:transparent; }
 .coach-directives.compact .coach-directives-head { margin-bottom:4px; }
 .coach-directives.compact .coach-directive { font-size:.8rem; gap:8px; }
