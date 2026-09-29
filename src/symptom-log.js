@@ -1330,6 +1330,21 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
           )
           .join('')}
       </ol>
+      ${
+        d.invite_zero_analysis
+          ? `<section class="slog-invite-zero" aria-label="邀約數為零分析">
+        <div class="slog-invite-zero-head"><span class="slog-invite-zero-kicker">邀約數 0</span><strong>為什麼邀不到人？</strong></div>
+        ${d.invite_zero_analysis.reason ? `<p class="slog-invite-zero-reason">${escapeHTML(d.invite_zero_analysis.reason)}</p>` : ''}
+        ${d.invite_zero_analysis.evidence ? `<p class="slog-invite-zero-evidence"><span>判斷依據</span>${escapeHTML(d.invite_zero_analysis.evidence)}</p>` : ''}
+        ${
+          d.invite_zero_analysis.better_script
+            ? `<div class="slog-invite-zero-script"><span>可以怎麼說較好</span><blockquote>${escapeHTML(d.invite_zero_analysis.better_script)}</blockquote>
+          ${d.invite_zero_analysis.why_better ? `<p>${escapeHTML(d.invite_zero_analysis.why_better)}</p>` : ''}</div>`
+            : ''
+        }
+      </section>`
+          : ''
+      }
       ${d.one_thing ? `<div class="slog-diag-one"><span>只改一件事</span>${escapeHTML(d.one_thing)} <button type="button" class="btn slog-mini" id="slUseOneThing">帶入筆記</button></div>` : ''}
     `;
     diagnosisEl.querySelector('#slUseOneThing')?.addEventListener('click', () => {
