@@ -8,9 +8,9 @@ import {
 } from '../src/coach-philosophy.js';
 
 describe('coach-philosophy', () => {
-  it('defines four-step cycle and four modes', () => {
+  it('defines four-step cycle and five modes', () => {
     expect(COACH_CYCLE).toHaveLength(4);
-    expect(Object.keys(MODE_ROLES).sort()).toEqual(['demo', 'dev', 'drill', 'log']);
+    expect(Object.keys(MODE_ROLES).sort()).toEqual(['brief', 'demo', 'dev', 'drill', 'log']);
   });
 
   it('month pace by day of month', () => {

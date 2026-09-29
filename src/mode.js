@@ -1,5 +1,5 @@
 const MODE_KEY = 'call_coach_mode';
-const MODES = new Set(['dev', 'demo', 'drill', 'log']);
+const MODES = new Set(['dev', 'demo', 'drill', 'log', 'brief']);
 
 import { MODE_ROLES, PHILOSOPHY } from './coach-philosophy.js';
 
@@ -8,6 +8,7 @@ const TAGLINES = {
   demo: `${MODE_ROLES.demo.title}。<br><span>${MODE_ROLES.demo.blurb} ・ MP4 本機轉錄</span>`,
   drill: `${MODE_ROLES.drill.title}。<br><span>${MODE_ROLES.drill.blurb} ・ 通話中不看逐字稿</span>`,
   log: `${MODE_ROLES.log.title}。<br><span>${MODE_ROLES.log.blurb} ・ wav 只存本機</span>`,
+  brief: `${MODE_ROLES.brief.title}。<br><span>${MODE_ROLES.brief.blurb} ・ 逐字稿與方向只存本機</span>`,
 };
 
 const TITLES = {
@@ -15,14 +16,16 @@ const TITLES = {
   demo: 'CALL COACH｜DEMO 轉錄與分析',
   drill: 'CALL COACH｜電訪開發陪練',
   log: 'CALL COACH｜開發症狀紀錄',
+  brief: 'CALL COACH｜主管早會語音紀錄',
 };
 
-/** 工作區頁首：模式短名與檔案碼（對應首頁四張頁籤卡） */
+/** 工作區頁首：模式短名與檔案碼（對應首頁五張頁籤卡） */
 export const WS_HEADINGS = {
   dev: { title: '電訪逐字稿', code: 'CODE_001' },
   demo: { title: 'DEMO 轉錄', code: 'CODE_002' },
   drill: { title: '臨場反應陪練', code: 'CODE_003' },
   log: { title: '開發症狀紀錄', code: 'CODE_004' },
+  brief: { title: '主管早會 · 語音紀錄', code: 'CODE_005' },
 };
 
 export function resolveMode() {
@@ -31,6 +34,7 @@ export function resolveMode() {
   if (hash === 'dev') return 'dev';
   if (hash === 'drill' || hash === 'practice') return 'drill';
   if (hash === 'log' || hash === 'symptom') return 'log';
+  if (hash === 'brief' || hash === 'meeting') return 'brief';
   const saved = sessionStorage.getItem(MODE_KEY) || '';
   return MODES.has(saved) ? saved : '';
 }
@@ -49,6 +53,7 @@ export function applyMode(mode) {
   const demoSection = document.getElementById('demoSection');
   const drillSection = document.getElementById('drillSection');
   const logSection = document.getElementById('logSection');
+  const briefSection = document.getElementById('briefSection');
   const modeBar = document.getElementById('modeBar');
   const tagline = document.getElementById('heroTagline');
   const wsTitle = document.getElementById('wsTitle');
@@ -73,6 +78,7 @@ export function applyMode(mode) {
   if (demoSection) demoSection.hidden = mode !== 'demo';
   if (drillSection) drillSection.hidden = mode !== 'drill';
   if (logSection) logSection.hidden = mode !== 'log';
+  if (briefSection) briefSection.hidden = mode !== 'brief';
 
   if (modeBar) {
     modeBar.hidden = !active;

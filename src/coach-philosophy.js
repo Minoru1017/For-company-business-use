@@ -37,6 +37,13 @@ export const MODE_ROLES = {
     blurb: '看錄影、轉逐字稿是輸入；要變強仍得回到自己打、自己講。',
     cta: '本機轉錄',
   },
+  brief: {
+    step: 'listen',
+    stepLabel: '聽指示',
+    title: '主管早會 = 聽指示、定方向',
+    blurb: '按錄音即時轉文字，萃取重點、你確認後套用成專案方向——AI 分析與頁首都會跟著對齊。',
+    cta: '開始錄音',
+  },
 };
 
 export const PHILOSOPHY = {
@@ -91,7 +98,7 @@ export function renderHomePhilosophyHtml() {
       <p class="coach-home-head">${PHILOSOPHY.headline}</p>
       <p class="hint coach-home-sub">${PHILOSOPHY.sub}</p>
       ${renderCycleHtml()}
-      <p class="hint coach-home-map">四種模式對應循環：<b>陪練＝做</b> · <b>症狀＝聽自己</b> · <b>電訪＝找問題</b> · <b>DEMO＝輸入回放</b></p>
+      <p class="hint coach-home-map">五種模式對應循環：<b>陪練＝做</b> · <b>症狀＝聽自己</b> · <b>電訪＝找問題</b> · <b>DEMO＝輸入回放</b> · <b>早會＝聽指示定方向</b></p>
     </div>`;
 }
 
@@ -102,7 +109,7 @@ export function renderHeroBarHtml(mode) {
   // 模式標題與 blurb 已在頁首 tagline 出現，這裡只留每月節奏提醒，避免重複
   return `
     <div class="coach-hero-bar coach-pace-${pace.tone}">
-      <span class="coach-hero-mode">${role.step === 'do' ? '做' : role.step === 'listen' ? '聽自己' : '找問題'}</span>
+      <span class="coach-hero-mode">${role.stepLabel || (role.step === 'do' ? '做' : role.step === 'listen' ? '聽自己' : '找問題')}</span>
       <span class="coach-pace coach-pace-${pace.tone}">${pace.text}</span>
     </div>`;
 }

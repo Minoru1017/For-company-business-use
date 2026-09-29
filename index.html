@@ -45,6 +45,12 @@
         <p><b>聽自己</b>：漏斗證明有在動 → 批次分析 → 改善筆記只改一件事 → 再去做。</p>
         <span class="mode-card-cta">開始記錄 →</span>
       </button>
+      <button type="button" class="mode-card brief" data-mode="brief" data-code="CODE_005 // BRIEF">
+        <span class="mode-card-tag">主管 · 早會</span>
+        <h3>主管早會語音紀錄</h3>
+        <p><b>聽指示、定方向</b>：按錄音即時轉文字 → 萃取重點 → 你確認後套用成專案方向。</p>
+        <span class="mode-card-cta">開始錄音 →</span>
+      </button>
     </div>
     <div id="coachPhilosophyHome"></div>
     <p class="hint mode-chooser-hint">首次使用 DEMO：<strong>公司電腦</strong>請下載 <a href="https://github.com/Minoru1017/For-company-business-use/releases/latest/download/CallCoachAssistant-Setup.exe" target="_blank" rel="noopener noreferrer">CallCoachAssistant-Setup.exe</a> 安裝精靈（不需 .cmd）；安裝完成後從開始選單啟動助手。</p>
@@ -72,6 +78,7 @@
         <button type="button" class="mode-pill app-nav-item" data-mode="demo" title="DEMO 轉錄"><span class="app-nav-code">02</span><span class="app-nav-text"><span class="app-nav-label">DEMO 轉錄</span><span class="app-nav-sub">輸入＋回放</span></span></button>
         <button type="button" class="mode-pill app-nav-item" data-mode="drill" title="臨場反應陪練"><span class="app-nav-code">03</span><span class="app-nav-text"><span class="app-nav-label">臨場陪練</span><span class="app-nav-sub">下水練</span></span></button>
         <button type="button" class="mode-pill app-nav-item" data-mode="log" title="開發症狀紀錄"><span class="app-nav-code">04</span><span class="app-nav-text"><span class="app-nav-label">症狀紀錄</span><span class="app-nav-sub">聽自己</span></span></button>
+        <button type="button" class="mode-pill app-nav-item" data-mode="brief" title="主管早會 · 語音紀錄"><span class="app-nav-code">05</span><span class="app-nav-text"><span class="app-nav-label">主管早會</span><span class="app-nav-sub">定方向</span></span></button>
       </nav>
       <div class="app-sidebar-recent">
         <button type="button" class="app-sidebar-new" id="sidebarNew" title="新增逐字稿"><span class="app-sidebar-new-icon" aria-hidden="true">＋</span><span class="app-sidebar-new-text">新增逐字稿</span></button>
@@ -143,6 +150,11 @@
   <section class="sec" id="logSection" hidden>
     <div class="sec-head"><span class="num">01</span><h2>開發症狀紀錄</h2><span class="tag">日曆 · 漏斗 · 錄音 · 共同病症 · 筆記</span></div>
     <div id="symptomLogPanel"></div>
+  </section>
+
+  <section class="sec" id="briefSection" hidden>
+    <div class="sec-head"><span class="num">01</span><h2>主管早會 · 語音紀錄</h2><span class="tag">錄音 · 即時轉文字 · 重點 · 確認 · 專案方向</span></div>
+    <div id="meetingPanel"></div>
   </section>
 
   <section class="sec history-sec" id="historySection" hidden aria-hidden="true">

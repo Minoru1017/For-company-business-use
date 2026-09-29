@@ -70,6 +70,7 @@ import {
   writeSheetCells,
 } from './sheet-sync.js';
 import { mountTimelinePlayer } from './call-timeline-player.js';
+import { buildDirectivesPromptAddendum } from './coach-directives.js';
 import { escapeHTML } from './utils.js';
 
 const WEEKDAYS = ['日', '一', '二', '三', '四', '五', '六'];
@@ -1364,6 +1365,7 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
         selfSymptoms: selfMarkNames(state.selected),
         followThrough: state.sheet.model?.days?.[state.selected]?.status || '',
         userJournal: summarizeDayJournalForPrompt(state.selected),
+        directives: buildDirectivesPromptAddendum(),
       });
       let model = getModel?.();
       const { parsed, usedTokens, modelUsed } = await callGeminiResilient({
