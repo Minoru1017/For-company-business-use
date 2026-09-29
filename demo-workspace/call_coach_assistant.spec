@@ -26,6 +26,7 @@ a = Analysis(
         "desktop_ui",
         "team_config",
         "srt_utils",
+        "speaker_refine",
         "proc_utils",
         "recording_pipeline",
         "assistant_update",

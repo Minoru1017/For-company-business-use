@@ -14,6 +14,7 @@ from typing import Callable
 
 from app_paths import is_frozen, resolve_paths
 from proc_utils import no_window_kwargs, quiet_run
+from speaker_refine import refine_speaker_srt
 
 ROOT, BUNDLE = resolve_paths()
 STATIC = BUNDLE / "demo_app"
@@ -564,6 +565,7 @@ def run_whisperx_transcribe(
         if last_code == CANCEL_EXIT:
             return last_code
         if last_code == 0:
+            refine_speaker_srt(output_dir, audio.stem, log)
             return 0
         if whisperx_env_broken(recent):
             break
@@ -2119,8 +2121,10 @@ def whisperx_args(
         "2",
         "--max_speakers",
         "2",
+        # "all" also writes JSON with per-word speakers; speaker_refine re-cuts the SRT
+        # at speaker changes and removes the extra formats afterwards.
         "--output_format",
-        "srt",
+        "all",
         # emits "Progress: xx%" during transcription/alignment so the UI can show real percent
         "--print_progress",
         "True",
