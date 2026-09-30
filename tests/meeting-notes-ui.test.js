@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { describeMicrophoneAccessError, describeSpeechError } from '../src/meeting-notes-ui.js';
+import { describeMicrophoneAccessError, describeSpeechError, pickRecorderMime } from '../src/meeting-notes-ui.js';
 
 describe('meeting-notes microphone errors', () => {
   it('gives actionable Web Speech error messages', () => {
@@ -25,5 +25,11 @@ describe('meeting-notes microphone errors', () => {
     expect(describeMicrophoneAccessError({ name: 'UnknownError', message: 'device exploded' })).toContain(
       'device exploded'
     );
+  });
+
+  it('selects the best MediaRecorder format supported by the browser', () => {
+    const supported = new Set(['audio/webm', 'audio/ogg;codecs=opus']);
+    expect(pickRecorderMime((type) => supported.has(type))).toBe('audio/webm');
+    expect(pickRecorderMime(() => false)).toBe('');
   });
 });
