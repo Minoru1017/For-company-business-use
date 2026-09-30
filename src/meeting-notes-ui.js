@@ -63,13 +63,18 @@ export function pickRecorderMime(isTypeSupported = () => false) {
   ) || '';
 }
 
-export function buildMicrophoneConstraints({ deviceId = '', preserveSpeakerAudio = false } = {}) {
+export function buildMicrophoneConstraints({
+  deviceId = '',
+  echoCancellation = true,
+  noiseSuppression = true,
+  autoGainControl = true,
+  preserveSpeakerAudio = false,
+} = {}) {
   return {
     ...(deviceId ? { deviceId: { exact: deviceId } } : {}),
-    echoCancellation: !preserveSpeakerAudio,
-    noiseSuppression: !preserveSpeakerAudio,
-    autoGainControl: true,
-    channelCount: 1,
+    echoCancellation: preserveSpeakerAudio ? false : !!echoCancellation,
+    noiseSuppression: preserveSpeakerAudio ? false : !!noiseSuppression,
+    autoGainControl: !!autoGainControl,
   };
 }
 
@@ -116,7 +121,11 @@ export function initMeetingNotes(container, { getApiKey, setApiKey, getModel, on
     signalWarnTimer: 0,
     transcribeBusy: false,
     micDeviceId: '',
-    preserveSpeakerAudio: false,
+    audioProcessing: {
+      echoCancellation: true,
+      noiseSuppression: true,
+      autoGainControl: true,
+    },
   };
 
   container.innerHTML = `
@@ -140,9 +149,21 @@ export function initMeetingNotes(container, { getApiKey, setApiKey, getModel, on
             <select class="field" id="bfMicDevice"><option value="">Windows／瀏覽器預設麥克風</option></select>
           </label>
           <button type="button" class="btn slog-mini" id="bfMicDevices">重新載入裝置</button>
-          <label class="brief-speaker-audio"><input type="checkbox" id="bfPreserveSpeaker"> 線上早會：保留喇叭傳進麥克風的聲音</label>
+          <label>收音模式
+            <select class="field" id="bfAudioPreset">
+              <option value="standard">一般近距離</option>
+              <option value="distant">遠距離主管</option>
+              <option value="raw">原始收音</option>
+              <option value="custom">自訂</option>
+            </select>
+          </label>
         </div>
-        <p class="hint brief-input-hint">若音量條不動，先在「錄音來源」改選實際使用的耳機／麥克風。線上會議若只錄到自己，請勾選「保留喇叭聲」並讓會議聲音由喇叭播放。</p>
+        <div class="brief-processing-options" id="bfProcessingOptions">
+          <label><input type="checkbox" id="bfNoiseSuppression"> 降噪</label>
+          <label><input type="checkbox" id="bfEchoCancellation"> 回音消除</label>
+          <label><input type="checkbox" id="bfAutoGain"> 自動增益</label>
+        </div>
+        <p class="hint brief-input-hint">主管離裝置較遠時選「遠距離主管」：關閉降噪與回音消除、保留自動增益，避免較小的人聲被當成背景音濾掉。三項也可自行勾選調整。</p>
         <div class="brief-level" id="bfLevel" hidden>
           <span class="brief-level-label">MIC</span>
           <span class="brief-level-track"><span id="bfLevelFill"></span></span>
@@ -228,7 +249,10 @@ export function initMeetingNotes(container, { getApiKey, setApiKey, getModel, on
     micRetry: q('#bfMicRetry'),
     micDevice: q('#bfMicDevice'),
     micDevices: q('#bfMicDevices'),
-    preserveSpeaker: q('#bfPreserveSpeaker'),
+    audioPreset: q('#bfAudioPreset'),
+    noiseSuppression: q('#bfNoiseSuppression'),
+    echoCancellation: q('#bfEchoCancellation'),
+    autoGain: q('#bfAutoGain'),
     level: q('#bfLevel'),
     levelFill: q('#bfLevelFill'),
     levelText: q('#bfLevelText'),
@@ -354,7 +378,7 @@ export function initMeetingNotes(container, { getApiKey, setApiKey, getModel, on
       stream = await media.getUserMedia({
         audio: buildMicrophoneConstraints({
           deviceId: state.micDeviceId,
-          preserveSpeakerAudio: state.preserveSpeakerAudio,
+          ...state.audioProcessing,
         }),
       });
       const track = stream.getAudioTracks()[0];
@@ -1060,13 +1084,58 @@ export function initMeetingNotes(container, { getApiKey, setApiKey, getModel, on
     }
     setMicCheck('錄音來源已更新；按「開始錄音」確認音量條會跳動。', '');
   });
-  els.preserveSpeaker.addEventListener('change', () => {
-    state.preserveSpeakerAudio = els.preserveSpeaker.checked;
+
+  function processingForPreset(preset) {
+    if (preset === 'distant') {
+      return { echoCancellation: false, noiseSuppression: false, autoGainControl: true };
+    }
+    if (preset === 'raw') {
+      return { echoCancellation: false, noiseSuppression: false, autoGainControl: false };
+    }
+    return { echoCancellation: true, noiseSuppression: true, autoGainControl: true };
+  }
+
+  function detectProcessingPreset(processing) {
+    for (const preset of ['standard', 'distant', 'raw']) {
+      const value = processingForPreset(preset);
+      if (Object.keys(value).every((key) => value[key] === processing[key])) return preset;
+    }
+    return 'custom';
+  }
+
+  function renderProcessingSettings() {
+    els.noiseSuppression.checked = state.audioProcessing.noiseSuppression;
+    els.echoCancellation.checked = state.audioProcessing.echoCancellation;
+    els.autoGain.checked = state.audioProcessing.autoGainControl;
+    els.audioPreset.value = detectProcessingPreset(state.audioProcessing);
+  }
+
+  function saveProcessingSettings() {
     try {
-      localStorage.setItem('callCoachBriefPreserveSpeaker', state.preserveSpeakerAudio ? '1' : '0');
+      localStorage.setItem('callCoachBriefAudioProcessing', JSON.stringify(state.audioProcessing));
     } catch {
       /* storage unavailable */
     }
+  }
+
+  els.audioPreset.addEventListener('change', () => {
+    if (els.audioPreset.value === 'custom') return;
+    state.audioProcessing = processingForPreset(els.audioPreset.value);
+    renderProcessingSettings();
+    saveProcessingSettings();
+    setMicCheck('收音模式已更新；下次開始錄音時套用。', '');
+  });
+  [els.noiseSuppression, els.echoCancellation, els.autoGain].forEach((input) => {
+    input.addEventListener('change', () => {
+      state.audioProcessing = {
+        noiseSuppression: els.noiseSuppression.checked,
+        echoCancellation: els.echoCancellation.checked,
+        autoGainControl: els.autoGain.checked,
+      };
+      renderProcessingSettings();
+      saveProcessingSettings();
+      setMicCheck('降噪設定已更新；下次開始錄音時套用。', '');
+    });
   });
   els.finish.addEventListener('click', () => stopRecording({ finish: true }));
   els.audioTranscribe.addEventListener('click', transcribeRecordedAudio);
@@ -1157,11 +1226,20 @@ export function initMeetingNotes(container, { getApiKey, setApiKey, getModel, on
   tickTimer();
   try {
     state.micDeviceId = localStorage.getItem('callCoachBriefMicDevice') || '';
-    state.preserveSpeakerAudio = localStorage.getItem('callCoachBriefPreserveSpeaker') === '1';
+    const savedProcessing = JSON.parse(localStorage.getItem('callCoachBriefAudioProcessing') || 'null');
+    if (savedProcessing && typeof savedProcessing === 'object') {
+      state.audioProcessing = {
+        echoCancellation: savedProcessing.echoCancellation !== false,
+        noiseSuppression: savedProcessing.noiseSuppression !== false,
+        autoGainControl: savedProcessing.autoGainControl !== false,
+      };
+    } else if (localStorage.getItem('callCoachBriefPreserveSpeaker') === '1') {
+      state.audioProcessing = processingForPreset('distant');
+    }
   } catch {
     /* storage unavailable */
   }
-  els.preserveSpeaker.checked = state.preserveSpeakerAudio;
+  renderProcessingSettings();
   refreshMicrophoneDevices();
 
   return {

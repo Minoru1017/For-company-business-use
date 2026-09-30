@@ -51,6 +51,21 @@ describe('meeting-notes microphone errors', () => {
     });
   });
 
+  it('allows each browser audio-processing constraint to be adjusted independently', () => {
+    expect(
+      buildMicrophoneConstraints({
+        echoCancellation: false,
+        noiseSuppression: false,
+        autoGainControl: true,
+      })
+    ).toMatchObject({
+      echoCancellation: false,
+      noiseSuppression: false,
+      autoGainControl: true,
+    });
+    expect(buildMicrophoneConstraints({ autoGainControl: false }).autoGainControl).toBe(false);
+  });
+
   it('keeps sampling while MediaRecorder is recording even before the UI flag changes', () => {
     expect(shouldSampleAudioLevel({ recorderState: 'recording', paused: false })).toBe(true);
     expect(shouldSampleAudioLevel({ recorderState: 'paused', paused: false })).toBe(false);
