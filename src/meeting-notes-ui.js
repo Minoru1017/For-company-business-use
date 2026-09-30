@@ -116,6 +116,7 @@ export function initMeetingNotes(container, { getApiKey, setApiKey, getModel, on
     aiBusy: false,
     theme: '',
     starting: false,
+    finalizing: false,
     recognizerStarted: false,
     speechErrorCount: 0,
     speechUnavailable: false,
@@ -582,6 +583,8 @@ export function initMeetingNotes(container, { getApiKey, setApiKey, getModel, on
         renderAudioReview(blob);
         els.saveState.textContent = state.audioSaveError ? '已完成；持續保存曾發生錯誤' : '完整音訊已保存';
         els.saveState.className = `brief-save-state ${state.audioSaveError ? 'bad' : 'ok'}`;
+        state.finalizing = false;
+        els.toggle.disabled = !MR;
       },
       { once: true }
     );
@@ -777,7 +780,7 @@ export function initMeetingNotes(container, { getApiKey, setApiKey, getModel, on
   }
 
   async function startRecording() {
-    if (!MR || state.starting) return;
+    if (!MR || state.starting || state.finalizing) return;
     if (state.paused && state.mediaRecorder?.state === 'paused') {
       state.recording = true;
       state.paused = false;
@@ -866,8 +869,10 @@ export function initMeetingNotes(container, { getApiKey, setApiKey, getModel, on
     state.startedAt = 0;
     clearInterval(state.timer);
     stopRecognizer();
+    state.finalizing = !!state.mediaRecorder && state.mediaRecorder.state !== 'inactive';
     stopMediaCapture();
     els.toggle.classList.remove('on');
+    els.toggle.disabled = state.finalizing || !MR;
     els.toggleLabel.textContent = '開始錄音';
     els.live.hidden = true;
     els.level.hidden = true;

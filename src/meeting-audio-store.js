@@ -152,7 +152,7 @@ export async function listInterruptedMeetingAudioSessions() {
   const db = await openDb();
   const sessions = await req(db.transaction(STORE_SESSIONS, 'readonly').objectStore(STORE_SESSIONS).getAll());
   return (sessions || [])
-    .filter((session) => session.status === 'recording' || session.status === 'interrupted')
+    .filter((session) => session.status === 'recording')
     .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
 }
 
