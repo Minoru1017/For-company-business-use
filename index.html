@@ -91,6 +91,7 @@
         <ul class="app-sidebar-list" id="sidebarRecentList"></ul>
       </div>
       <div class="app-sidebar-foot">
+        <button type="button" class="app-sidebar-clear app-sidebar-trajectory" id="sidebarTrajectory">複盤學習軌跡</button>
         <button type="button" class="app-sidebar-clear" id="sidebarClear">清空紀錄</button>
         <span class="app-sidebar-ver mono">VER 11.9 · LOCAL</span>
       </div>
@@ -123,7 +124,10 @@
       <div class="sec-head" style="margin-bottom:8px"><span class="num">◎</span><h2>每日三通自寫複盤</h2><span class="tag">解鎖 AI 單通分析</span></div>
       <p class="hint">循環裡的<b>「聽自己＋找問題」</b>：做了什麼／客戶回應／語氣與反應／客戶可能在想什麼。完成今日 <b>3 通</b> 後，才解鎖 AI（第二意見、交叉對照）。</p>
       <p id="rjSummary" class="rj-summary hint"></p>
-      <button type="button" class="btn primary" id="rjOpen">開啟今日複盤筆記</button>
+      <div class="row rj-panel-actions">
+        <button type="button" class="btn primary" id="rjOpen">開啟今日複盤筆記</button>
+        <button type="button" class="btn" id="rjTrajectoryOpen">查看學習軌跡</button>
+      </div>
     </div>
     <div class="sample-actions">
       <button type="button" class="btn" data-load-sample>載入範例逐字稿</button>
@@ -358,6 +362,21 @@
       <button type="button" class="primary" id="rjSave">儲存今日複盤</button>
       <button type="button" id="rjClose">關閉</button>
     </div>
+  </div>
+</div>
+
+<div id="reflectionTrajectoryModal" class="dev-notes-modal reflection-trajectory-modal" hidden>
+  <div class="dev-notes-dialog reflection-trajectory-dialog">
+    <div class="rjt-head">
+      <div>
+        <p class="rjt-kicker">REFLECTION ARCHIVE</p>
+        <h2>我的學習軌跡</h2>
+        <p class="hint">回頭看當時怎麼理解客戶、怎麼修正自己。這些複盤只存在這台電腦。</p>
+      </div>
+      <button type="button" class="btn" id="rjtClose" aria-label="關閉學習軌跡">關閉</button>
+    </div>
+    <div id="rjtStats" class="rjt-stats"></div>
+    <div id="rjtTimeline" class="rjt-timeline"></div>
   </div>
 </div>
 
