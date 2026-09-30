@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { describeMicrophoneAccessError, describeSpeechError, pickRecorderMime } from '../src/meeting-notes-ui.js';
+import {
+  buildMicrophoneConstraints,
+  describeMicrophoneAccessError,
+  describeSpeechError,
+  pickRecorderMime,
+  shouldSampleAudioLevel,
+} from '../src/meeting-notes-ui.js';
 
 describe('meeting-notes microphone errors', () => {
   it('gives actionable Web Speech error messages', () => {
@@ -31,5 +37,23 @@ describe('meeting-notes microphone errors', () => {
     const supported = new Set(['audio/webm', 'audio/ogg;codecs=opus']);
     expect(pickRecorderMime((type) => supported.has(type))).toBe('audio/webm');
     expect(pickRecorderMime(() => false)).toBe('');
+  });
+
+  it('can select an exact input device and preserve speaker audio', () => {
+    expect(buildMicrophoneConstraints({ deviceId: 'usb-mic' })).toMatchObject({
+      deviceId: { exact: 'usb-mic' },
+      echoCancellation: true,
+      noiseSuppression: true,
+    });
+    expect(buildMicrophoneConstraints({ preserveSpeakerAudio: true })).toMatchObject({
+      echoCancellation: false,
+      noiseSuppression: false,
+    });
+  });
+
+  it('keeps sampling while MediaRecorder is recording even before the UI flag changes', () => {
+    expect(shouldSampleAudioLevel({ recorderState: 'recording', paused: false })).toBe(true);
+    expect(shouldSampleAudioLevel({ recorderState: 'paused', paused: false })).toBe(false);
+    expect(shouldSampleAudioLevel({ recorderState: 'recording', paused: true })).toBe(false);
   });
 });
