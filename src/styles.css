@@ -80,10 +80,12 @@ body.sidebar-collapsed .app-shell { grid-template-columns:var(--sidebar-w-min) m
 .app-sidebar-item-title { font-size:.8rem; font-weight:600; line-height:1.35; word-break:break-all;
   display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; }
 .app-sidebar-item-sub { font-size:.66rem; color:var(--muted); font-family:var(--mono); letter-spacing:.02em; }
-.app-sidebar-foot { display:flex; align-items:center; justify-content:space-between; gap:var(--s2); padding-top:var(--s2); border-top:1px solid var(--border); }
+.app-sidebar-foot { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:var(--s1) var(--s2); padding-top:var(--s2); border-top:1px solid var(--border); }
 .app-sidebar-clear { padding:6px 8px; border:none; background:transparent; color:var(--muted); font-size:.68rem;
   font-family:var(--mono); cursor:pointer; border-radius:4px; box-shadow:none; letter-spacing:.06em; }
 .app-sidebar-clear:hover { color:var(--bad); background:rgba(226,87,63,.08); transform:none; box-shadow:none; }
+.app-sidebar-trajectory { flex:1 0 100%; color:var(--tab-paper); text-align:left; }
+.app-sidebar-trajectory:hover { color:var(--text); background:rgba(232,228,220,.06); }
 .app-sidebar-ver { font-size:.58rem; letter-spacing:.16em; color:#5b6573; }
 
 /* 收合：只留檔案碼與圖示 */
@@ -1103,6 +1105,7 @@ button.primary:hover { background:linear-gradient(180deg,#ffffff,#e6e0d1);
 /* ---- 每日自寫複盤 · 學習軌跡 ---- */
 .reflection-trajectory-dialog { width:min(900px,100%); padding:0; overflow:hidden; }
 .rjt-head { display:flex; justify-content:space-between; align-items:flex-start; gap:18px; padding:20px 22px 16px; border-bottom:1px solid var(--border); }
+.rjt-head > button { flex:0 0 auto; white-space:nowrap; }
 .rjt-head h2 { margin:2px 0 6px; font-size:1.35rem; }
 .rjt-head .hint { margin:0; }
 .rjt-kicker { margin:0; color:var(--tab-paper); font-family:var(--mono); font-size:.62rem; letter-spacing:.2em; }

@@ -30,6 +30,7 @@ export function initReflectionJournal(deps = {}) {
   const saveBtn = modal.querySelector('#rjSave');
   const closeBtn = modal.querySelector('#rjClose');
   const trajectoryOpenBtn = panel.querySelector('#rjTrajectoryOpen');
+  const sidebarTrajectoryBtn = document.getElementById('sidebarTrajectory');
   const trajectoryCloseBtn = trajectoryModal?.querySelector('#rjtClose');
   const trajectoryStatsEl = trajectoryModal?.querySelector('#rjtStats');
   const trajectoryTimelineEl = trajectoryModal?.querySelector('#rjtTimeline');
@@ -196,6 +197,7 @@ export function initReflectionJournal(deps = {}) {
 
   openBtn?.addEventListener('click', openModal);
   trajectoryOpenBtn?.addEventListener('click', openTrajectory);
+  sidebarTrajectoryBtn?.addEventListener('click', openTrajectory);
   closeBtn?.addEventListener('click', closeModal);
   trajectoryCloseBtn?.addEventListener('click', closeTrajectory);
   modal.addEventListener('click', (e) => {
