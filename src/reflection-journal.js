@@ -78,6 +78,57 @@ export function getDayJournal(dateKey = todayKey()) {
   return { dateKey, entries, updatedAt: day.updatedAt || 0 };
 }
 
+/** 任一欄有內容就算一筆曾經寫過的複盤（完整度另由 isEntryComplete 判斷）。 */
+export function entryHasContent(entry) {
+  if (!entry) return false;
+  return ['callTitle', 'linkedSource', 'iDid', 'customerSaid', 'toneEffect', 'customerMind'].some(
+    (key) => String(entry[key] || '').trim()
+  );
+}
+
+/**
+ * 讀出所有曾寫過的日期，最新在前。空白的預建 slot 不算學習紀錄。
+ * @returns {Array<{dateKey:string,entries:Array,updatedAt:number}>}
+ */
+export function listJournalDays() {
+  const root = loadRoot();
+  return Object.keys(root.days || {})
+    .sort((a, b) => b.localeCompare(a))
+    .map((dateKey) => getDayJournal(dateKey))
+    .filter((day) => day.entries.some(entryHasContent));
+}
+
+function dateKeyToUtcDay(key) {
+  const m = String(key || '').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if (!m) return null;
+  return Math.floor(Date.UTC(Number(m[1]), Number(m[2]) - 1, Number(m[3])) / 86400000);
+}
+
+/**
+ * 學習軌跡摘要。「最近連續」以最新一個有寫的日期往前算，不要求今天已經寫完。
+ */
+export function journalTrajectoryStats(days = listJournalDays()) {
+  const active = (days || []).filter((day) => day?.entries?.some(entryHasContent));
+  const writtenEntries = active.reduce((n, day) => n + day.entries.filter(entryHasContent).length, 0);
+  const completeEntries = active.reduce((n, day) => n + day.entries.filter(isEntryComplete).length, 0);
+  const keys = [...new Set(active.map((day) => day.dateKey))]
+    .map((key) => ({ key, day: dateKeyToUtcDay(key) }))
+    .filter((x) => x.day != null)
+    .sort((a, b) => b.day - a.day);
+  let recentStreak = keys.length ? 1 : 0;
+  for (let i = 1; i < keys.length; i++) {
+    if (keys[i - 1].day - keys[i].day !== 1) break;
+    recentStreak++;
+  }
+  return {
+    days: active.length,
+    writtenEntries,
+    completeEntries,
+    recentStreak,
+    latestDate: keys[0]?.key || '',
+  };
+}
+
 export function saveDayJournal(dateKey, entries) {
   const root = loadRoot();
   const cleaned = entries.slice(0, REQUIRED_CALLS_PER_DAY).map((e, i) => ({
