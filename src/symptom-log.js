@@ -15,6 +15,20 @@ import {
   q4Label,
   reviewMonthKey,
 } from './monthly-review.js';
+import {
+  ADJUSTMENT_CHECKPOINTS,
+  MANAGER_ANALYSIS_FIELDS,
+  PLAN_CHECKPOINTS,
+  PLAN_METRICS,
+  checkpointDateKey,
+  checkpointDue,
+  computeCheckpointActuals,
+  evaluateCheckpoint,
+  getMonthlyPlanFromSettings,
+  managerDiscussionReadiness,
+  patchMonthlyPlans,
+  targetSequenceWarnings,
+} from './monthly-plan.js';
 import { isAiAnalysisUnlocked, summarizeDayJournalForPrompt, unlockStatusMessage } from './reflection-journal.js';
 import { runAnalysis } from './analyze.js';
 import { AUDIO_ACCEPT, describeSize, transcribeAudioWithGemini, validateAudioFile, guessAudioMime } from './audio-transcribe.js';
@@ -190,6 +204,27 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
         </div>
       </div>
 
+      <details class="card slog-plan" id="slPlanCard" open>
+        <summary>
+          <div><span class="slog-plan-kicker">MONTHLY BATTLE PLAN</span><h2 id="slPlanTitle">本月作戰儀表板</h2></div>
+          <span class="slog-count" id="slPlanBadge">設定目標</span>
+        </summary>
+        <p class="hint slog-plan-def">定義：<b>通次＝撥出</b> · <b>邀約＝客戶明確同意時間</b> · <b>Demo＝實際出席</b> · <b>承攬＝完成承攬</b>。目標填累計值；實際數字從每天漏斗自動加總。</p>
+        <div id="slPlanProgress" class="slog-plan-progress"></div>
+        <div id="slPlanTargets" class="slog-plan-targets"></div>
+        <div id="slPlanWarnings" class="slog-plan-warnings"></div>
+        <section class="slog-plan-adjust">
+          <div class="slog-plan-subhead"><span>04</span><div><h3>如果進度落後了，怎麼調整？</h3><p class="hint">每個檢查點先寫好具體的「如果—那麼」，不要只寫更努力。</p></div></div>
+          <div id="slPlanAdjustments" class="slog-plan-adjust-grid"></div>
+        </section>
+        <section class="slog-plan-manager">
+          <div class="slog-plan-subhead"><span>05</span><div><h3>什麼時候該找主管討論？</h3><p class="hint">不是業績達標才能討論；先確認自己設定的行為量有落實，並帶著分析過程來。</p></div></div>
+          <div id="slPlanReadiness" class="slog-plan-readiness"></div>
+          <div id="slPlanAnalysis" class="slog-plan-analysis"></div>
+        </section>
+        <p class="hint" id="slPlanSaved"></p>
+      </details>
+
       <details class="card slog-monthly-review" id="slMonthlyReviewCard">
         <summary><h2>每月總結</h2><span class="slog-count" id="slMonthlyReviewBadge">待填</span></summary>
         <p class="hint">對照當月日曆與 AI 診斷，<b>自己先寫</b>（主管复盘四问）。數據只輔助，不能代替你的思考。</p>
@@ -241,8 +276,10 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
             <label>超過 <span id="slShortMinLabel">5</span> 分<input type="number" min="0" inputmode="numeric" data-day="over5Manual" placeholder="自動"></label>
             <label>長 Call（≥<span id="slLongMinLabel">15</span> 分）<input type="number" min="0" inputmode="numeric" data-day="longManual" placeholder="自動"></label>
             <label>進邀約（客戶同意時間）<input type="number" min="0" inputmode="numeric" data-day="invites" placeholder="0" title="客戶明確同意某個諮詢／見面時間才計入，僅開口約不算"></label>
+            <label>Demo 出席<input type="number" min="0" inputmode="numeric" data-day="demos" placeholder="0" title="實際出席 Demo 才計入"></label>
+            <label>完成承攬<input type="number" min="0" inputmode="numeric" data-day="contracts" placeholder="0" title="完成承攬才計入"></label>
           </div>
-          <p class="hint">留存率＝超過 N 分通 ÷ 接通（破冰留客）｜邀約率＝進邀約（客戶同意時間）÷ 超過 N 分通。</p>
+          <p class="hint">留存率＝超過 N 分通 ÷ 接通（破冰留客）｜邀約率＝進邀約（客戶同意時間）÷ 超過 N 分通。Demo 與承攬會帶入本月作戰儀表板。</p>
           <div class="slog-funnel-bar" id="slFunnelBar"></div>
           <div class="slog-ice-stats" id="slIceStats"></div>
           <details class="slog-settings">
@@ -442,9 +479,164 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
       .join('');
     refreshStorage();
     renderMonthlyReview();
+    renderMonthlyPlan();
   }
 
   let monthlyReviewTimer = null;
+  let monthlyPlanTimer = null;
+
+  function readMonthlyPlanForm(base) {
+    const next =
+      typeof structuredClone === 'function'
+        ? structuredClone(base)
+        : JSON.parse(JSON.stringify(base));
+    q('#slPlanTargets')?.querySelectorAll('[data-plan-target]').forEach((input) => {
+      const [checkpoint, metric] = input.dataset.planTarget.split(':');
+      next.targets[checkpoint][metric] = Math.max(0, Math.floor(Number(input.value) || 0));
+    });
+    q('#slPlanAdjustments')?.querySelectorAll('[data-plan-adjust]').forEach((input) => {
+      next.adjustments[input.dataset.planAdjust] = input.value;
+    });
+    q('#slPlanAnalysis')?.querySelectorAll('[data-plan-analysis]').forEach((input) => {
+      next.analysis[input.dataset.planAnalysis] = input.value;
+    });
+    return next;
+  }
+
+  function scheduleMonthlyPlanSave(plan) {
+    clearTimeout(monthlyPlanTimer);
+    monthlyPlanTimer = setTimeout(async () => {
+      try {
+        const next = readMonthlyPlanForm(plan);
+        const bag = patchMonthlyPlans(state.settings, state.year, state.month, next);
+        state.settings = await saveSettings({ monthlyPlans: bag });
+        const saved = q('#slPlanSaved');
+        if (saved) saved.textContent = `已自動儲存 ${new Date().toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' })}`;
+        const badge = q('#slPlanBadge');
+        const total = next.targets.end;
+        if (badge) badge.textContent = PLAN_METRICS.every((metric) => total[metric.key] > 0) ? '月底目標已設定' : '尚未填完月底目標';
+      } catch (error) {
+        showDbError(error);
+      }
+    }, 400);
+  }
+
+  async function renderMonthlyPlan() {
+    const title = q('#slPlanTitle');
+    if (title) title.textContent = `${state.month} 月作戰儀表板`;
+    const from = `${reviewMonthKey(state.year, state.month)}-01`;
+    const last = new Date(state.year, state.month, 0).getDate();
+    const to = `${reviewMonthKey(state.year, state.month)}-${String(last).padStart(2, '0')}`;
+    let days = [];
+    try {
+      days = await listDays(from, to);
+    } catch {
+      days = [];
+    }
+    const plan = getMonthlyPlanFromSettings(state.settings, state.year, state.month);
+    const actuals = computeCheckpointActuals(days, state.year, state.month);
+    const evaluations = Object.fromEntries(
+      PLAN_CHECKPOINTS.map((cp) => [cp.id, evaluateCheckpoint(plan.targets[cp.id], actuals[cp.id])])
+    );
+    const dueList = PLAN_CHECKPOINTS.filter((cp) => checkpointDue(state.year, state.month, cp, today));
+    const focus = dueList.at(-1) || PLAN_CHECKPOINTS[0];
+    const focusEval = evaluations[focus.id];
+    const focusDue = checkpointDue(state.year, state.month, focus, today);
+
+    const badge = q('#slPlanBadge');
+    if (badge) {
+      const total = plan.targets.end;
+      badge.textContent = PLAN_METRICS.every((metric) => total[metric.key] > 0) ? '月底目標已設定' : '設定目標';
+    }
+
+    const progress = q('#slPlanProgress');
+    if (progress) {
+      const metricHtml = PLAN_METRICS.map((metric) => {
+        const item = focusEval.metrics[metric.key];
+        const cls = !focusDue || item.status === 'unset' ? '' : item.status;
+        return `<span class="slog-plan-progress-metric ${cls}"><b>${escapeHTML(metric.short)}</b>${item.actual}<i>/ ${item.target || '—'}</i></span>`;
+      }).join('');
+      const focusDate = checkpointDateKey(state.year, state.month, focus);
+      progress.innerHTML = `<div class="slog-plan-progress-head">
+          <div><span>${focusDue ? '最近檢查點' : '下一檢查點'}</span><strong>${escapeHTML(fmtDateLabel(focusDate))}</strong></div>
+          <span class="slog-plan-state ${focusDue ? focusEval.status : 'upcoming'}">${
+            focusDue ? (focusEval.status === 'met' ? '行為進度達標' : focusEval.status === 'behind' ? '需要調整' : '請先設定目標') : '進行中'
+          }</span>
+        </div><div class="slog-plan-progress-metrics">${metricHtml}</div>`;
+    }
+
+    const targets = q('#slPlanTargets');
+    if (targets) {
+      targets.innerHTML = `
+        <div class="slog-plan-table-head"><span>檢查點</span>${PLAN_METRICS.map((m) => `<span>${escapeHTML(m.label)}</span>`).join('')}</div>
+        ${PLAN_CHECKPOINTS.map((cp) => {
+          const due = checkpointDue(state.year, state.month, cp, today);
+          const evaluation = evaluations[cp.id];
+          return `<div class="slog-plan-target-row ${due ? evaluation.status : 'upcoming'}">
+            <div class="slog-plan-cp"><strong>${state.month}/${cp.day === 'end' ? last : cp.day} 前</strong><span>${cp.id === 'end' ? '總計' : '累計'}</span></div>
+            ${PLAN_METRICS.map((metric) => {
+              const item = evaluation.metrics[metric.key];
+              return `<label class="slog-plan-target ${due ? item.status : ''}">
+                <span class="slog-plan-mobile-label">${escapeHTML(metric.label)}</span>
+                <input type="number" min="0" inputmode="numeric" data-plan-target="${cp.id}:${metric.key}" value="${item.target || ''}" placeholder="目標">
+                <small>實際 <b>${item.actual}</b>${due && item.target ? ` · ${item.status === 'met' ? '達標' : '差 ' + Math.max(0, item.target - item.actual)}` : ''}</small>
+              </label>`;
+            }).join('')}
+          </div>`;
+        }).join('')}`;
+    }
+
+    const warnings = targetSequenceWarnings(plan);
+    const warningsEl = q('#slPlanWarnings');
+    if (warningsEl) {
+      warningsEl.innerHTML = warnings.length
+        ? warnings.map((w) => `<p>⚠ ${escapeHTML(w)}</p>`).join('')
+        : '';
+    }
+
+    const adjustments = q('#slPlanAdjustments');
+    if (adjustments) {
+      adjustments.innerHTML = ADJUSTMENT_CHECKPOINTS.map(
+        (cp) => `<label><span>如果 ${state.month}/${cp.day} 前沒達標，我會：</span>
+          <textarea class="field" rows="2" data-plan-adjust="${cp.id}" placeholder="例：回聽 3 通有聊到困擾卻沒邀約的電話，重寫價值橋接句，隔天每通練一次">${escapeHTML(plan.adjustments[cp.id])}</textarea>
+        </label>`
+      ).join('');
+    }
+
+    const readiness = managerDiscussionReadiness(plan, actuals, state.year, state.month, today);
+    const readinessEl = q('#slPlanReadiness');
+    if (readinessEl) {
+      const cpLabel = readiness.checkpoint ? `${state.month}/${readiness.checkpoint.day === 'end' ? last : readiness.checkpoint.day}` : '首個檢查點';
+      readinessEl.innerHTML = `
+        <div class="slog-plan-condition ${readiness.behaviorReady ? 'ok' : ''}">
+          <span>${readiness.behaviorReady ? '✓' : '1'}</span><div><strong>行為量要夠</strong><p>${readiness.checkpoint ? `以 ${cpLabel} 累計目標檢查 Demo／邀約／通次：${readiness.behaviorReady ? '已達到自己設定的量。' : '尚未全部達標，先確認是否真的落實動作量。'}` : '第一個檢查點尚未到期；先填好 Demo／邀約／通次目標。'}</p></div>
+        </div>
+        <div class="slog-plan-condition ${readiness.analysisReady ? 'ok' : ''}">
+          <span>${readiness.analysisReady ? '✓' : '2'}</span><div><strong>真的努力分析過</strong><p>${readiness.analysisReady ? '四個分析問題都有具體紀錄。' : '請先具體寫下聽了什麼、做了什麼、看了什麼，以及推理路徑。'}</p></div>
+        </div>
+        <p class="slog-plan-ready ${readiness.ready ? 'ok' : ''}">${readiness.ready ? '已準備好：帶著數據與分析去找主管討論。' : '準備中：不是要獨自撐住，而是先帶著證據與假設來討論。'}</p>
+        <p class="hint slog-plan-escalate">合規、客訴或重大承諾風險請立刻找主管，不必等行為量達標。</p>`;
+    }
+
+    const analysis = q('#slPlanAnalysis');
+    if (analysis) {
+      analysis.innerHTML = MANAGER_ANALYSIS_FIELDS.map(
+        (field) => `<label><span>${escapeHTML(field.label)}</span>
+          <textarea class="field" rows="2" data-plan-analysis="${field.key}" placeholder="${escapeHTML(field.placeholder)}">${escapeHTML(plan.analysis[field.key])}</textarea>
+        </label>`
+      ).join('');
+    }
+
+    q('#slPlanCard')?.querySelectorAll('[data-plan-target], [data-plan-adjust], [data-plan-analysis]').forEach((input) => {
+      input.addEventListener('input', () => scheduleMonthlyPlanSave(plan));
+    });
+    q('#slPlanTargets')?.querySelectorAll('[data-plan-target]').forEach((input) => {
+      input.addEventListener('change', () => {
+        scheduleMonthlyPlanSave(plan);
+        setTimeout(renderMonthlyPlan, 450);
+      });
+    });
+  }
 
   function bindMonthlyReviewFields() {
     const fieldsHost = q('#slMonthlyReviewFields');

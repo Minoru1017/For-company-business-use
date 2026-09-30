@@ -177,7 +177,9 @@ export async function summarizeRange(fromKey, toKey) {
   const ensure = (k) => (out[k] ||= { calls: 0, analyzed: 0, hasFunnel: false, hasNote: false, invites: null, over: 0, symptoms: [], durations: [] });
   (days || []).forEach((d) => {
     const e = ensure(d.date);
-    e.hasFunnel = [d.dialed, d.connected, d.invites, d.over5Manual].some((v) => v != null && v !== '' && Number(v) > 0);
+    e.hasFunnel = [d.dialed, d.connected, d.invites, d.demos, d.contracts, d.over5Manual].some(
+      (v) => v != null && v !== '' && Number(v) > 0
+    );
     e.invites = d.invites == null || d.invites === '' ? null : Number(d.invites) || 0;
     const n = d.note || {};
     e.hasNote = !!(n.symptom || n.action || n.verify || n.free);
