@@ -3,6 +3,7 @@
  * → 勾選確認 → 套用為「專案方向」（首頁、工作區頁首、AI prompt 都會對齊）。
  */
 import { callGeminiResilient, describeApiKeyProblem } from './gemini.js';
+import { transcribeAudioWithGemini } from './audio-transcribe.js';
 import {
   applyMeetingDirectives,
   archiveDirective,
@@ -54,6 +55,12 @@ export function describeMicrophoneAccessError(error, { secureContext = true } = 
   return error?.message ? `無法開啟麥克風：${error.message}` : '無法開啟麥克風，請檢查瀏覽器與 Windows 權限。';
 }
 
+export function pickRecorderMime(isTypeSupported = () => false) {
+  return ['audio/webm;codecs=opus', 'audio/webm', 'audio/ogg;codecs=opus', 'audio/mp4'].find((type) =>
+    isTypeSupported(type)
+  ) || '';
+}
+
 function dateKeyOf(ts) {
   const d = new Date(ts);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -63,6 +70,7 @@ export function initMeetingNotes(container, { getApiKey, setApiKey, getModel, on
   if (!container) return { activate() {}, syncApiKey() {} };
   const toast = (m) => showToast?.(m);
   const SR = typeof window !== 'undefined' ? window.SpeechRecognition || window.webkitSpeechRecognition : null;
+  const MR = typeof window !== 'undefined' ? window.MediaRecorder : null;
 
   const state = {
     meeting: null, // 目前這場（含 lines/points）
@@ -79,6 +87,18 @@ export function initMeetingNotes(container, { getApiKey, setApiKey, getModel, on
     starting: false,
     recognizerStarted: false,
     speechErrorCount: 0,
+    speechUnavailable: false,
+    mediaStream: null,
+    mediaRecorder: null,
+    audioChunks: [],
+    audioBlob: null,
+    audioUrl: '',
+    audioCtx: null,
+    analyser: null,
+    levelRaf: 0,
+    hasSignal: false,
+    signalWarnTimer: 0,
+    transcribeBusy: false,
   };
 
   container.innerHTML = `
@@ -97,6 +117,11 @@ export function initMeetingNotes(container, { getApiKey, setApiKey, getModel, on
           <span id="bfMicText">按「開始錄音」後會先檢查麥克風，第一次使用請在瀏覽器跳出的視窗按「允許」。</span>
           <button type="button" class="btn slog-mini" id="bfMicRetry" hidden>重新檢查</button>
         </div>
+        <div class="brief-level" id="bfLevel" hidden>
+          <span class="brief-level-label">MIC</span>
+          <span class="brief-level-track"><span id="bfLevelFill"></span></span>
+          <span class="brief-level-text" id="bfLevelText">等待聲音</span>
+        </div>
         <div class="brief-rec-controls">
           <button type="button" class="brief-rec-btn" id="bfToggle"><span class="brief-rec-dot" aria-hidden="true"></span><span id="bfToggleLabel">開始錄音</span></button>
           <span class="brief-timer" id="bfTimer">00:00</span>
@@ -105,6 +130,17 @@ export function initMeetingNotes(container, { getApiKey, setApiKey, getModel, on
         </div>
         <div class="brief-live" id="bfLive" hidden><span class="brief-live-dot" aria-hidden="true"></span><span id="bfInterim" class="brief-interim">聆聽中…</span></div>
         <ol class="brief-lines" id="bfLines"></ol>
+        <div class="brief-audio-review" id="bfAudioReview" hidden>
+          <div class="brief-audio-review-head">
+            <div><strong>本次早會錄音</strong><span class="hint" id="bfAudioMeta"></span></div>
+            <a class="btn slog-mini" id="bfAudioDownload" download="主管早會.webm">下載備份</a>
+          </div>
+          <audio id="bfAudio" controls preload="metadata"></audio>
+          <div class="row brief-audio-actions">
+            <button type="button" class="primary" id="bfAudioTranscribe">用 Gemini 轉成逐字稿</button>
+            <span class="hint" id="bfAudioStatus">若即時文字沒有出現，可用實際錄下的音訊補轉。</span>
+          </div>
+        </div>
         <p class="hint brief-unsupported" id="bfUnsupported" hidden>這個瀏覽器不支援即時語音辨識（建議用 Chrome 或 Edge）。你仍可在下方貼上逐字稿再萃取重點。</p>
       </div>
 
@@ -164,6 +200,15 @@ export function initMeetingNotes(container, { getApiKey, setApiKey, getModel, on
     micCheck: q('#bfMicCheck'),
     micText: q('#bfMicText'),
     micRetry: q('#bfMicRetry'),
+    level: q('#bfLevel'),
+    levelFill: q('#bfLevelFill'),
+    levelText: q('#bfLevelText'),
+    audioReview: q('#bfAudioReview'),
+    audio: q('#bfAudio'),
+    audioMeta: q('#bfAudioMeta'),
+    audioDownload: q('#bfAudioDownload'),
+    audioTranscribe: q('#bfAudioTranscribe'),
+    audioStatus: q('#bfAudioStatus'),
     transcriptCard: q('#bfTranscriptCard'),
     lineCount: q('#bfLineCount'),
     text: q('#bfText'),
@@ -191,8 +236,10 @@ export function initMeetingNotes(container, { getApiKey, setApiKey, getModel, on
     els.unsupported.textContent =
       typeof window !== 'undefined' && !window.isSecureContext
         ? '目前不是安全連線，瀏覽器不允許使用麥克風。請改用 https:// 網址開啟。你仍可在下方貼上逐字稿再萃取重點。'
-        : '這個瀏覽器不支援即時語音辨識（建議用最新版 Chrome 或 Edge）。你仍可在下方貼上逐字稿再萃取重點。';
-    els.toggle.disabled = true;
+        : MR
+          ? '這個瀏覽器不支援即時語音轉文字，但仍會錄下音訊；結束後可播放確認，再用 Gemini 補轉逐字稿。'
+          : '這個瀏覽器不支援即時語音辨識或錄音（建議用最新版 Chrome 或 Edge）。你仍可在下方貼上逐字稿再萃取重點。';
+    els.toggle.disabled = !MR;
     els.transcriptCard.hidden = false;
   }
 
@@ -269,15 +316,168 @@ export function initMeetingNotes(container, { getApiKey, setApiKey, getModel, on
       }
       const label = track.label?.trim();
       setMicCheck(`麥克風已連線${label ? `：${label}` : ''}`, 'ok');
-      return true;
+      return stream;
     } catch (error) {
       const message = describeMicrophoneAccessError(error, { secureContext });
       setMicCheck(message, 'bad', { retry: true });
-      throw Object.assign(error instanceof Error ? error : new Error(message), { userMessage: message });
-    } finally {
-      // Web Speech API 會自行開啟預設麥克風；預檢串流只用來確認權限與裝置，立即釋放避免占用。
+      // 失敗時釋放可能已建立一半的串流；成功串流交給 MediaRecorder 真正錄音。
       stream?.getTracks().forEach((track) => track.stop());
+      throw Object.assign(error instanceof Error ? error : new Error(message), { userMessage: message });
     }
+  }
+
+  function stopLevelMeter({ close = false } = {}) {
+    cancelAnimationFrame(state.levelRaf);
+    state.levelRaf = 0;
+    if (close) {
+      state.audioCtx?.close?.().catch?.(() => {});
+      state.audioCtx = null;
+      state.analyser = null;
+    }
+  }
+
+  function startLevelMeter(stream) {
+    stopLevelMeter({ close: true });
+    els.level.hidden = false;
+    els.levelFill.style.width = '0%';
+    els.levelText.textContent = '等待聲音';
+    const Ctx = window.AudioContext || window.webkitAudioContext;
+    if (!Ctx) {
+      els.levelText.textContent = '錄音中';
+      return;
+    }
+    try {
+      const ctx = new Ctx();
+      const analyser = ctx.createAnalyser();
+      analyser.fftSize = 512;
+      analyser.smoothingTimeConstant = 0.72;
+      ctx.createMediaStreamSource(stream).connect(analyser);
+      state.audioCtx = ctx;
+      state.analyser = analyser;
+      const samples = new Uint8Array(analyser.fftSize);
+      const draw = () => {
+        if (!state.recording || state.paused || state.analyser !== analyser) return;
+        analyser.getByteTimeDomainData(samples);
+        let sum = 0;
+        for (const sample of samples) {
+          const n = (sample - 128) / 128;
+          sum += n * n;
+        }
+        const rms = Math.sqrt(sum / samples.length);
+        const pct = Math.min(100, Math.round(rms * 420));
+        els.levelFill.style.width = `${Math.max(2, pct)}%`;
+        if (rms >= 0.012) {
+          if (!state.hasSignal) {
+            clearTimeout(state.signalWarnTimer);
+            setMicCheck('麥克風有收到聲音；正在保留錄音', 'ok');
+          }
+          state.hasSignal = true;
+          els.level.classList.add('active');
+          els.levelText.textContent = '有聲音';
+        } else {
+          els.level.classList.remove('active');
+          els.levelText.textContent = state.hasSignal ? '目前安靜' : '尚未收到聲音';
+        }
+        state.levelRaf = requestAnimationFrame(draw);
+      };
+      state.levelRaf = requestAnimationFrame(draw);
+    } catch {
+      els.levelText.textContent = '錄音中';
+    }
+  }
+
+  function clearAudioReview() {
+    if (state.audioUrl) URL.revokeObjectURL(state.audioUrl);
+    state.audioUrl = '';
+    state.audioBlob = null;
+    els.audio.removeAttribute('src');
+    els.audioReview.hidden = true;
+  }
+
+  function renderAudioReview(blob) {
+    if (!blob?.size) return;
+    if (state.audioUrl) URL.revokeObjectURL(state.audioUrl);
+    state.audioBlob = blob;
+    state.audioUrl = URL.createObjectURL(blob);
+    els.audio.src = state.audioUrl;
+    els.audioDownload.href = state.audioUrl;
+    const ext = blob.type.includes('mp4') ? 'm4a' : blob.type.includes('ogg') ? 'ogg' : 'webm';
+    els.audioDownload.download = `${els.title.value.trim() || defaultMeetingTitle()}.${ext}`;
+    const kb = Math.max(1, Math.round(blob.size / 1024));
+    els.audioMeta.textContent = ` · ${formatClock(state.elapsedBase)} · ${kb} KB`;
+    els.audioStatus.textContent = state.hasSignal
+      ? '已錄到音訊。可先播放確認；若即時文字不完整，再用 Gemini 補轉。'
+      : '錄音檔已建立，但音量一直很低。請先播放確認是否有聲音。';
+    els.audioReview.hidden = false;
+  }
+
+  function startMediaCapture(stream) {
+    if (!MR) throw new Error('這個瀏覽器不支援 MediaRecorder');
+    state.mediaStream = stream;
+    state.audioChunks = [];
+    state.hasSignal = false;
+    const mime = pickRecorderMime((type) => MR.isTypeSupported?.(type));
+    const recorder = mime ? new MR(stream, { mimeType: mime }) : new MR(stream);
+    state.mediaRecorder = recorder;
+    recorder.addEventListener('dataavailable', (e) => {
+      if (e.data?.size) state.audioChunks.push(e.data);
+    });
+    recorder.addEventListener('error', () => {
+      setMicCheck('音訊錄製發生錯誤；請結束後播放確認，或重新錄一次。', 'bad', { retry: true });
+    });
+    recorder.addEventListener(
+      'stop',
+      () => {
+        const type = recorder.mimeType || mime || 'audio/webm';
+        const blob = new Blob(state.audioChunks, { type });
+        state.audioChunks = [];
+        state.mediaRecorder = null;
+        state.mediaStream?.getTracks().forEach((track) => track.stop());
+        state.mediaStream = null;
+        stopLevelMeter({ close: true });
+        els.level.hidden = true;
+        renderAudioReview(blob);
+      },
+      { once: true }
+    );
+    recorder.start(1000);
+    startLevelMeter(stream);
+    clearTimeout(state.signalWarnTimer);
+    state.signalWarnTimer = setTimeout(() => {
+      if (state.recording && !state.hasSignal) {
+        setMicCheck(
+          '麥克風已開啟，但音量仍是 0。請取消靜音、提高 Windows 輸入音量，或在網址列改選正確麥克風。',
+          'warn',
+          { retry: true }
+        );
+      }
+    }, 4000);
+  }
+
+  function stopMediaCapture() {
+    clearTimeout(state.signalWarnTimer);
+    stopLevelMeter();
+    const recorder = state.mediaRecorder;
+    if (recorder && recorder.state !== 'inactive') {
+      try {
+        recorder.stop();
+        return;
+      } catch {
+        /* release below */
+      }
+    }
+    state.mediaStream?.getTracks().forEach((track) => track.stop());
+    state.mediaStream = null;
+    stopLevelMeter({ close: true });
+    els.level.hidden = true;
+  }
+
+  function disableLiveTranscription(message) {
+    state.speechUnavailable = true;
+    stopRecognizer();
+    setStatus('錄音中 · 音訊備援', 'warn');
+    setMicCheck(`${message} 音訊仍在錄製；結束後可播放並補轉文字。`, 'warn');
+    els.interim.textContent = '即時文字暫停；音訊持續錄製中…';
   }
 
   function resetRecordingUi({ label = '開始錄音' } = {}) {
@@ -287,7 +487,7 @@ export function initMeetingNotes(container, { getApiKey, setApiKey, getModel, on
     state.recognizerStarted = false;
     state.startedAt = 0;
     clearInterval(state.timer);
-    els.toggle.disabled = !SR;
+    els.toggle.disabled = !MR;
     els.toggle.classList.remove('on');
     els.toggleLabel.textContent = label;
     els.live.hidden = true;
@@ -299,6 +499,7 @@ export function initMeetingNotes(container, { getApiKey, setApiKey, getModel, on
     state.recording = false;
     state.paused = false;
     stopRecognizer();
+    stopMediaCapture();
     resetRecordingUi();
     els.finish.disabled = !(state.meeting?.lines?.length);
     els.transcriptCard.hidden = false;
@@ -344,21 +545,21 @@ export function initMeetingNotes(container, { getApiKey, setApiKey, getModel, on
     };
     rec.onerror = (e) => {
       if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
-        failRecording(describeSpeechError(e.error), '麥克風被拒');
+        disableLiveTranscription(describeSpeechError(e.error));
         return;
       }
       if (e.error === 'audio-capture') {
-        failRecording(describeSpeechError(e.error), '找不到麥克風');
+        disableLiveTranscription(describeSpeechError(e.error));
         return;
       }
       if (e.error === 'language-not-supported') {
-        failRecording(describeSpeechError(e.error), '不支援中文辨識');
+        disableLiveTranscription(describeSpeechError(e.error));
         return;
       }
       if (e.error === 'network') {
         state.speechErrorCount++;
         if (state.speechErrorCount >= 2) {
-          failRecording(describeSpeechError(e.error), '辨識服務連線失敗');
+          disableLiveTranscription(describeSpeechError(e.error));
           return;
         }
         setStatus('辨識服務連線失敗，重試中…', 'warn');
@@ -389,9 +590,8 @@ export function initMeetingNotes(container, { getApiKey, setApiKey, getModel, on
     } catch (error) {
       state.recognizer = null;
       state.recognizerStarted = false;
-      failRecording(
+      disableLiveTranscription(
         error?.message ? `語音辨識無法啟動：${error.message}` : describeSpeechError('start-failed'),
-        '啟動失敗'
       );
       return false;
     }
@@ -408,14 +608,37 @@ export function initMeetingNotes(container, { getApiKey, setApiKey, getModel, on
   }
 
   async function startRecording() {
-    if (!SR || state.starting) return;
+    if (!MR || state.starting) return;
+    if (state.paused && state.mediaRecorder?.state === 'paused') {
+      state.recording = true;
+      state.paused = false;
+      state.startedAt = Date.now();
+      state.mediaRecorder.resume();
+      state.audioCtx?.resume?.();
+      startLevelMeter(state.mediaStream);
+      clearInterval(state.timer);
+      state.timer = setInterval(tickTimer, 500);
+      els.toggle.classList.add('on');
+      els.toggleLabel.textContent = '暫停';
+      els.finish.disabled = false;
+      els.live.hidden = false;
+      setStatus('錄音中 · 音訊已恢復', 'ok');
+      if (SR && !state.speechUnavailable) startRecognizer();
+      return;
+    }
     state.starting = true;
     els.toggle.disabled = true;
     els.toggleLabel.textContent = '檢查麥克風…';
     setStatus('檢查麥克風', 'warn');
+    let stream;
     try {
-      await ensureMicrophoneAccess();
+      stream = await ensureMicrophoneAccess();
+      clearAudioReview();
+      startMediaCapture(stream);
     } catch (error) {
+      stream?.getTracks().forEach((track) => track.stop());
+      state.mediaStream = null;
+      state.mediaRecorder = null;
       resetRecordingUi();
       setStatus('無法使用麥克風', 'bad');
       els.transcriptCard.hidden = false;
@@ -428,6 +651,7 @@ export function initMeetingNotes(container, { getApiKey, setApiKey, getModel, on
     state.paused = false;
     state.startedAt = Date.now();
     state.speechErrorCount = 0;
+    state.speechUnavailable = !SR;
     clearInterval(state.timer);
     state.timer = setInterval(tickTimer, 500);
     els.toggle.classList.add('on');
@@ -435,9 +659,14 @@ export function initMeetingNotes(container, { getApiKey, setApiKey, getModel, on
     els.toggle.disabled = false;
     els.finish.disabled = false;
     els.live.hidden = false;
-    els.interim.textContent = '正在啟動語音辨識…';
-    setStatus('啟動辨識中', 'warn');
-    if (!startRecognizer()) return;
+    if (SR) {
+      els.interim.textContent = '正在啟動語音辨識…';
+      setStatus('錄音中 · 啟動即時文字', 'warn');
+      startRecognizer();
+    } else {
+      els.interim.textContent = '瀏覽器不支援即時文字；音訊錄製中…';
+      setStatus('錄音中 · 音訊備援', 'warn');
+    }
     persist(true);
   }
 
@@ -448,6 +677,9 @@ export function initMeetingNotes(container, { getApiKey, setApiKey, getModel, on
     state.startedAt = 0;
     clearInterval(state.timer);
     stopRecognizer();
+    if (state.mediaRecorder?.state === 'recording') state.mediaRecorder.pause();
+    stopLevelMeter();
+    els.level.hidden = true;
     els.toggle.classList.remove('on');
     els.toggleLabel.textContent = '繼續錄音';
     els.live.hidden = true;
@@ -465,9 +697,11 @@ export function initMeetingNotes(container, { getApiKey, setApiKey, getModel, on
     state.startedAt = 0;
     clearInterval(state.timer);
     stopRecognizer();
+    stopMediaCapture();
     els.toggle.classList.remove('on');
     els.toggleLabel.textContent = '開始錄音';
     els.live.hidden = true;
+    els.level.hidden = true;
     tickTimer();
     if (!finish) return;
     const m = ensureMeeting();
@@ -547,6 +781,56 @@ export function initMeetingNotes(container, { getApiKey, setApiKey, getModel, on
     } finally {
       state.aiBusy = false;
       els.extractAI.disabled = false;
+    }
+  }
+
+  async function transcribeRecordedAudio() {
+    if (state.transcribeBusy || !state.audioBlob) return;
+    const key = (getApiKey?.() || '').trim();
+    const problem = describeApiKeyProblem(key);
+    if (problem) {
+      els.keyRow.hidden = false;
+      els.transcriptCard.hidden = false;
+      els.keyHint.textContent = problem;
+      els.apiKey.focus();
+      els.transcriptCard.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      return;
+    }
+    state.transcribeBusy = true;
+    els.audioTranscribe.disabled = true;
+    els.audioStatus.textContent = '準備上傳錄音…';
+    const ext = state.audioBlob.type.includes('mp4') ? 'm4a' : state.audioBlob.type.includes('ogg') ? 'ogg' : 'webm';
+    const file = new File([state.audioBlob], `manager-brief.${ext}`, { type: state.audioBlob.type || 'audio/webm' });
+    try {
+      const result = await transcribeAudioWithGemini({
+        apiKey: key,
+        model: getModel?.(),
+        file,
+        onProgress: (message) => {
+          els.audioStatus.textContent = message;
+        },
+        onRetry: ({ attempt, maxAttempts, delayMs, status }) => {
+          els.audioStatus.textContent = `Google 回報 ${status}，${Math.round(delayMs / 1000)} 秒後重試（${attempt}/${maxAttempts}）…`;
+        },
+      });
+      onGeminiUsed?.(result.usedTokens || 0);
+      const m = ensureMeeting();
+      m.lines = result.segs.map((seg) => ({ t: seg.start || 0, text: seg.text }));
+      m.transcript = linesToTranscript(m.lines);
+      els.text.value = m.transcript;
+      els.transcriptCard.hidden = false;
+      renderLines();
+      persist(true);
+      els.audioStatus.textContent = `轉錄完成 · ${m.lines.length} 段${result.truncated ? '（錄音較長，目前只取得前段）' : ''}`;
+      setStatus(`已轉錄 · ${m.lines.length} 段`, 'ok');
+      runRuleExtract();
+      els.transcriptCard.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    } catch (error) {
+      els.audioStatus.textContent = `轉錄失敗：${error?.message || error}`;
+      toast(error?.message || '錄音轉錄失敗');
+    } finally {
+      state.transcribeBusy = false;
+      els.audioTranscribe.disabled = false;
     }
   }
 
@@ -681,9 +965,12 @@ export function initMeetingNotes(container, { getApiKey, setApiKey, getModel, on
   }
 
   function newSession() {
+    clearAudioReview();
     state.meeting = null;
     state.elapsedBase = 0;
     state.theme = '';
+    state.speechUnavailable = false;
+    state.hasSignal = false;
     els.title.value = '';
     els.text.value = '';
     els.lines.innerHTML = '';
@@ -708,6 +995,7 @@ export function initMeetingNotes(container, { getApiKey, setApiKey, getModel, on
     if (!state.recording && !state.starting) startRecording();
   });
   els.finish.addEventListener('click', () => stopRecording({ finish: true }));
+  els.audioTranscribe.addEventListener('click', transcribeRecordedAudio);
   els.title.addEventListener('input', () => persist());
   els.text.addEventListener('input', () => {
     if (!state.meeting) ensureMeeting();
@@ -786,6 +1074,8 @@ export function initMeetingNotes(container, { getApiKey, setApiKey, getModel, on
 
   window.addEventListener('beforeunload', () => {
     if (state.recording || state.paused) persist(true);
+    state.mediaStream?.getTracks().forEach((track) => track.stop());
+    if (state.audioUrl) URL.revokeObjectURL(state.audioUrl);
   });
 
   renderDirectives();

@@ -1494,6 +1494,12 @@ button.primary:hover { background:linear-gradient(180deg,#ffffff,#e6e0d1);
 .brief-mic-check.bad { color:var(--bad); border-color:rgba(255,75,51,.5); background:rgba(255,75,51,.055); }
 .brief-mic-check.bad .brief-mic-check-dot { background:var(--bad); }
 .brief-mic-check .slog-mini { flex:0 0 auto; white-space:nowrap; }
+.brief-level { display:grid; grid-template-columns:auto minmax(80px,1fr) auto; align-items:center; gap:9px; margin:-4px 0 12px; }
+.brief-level-label, .brief-level-text { font-family:var(--mono); font-size:.62rem; letter-spacing:.1em; color:var(--muted); }
+.brief-level-track { height:6px; overflow:hidden; border-radius:999px; background:rgba(255,255,255,.1); }
+.brief-level-track > span { display:block; width:0; height:100%; border-radius:inherit; background:var(--warn); transition:width .08s linear, background .15s; }
+.brief-level.active .brief-level-track > span { background:var(--ok); }
+.brief-level.active .brief-level-text { color:var(--ok); }
 .brief-rec-controls { display:flex; align-items:center; gap:12px; flex-wrap:wrap; }
 .brief-rec-btn { display:inline-flex; align-items:center; gap:10px; padding:12px 20px; border-radius:999px; font-weight:700; letter-spacing:.06em;
   border:1px solid var(--border); background:var(--panel2); color:var(--text); }
@@ -1513,12 +1519,18 @@ button.primary:hover { background:linear-gradient(180deg,#ffffff,#e6e0d1);
 .brief-lines li { display:grid; grid-template-columns:auto 1fr; gap:12px; padding:8px 12px; border-bottom:1px solid var(--border); font-size:.9rem; line-height:1.6; }
 .brief-lines li:last-child { border-bottom:none; }
 .brief-line-t { font-family:var(--mono); font-size:.68rem; letter-spacing:.08em; color:var(--muted); padding-top:4px; }
+.brief-audio-review { margin:12px 0 0; padding:12px; border:1px solid rgba(61,220,132,.35); border-radius:8px; background:rgba(61,220,132,.045); }
+.brief-audio-review-head { display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:8px; }
+.brief-audio-review-head > div { display:flex; align-items:baseline; gap:4px; flex-wrap:wrap; }
+.brief-audio-review audio { display:block; width:100%; height:38px; }
+.brief-audio-actions { margin-top:9px; }
+.brief-audio-actions .hint { flex:1 1 260px; }
 .brief-unsupported { margin-top:10px; color:var(--warn); }
 .brief-text { width:100%; min-height:160px; resize:vertical; line-height:1.7; }
 .brief-actions { margin-top:12px; }
 .brief-extract-hint { flex:1 1 260px; }
 .brief-key-row { margin-top:10px; }
-.brief-live[hidden], .brief-key-row[hidden], .brief-theme[hidden], .brief .card[hidden] { display:none; }
+.brief-live[hidden], .brief-level[hidden], .brief-audio-review[hidden], .brief-key-row[hidden], .brief-theme[hidden], .brief .card[hidden] { display:none; }
 .brief-points-head { display:flex; flex-direction:column; gap:4px; margin-bottom:10px; }
 .brief-theme { margin:0 0 12px; padding:10px 14px; border-left:3px solid var(--tab-paper); background:rgba(0,0,0,.12); border-radius:0 6px 6px 0; font-size:.9rem; }
 .brief-point-list, .brief-dir-list, .brief-hist-list { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:8px; }
