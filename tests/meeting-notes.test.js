@@ -113,6 +113,20 @@ describe('meeting-notes: storage', () => {
     expect(m.points[0]).toMatchObject({ text: '重點', category: 'process', selected: true });
   });
 
+  it('keeps the persisted continuous-audio reference with a meeting', () => {
+    const m = mn.saveMeeting({
+      title: '有錄音的早會',
+      audioSessionId: 'brief_mt_1',
+      audioMimeType: 'audio/webm',
+      audioBytes: 1234,
+    });
+    expect(mn.getMeeting(m.id)).toMatchObject({
+      audioSessionId: 'brief_mt_1',
+      audioMimeType: 'audio/webm',
+      audioBytes: 1234,
+    });
+  });
+
   it('caps stored meetings at MEETING_LIMIT', () => {
     for (let i = 0; i < mn.MEETING_LIMIT + 5; i++) mn.saveMeeting({ title: `m${i}`, startedAt: i });
     expect(mn.listMeetings()).toHaveLength(mn.MEETING_LIMIT);

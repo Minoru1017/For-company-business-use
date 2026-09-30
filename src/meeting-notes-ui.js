@@ -5,6 +5,16 @@
 import { callGeminiResilient, describeApiKeyProblem } from './gemini.js';
 import { transcribeAudioWithGemini } from './audio-transcribe.js';
 import {
+  appendMeetingAudioChunk,
+  beginMeetingAudioSession,
+  deleteMeetingAudioSession,
+  finalizeMeetingAudioSession,
+  getMeetingAudioBlob,
+  getMeetingAudioSession,
+  listInterruptedMeetingAudioSessions,
+  makeMeetingAudioSessionId,
+} from './meeting-audio-store.js';
+import {
   applyMeetingDirectives,
   archiveDirective,
   listDirectives,
@@ -112,6 +122,10 @@ export function initMeetingNotes(container, { getApiKey, setApiKey, getModel, on
     mediaStream: null,
     mediaRecorder: null,
     audioChunks: [],
+    audioSessionId: '',
+    audioChunkIndex: 0,
+    audioSaveQueue: Promise.resolve(),
+    audioSaveError: null,
     audioBlob: null,
     audioUrl: '',
     audioCtx: null,
@@ -126,6 +140,7 @@ export function initMeetingNotes(container, { getApiKey, setApiKey, getModel, on
       noiseSuppression: true,
       autoGainControl: true,
     },
+    recoveryChecked: false,
   };
 
   container.innerHTML = `
@@ -172,6 +187,7 @@ export function initMeetingNotes(container, { getApiKey, setApiKey, getModel, on
         <div class="brief-rec-controls">
           <button type="button" class="brief-rec-btn" id="bfToggle"><span class="brief-rec-dot" aria-hidden="true"></span><span id="bfToggleLabel">開始錄音</span></button>
           <span class="brief-timer" id="bfTimer">00:00</span>
+          <span class="brief-save-state" id="bfSaveState">尚未錄音</span>
           <input type="text" class="field brief-title" id="bfTitle" placeholder="${escapeHTML(defaultMeetingTitle())}" maxlength="60">
           <button type="button" class="btn" id="bfFinish" disabled>結束並整理</button>
         </div>
@@ -238,6 +254,7 @@ export function initMeetingNotes(container, { getApiKey, setApiKey, getModel, on
     toggle: q('#bfToggle'),
     toggleLabel: q('#bfToggleLabel'),
     timer: q('#bfTimer'),
+    saveState: q('#bfSaveState'),
     title: q('#bfTitle'),
     finish: q('#bfFinish'),
     live: q('#bfLive'),
@@ -487,35 +504,107 @@ export function initMeetingNotes(container, { getApiKey, setApiKey, getModel, on
     els.audioReview.hidden = false;
   }
 
-  function startMediaCapture(stream) {
+  async function startMediaCapture(stream, meeting) {
     if (!MR) throw new Error('這個瀏覽器不支援 MediaRecorder');
     state.mediaStream = stream;
     state.audioChunks = [];
+    state.audioChunkIndex = 0;
+    state.audioSaveError = null;
+    state.audioSaveQueue = Promise.resolve();
     state.hasSignal = false;
     const mime = pickRecorderMime((type) => MR.isTypeSupported?.(type));
-    const recorder = mime ? new MR(stream, { mimeType: mime }) : new MR(stream);
+    const options = { audioBitsPerSecond: 128000, ...(mime ? { mimeType: mime } : {}) };
+    const recorder = new MR(stream, options);
+    const type = recorder.mimeType || mime || 'audio/webm';
+    const sessionId = makeMeetingAudioSessionId(meeting.id, meeting.startedAt);
+    await beginMeetingAudioSession({
+      id: sessionId,
+      meetingId: meeting.id,
+      title: meeting.title || els.title.value.trim(),
+      mimeType: type,
+      startedAt: meeting.startedAt,
+    });
+    state.audioSessionId = sessionId;
+    meeting.audioSessionId = sessionId;
+    meeting.audioMimeType = type;
+    els.saveState.textContent = '連續保存準備完成';
+    els.saveState.className = 'brief-save-state ok';
     state.mediaRecorder = recorder;
     recorder.addEventListener('dataavailable', (e) => {
-      if (e.data?.size) state.audioChunks.push(e.data);
+      if (!e.data?.size) return;
+      state.audioChunks.push(e.data);
+      const index = state.audioChunkIndex++;
+      state.audioSaveQueue = state.audioSaveQueue
+        .then(() => appendMeetingAudioChunk(sessionId, index, e.data))
+        .then(() => {
+          els.saveState.textContent = `已連續保存 ${state.audioChunkIndex} 段`;
+          els.saveState.className = 'brief-save-state ok';
+        })
+        .catch((error) => {
+          state.audioSaveError ||= error;
+          els.saveState.textContent = '本機保存失敗，錄音仍在記憶體中';
+          els.saveState.className = 'brief-save-state bad';
+        });
     });
     recorder.addEventListener('error', () => {
       setMicCheck('音訊錄製發生錯誤；請結束後播放確認，或重新錄一次。', 'bad', { retry: true });
     });
     recorder.addEventListener(
       'stop',
-      () => {
-        const type = recorder.mimeType || mime || 'audio/webm';
-        const blob = new Blob(state.audioChunks, { type });
+      async () => {
+        els.saveState.textContent = '正在完成最後一段…';
+        els.saveState.className = 'brief-save-state busy';
+        await state.audioSaveQueue;
+        let storedBlob = null;
+        let session = null;
+        try {
+          if (!state.audioSaveError) {
+            await finalizeMeetingAudioSession(sessionId);
+            storedBlob = await getMeetingAudioBlob(sessionId);
+            session = await getMeetingAudioSession(sessionId);
+          }
+        } catch (error) {
+          state.audioSaveError ||= error;
+        }
+        const blob = storedBlob?.size ? storedBlob : new Blob(state.audioChunks, { type });
         state.audioChunks = [];
         state.mediaRecorder = null;
         state.mediaStream?.getTracks().forEach((track) => track.stop());
         state.mediaStream = null;
         stopLevelMeter({ close: true });
         els.level.hidden = true;
+        if (state.meeting) {
+          state.meeting.audioSessionId = sessionId;
+          state.meeting.audioMimeType = type;
+          state.meeting.audioBytes = session?.bytes || blob.size;
+          persist(true);
+        }
         renderAudioReview(blob);
+        els.saveState.textContent = state.audioSaveError ? '已完成；持續保存曾發生錯誤' : '完整音訊已保存';
+        els.saveState.className = `brief-save-state ${state.audioSaveError ? 'bad' : 'ok'}`;
       },
       { once: true }
     );
+    const track = stream.getAudioTracks()[0];
+    track?.addEventListener('mute', () => {
+      if (state.mediaRecorder === recorder && recorder.state === 'recording') {
+        setMicCheck('麥克風暫時沒有提供音訊；已錄片段仍安全保存，正在等待恢復。', 'warn');
+      }
+    });
+    track?.addEventListener('unmute', () => {
+      if (state.mediaRecorder === recorder && recorder.state === 'recording') {
+        setMicCheck('麥克風音訊已恢復；持續保存中。', 'ok');
+      }
+    });
+    track?.addEventListener('ended', () => {
+      if (state.mediaRecorder === recorder && recorder.state !== 'inactive') {
+        stopRecording({ finish: true });
+        setStatus('麥克風已中斷 · 已保留中斷前音訊', 'bad');
+        setMicCheck('麥克風裝置已中斷。中斷前每秒保存的音訊已保留，請重新選擇裝置再錄。', 'bad', {
+          retry: true,
+        });
+      }
+    });
     recorder.start(1000);
     startLevelMeter(stream);
     clearTimeout(state.signalWarnTimer);
@@ -714,7 +803,8 @@ export function initMeetingNotes(container, { getApiKey, setApiKey, getModel, on
     try {
       stream = await ensureMicrophoneAccess();
       clearAudioReview();
-      startMediaCapture(stream);
+      const meeting = ensureMeeting();
+      await startMediaCapture(stream, meeting);
     } catch (error) {
       stream?.getTracks().forEach((track) => track.stop());
       state.mediaStream = null;
@@ -725,7 +815,6 @@ export function initMeetingNotes(container, { getApiKey, setApiKey, getModel, on
       toast(error?.userMessage || describeMicrophoneAccessError(error, { secureContext: window.isSecureContext }));
       return;
     }
-    ensureMeeting();
     state.starting = false;
     state.recording = true;
     state.paused = false;
@@ -1024,10 +1113,11 @@ export function initMeetingNotes(container, { getApiKey, setApiKey, getModel, on
       : '<li class="hint brief-empty">還沒有紀錄。</li>';
   }
 
-  function openMeeting(id) {
+  async function openMeeting(id) {
     if (state.recording) return toast('請先結束目前錄音');
     const m = getMeeting(id);
     if (!m) return;
+    clearAudioReview();
     state.meeting = { ...m, lines: m.lines.map((l) => ({ ...l })), points: normalizePoints(m.points) };
     state.elapsedBase = m.endedAt && m.startedAt ? (m.endedAt - m.startedAt) / 1000 : m.lines.at(-1)?.t || 0;
     state.theme = '';
@@ -1041,6 +1131,15 @@ export function initMeetingNotes(container, { getApiKey, setApiKey, getModel, on
     else els.pointsCard.hidden = true;
     renderHistory();
     setStatus(m.applied ? '已套用' : '已結束', '');
+    if (m.audioSessionId) {
+      const blob = await getMeetingAudioBlob(m.audioSessionId).catch(() => null);
+      if (blob?.size && state.meeting?.id === m.id) {
+        state.audioSessionId = m.audioSessionId;
+        renderAudioReview(blob);
+        els.saveState.textContent = '已載入完整保存音訊';
+        els.saveState.className = 'brief-save-state ok';
+      }
+    }
     container.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
@@ -1051,6 +1150,7 @@ export function initMeetingNotes(container, { getApiKey, setApiKey, getModel, on
     state.theme = '';
     state.speechUnavailable = false;
     state.hasSignal = false;
+    state.audioSessionId = '';
     els.title.value = '';
     els.text.value = '';
     els.lines.innerHTML = '';
@@ -1060,6 +1160,48 @@ export function initMeetingNotes(container, { getApiKey, setApiKey, getModel, on
     els.finish.disabled = true;
     tickTimer();
     setStatus('待命');
+    els.saveState.textContent = '尚未錄音';
+    els.saveState.className = 'brief-save-state';
+  }
+
+  async function recoverInterruptedAudio() {
+    if (state.recoveryChecked || state.recording) return;
+    state.recoveryChecked = true;
+    const sessions = await listInterruptedMeetingAudioSessions().catch(() => []);
+    const session = sessions[0];
+    if (!session) return;
+    const blob = await getMeetingAudioBlob(session.id).catch(() => null);
+    if (!blob?.size) return;
+    await finalizeMeetingAudioSession(session.id, { endedAt: session.updatedAt || Date.now(), interrupted: true }).catch(
+      () => {}
+    );
+    const saved = getMeeting(session.meetingId);
+    state.meeting = saved || {
+      id: session.meetingId,
+      title: session.title || defaultMeetingTitle(session.startedAt),
+      startedAt: session.startedAt,
+      endedAt: session.updatedAt || Date.now(),
+      lines: [],
+      transcript: '',
+      points: [],
+      applied: false,
+    };
+    state.meeting.audioSessionId = session.id;
+    state.meeting.audioMimeType = session.mimeType;
+    state.meeting.audioBytes = session.bytes || blob.size;
+    state.meeting.endedAt ||= session.updatedAt || Date.now();
+    state.elapsedBase = Math.max(0, (state.meeting.endedAt - state.meeting.startedAt) / 1000);
+    state.audioSessionId = session.id;
+    els.title.value = state.meeting.title || '';
+    renderAudioReview(blob);
+    persist(true);
+    tickTimer();
+    renderHistory();
+    setStatus('已救回中斷前音訊', 'warn');
+    els.audioStatus.textContent = '偵測到上次未正常結束的錄音；每秒保存的音訊已救回，可播放或下載確認。';
+    els.saveState.textContent = '中斷前完整片段已救回';
+    els.saveState.className = 'brief-save-state ok';
+    toast('已救回上次中斷前持續保存的早會音訊');
   }
 
   /* ---------------- 事件 ---------------- */
@@ -1209,15 +1351,30 @@ export function initMeetingNotes(container, { getApiKey, setApiKey, getModel, on
     if (e.target.closest('[data-open]')) return openMeeting(li.dataset.id);
     if (e.target.closest('[data-del]')) {
       if (!confirm('刪除這場早會紀錄？（已套用的方向會保留）')) return;
+      const meeting = getMeeting(li.dataset.id);
       deleteMeeting(li.dataset.id);
+      if (meeting?.audioSessionId) deleteMeetingAudioSession(meeting.audioSessionId).catch(() => {});
       if (state.meeting?.id === li.dataset.id) newSession();
       renderHistory();
     }
   });
 
+  const flushCurrentAudioSlice = () => {
+    if (state.mediaRecorder?.state === 'recording') {
+      try {
+        state.mediaRecorder.requestData();
+      } catch {
+        /* browser is already unloading */
+      }
+    }
+  };
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState === 'hidden') flushCurrentAudioSlice();
+  });
+  window.addEventListener('pagehide', flushCurrentAudioSlice);
   window.addEventListener('beforeunload', () => {
     if (state.recording || state.paused) persist(true);
-    state.mediaStream?.getTracks().forEach((track) => track.stop());
+    flushCurrentAudioSlice();
     if (state.audioUrl) URL.revokeObjectURL(state.audioUrl);
   });
 
@@ -1246,6 +1403,7 @@ export function initMeetingNotes(container, { getApiKey, setApiKey, getModel, on
     activate() {
       renderDirectives();
       renderHistory();
+      recoverInterruptedAudio();
     },
     syncApiKey(v) {
       els.apiKey.value = v || '';
