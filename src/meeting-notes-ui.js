@@ -26,6 +26,34 @@ import {
 } from './meeting-notes.js';
 import { escapeHTML } from './utils.js';
 
+export function describeSpeechError(code) {
+  const key = String(code || '').toLowerCase();
+  if (key === 'not-allowed' || key === 'service-not-allowed') {
+    return '麥克風權限被封鎖。請點網址列左側的鎖頭／設定圖示 → 麥克風 → 允許，重新整理後再試。';
+  }
+  if (key === 'audio-capture') {
+    return '找不到可用的麥克風。請確認耳機或麥克風已接上，並在 Windows「設定 → 系統 → 音效 → 輸入」選對裝置。';
+  }
+  if (key === 'network') {
+    return '瀏覽器語音辨識服務連線失敗。即時辨識需要網路；請確認公司網路沒有封鎖 Google 語音服務後再試。';
+  }
+  if (key === 'language-not-supported') return '瀏覽器不支援繁體中文語音辨識，請改用最新版 Chrome 或 Edge。';
+  if (key === 'no-speech') return '目前沒有偵測到聲音，請靠近麥克風說話，並確認輸入音量沒有靜音。';
+  return '語音辨識沒有成功啟動，請重新檢查麥克風後再試。';
+}
+
+export function describeMicrophoneAccessError(error, { secureContext = true } = {}) {
+  if (!secureContext) return '目前不是安全連線，瀏覽器不允許使用麥克風。請改用 https:// 網址。';
+  const name = String(error?.name || '');
+  if (name === 'NotAllowedError' || name === 'SecurityError') return describeSpeechError('not-allowed');
+  if (name === 'NotFoundError' || name === 'DevicesNotFoundError') return describeSpeechError('audio-capture');
+  if (name === 'NotReadableError' || name === 'TrackStartError') {
+    return '麥克風正被其他程式占用，或 Windows 不允許瀏覽器使用。請關閉 Teams／Meet／錄音程式後再試。';
+  }
+  if (name === 'OverconstrainedError') return '目前的麥克風設定無法使用，請在瀏覽器網站設定中改選其他輸入裝置。';
+  return error?.message ? `無法開啟麥克風：${error.message}` : '無法開啟麥克風，請檢查瀏覽器與 Windows 權限。';
+}
+
 function dateKeyOf(ts) {
   const d = new Date(ts);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -48,6 +76,9 @@ export function initMeetingNotes(container, { getApiKey, setApiKey, getModel, on
     saveT: null,
     aiBusy: false,
     theme: '',
+    starting: false,
+    recognizerStarted: false,
+    speechErrorCount: 0,
   };
 
   container.innerHTML = `
@@ -61,6 +92,11 @@ export function initMeetingNotes(container, { getApiKey, setApiKey, getModel, on
           <span class="brief-status" id="bfStatus">待命</span>
         </div>
         <p class="hint brief-consent">語音辨識由瀏覽器提供（Chrome／Edge 會把聲音送到瀏覽器供應商處理），逐字稿與重點只存在這台電腦。不支援的瀏覽器可在下方直接貼上文字。</p>
+        <div class="brief-mic-check" id="bfMicCheck">
+          <span class="brief-mic-check-dot" aria-hidden="true"></span>
+          <span id="bfMicText">按「開始錄音」後會先檢查麥克風，第一次使用請在瀏覽器跳出的視窗按「允許」。</span>
+          <button type="button" class="btn slog-mini" id="bfMicRetry" hidden>重新檢查</button>
+        </div>
         <div class="brief-rec-controls">
           <button type="button" class="brief-rec-btn" id="bfToggle"><span class="brief-rec-dot" aria-hidden="true"></span><span id="bfToggleLabel">開始錄音</span></button>
           <span class="brief-timer" id="bfTimer">00:00</span>
@@ -125,6 +161,9 @@ export function initMeetingNotes(container, { getApiKey, setApiKey, getModel, on
     interim: q('#bfInterim'),
     lines: q('#bfLines'),
     unsupported: q('#bfUnsupported'),
+    micCheck: q('#bfMicCheck'),
+    micText: q('#bfMicText'),
+    micRetry: q('#bfMicRetry'),
     transcriptCard: q('#bfTranscriptCard'),
     lineCount: q('#bfLineCount'),
     text: q('#bfText'),
@@ -149,6 +188,10 @@ export function initMeetingNotes(container, { getApiKey, setApiKey, getModel, on
 
   if (!SR) {
     els.unsupported.hidden = false;
+    els.unsupported.textContent =
+      typeof window !== 'undefined' && !window.isSecureContext
+        ? '目前不是安全連線，瀏覽器不允許使用麥克風。請改用 https:// 網址開啟。你仍可在下方貼上逐字稿再萃取重點。'
+        : '這個瀏覽器不支援即時語音辨識（建議用最新版 Chrome 或 Edge）。你仍可在下方貼上逐字稿再萃取重點。';
     els.toggle.disabled = true;
     els.transcriptCard.hidden = false;
   }
@@ -197,22 +240,98 @@ export function initMeetingNotes(container, { getApiKey, setApiKey, getModel, on
 
   /* ---------------- 語音辨識 ---------------- */
 
+  function setMicCheck(text, cls = '', { retry = false } = {}) {
+    els.micText.textContent = text;
+    els.micCheck.className = `brief-mic-check ${cls}`;
+    els.micRetry.hidden = !retry;
+  }
+
+  async function ensureMicrophoneAccess() {
+    const secureContext = typeof window === 'undefined' || window.isSecureContext;
+    if (!secureContext) throw Object.assign(new Error('insecure-context'), { name: 'SecurityError' });
+    const media = typeof navigator !== 'undefined' ? navigator.mediaDevices : null;
+    if (!media?.getUserMedia) {
+      throw Object.assign(new Error('瀏覽器沒有提供麥克風存取功能'), { name: 'NotSupportedError' });
+    }
+    setMicCheck('正在向瀏覽器確認麥克風權限…', 'checking');
+    let stream;
+    try {
+      stream = await media.getUserMedia({
+        audio: {
+          echoCancellation: true,
+          noiseSuppression: true,
+          autoGainControl: true,
+        },
+      });
+      const track = stream.getAudioTracks()[0];
+      if (!track || track.readyState !== 'live') {
+        throw Object.assign(new Error('找不到啟用中的音訊軌'), { name: 'NotFoundError' });
+      }
+      const label = track.label?.trim();
+      setMicCheck(`麥克風已連線${label ? `：${label}` : ''}`, 'ok');
+      return true;
+    } catch (error) {
+      const message = describeMicrophoneAccessError(error, { secureContext });
+      setMicCheck(message, 'bad', { retry: true });
+      throw Object.assign(error instanceof Error ? error : new Error(message), { userMessage: message });
+    } finally {
+      // Web Speech API 會自行開啟預設麥克風；預檢串流只用來確認權限與裝置，立即釋放避免占用。
+      stream?.getTracks().forEach((track) => track.stop());
+    }
+  }
+
+  function resetRecordingUi({ label = '開始錄音' } = {}) {
+    state.recording = false;
+    state.paused = false;
+    state.starting = false;
+    state.recognizerStarted = false;
+    state.startedAt = 0;
+    clearInterval(state.timer);
+    els.toggle.disabled = !SR;
+    els.toggle.classList.remove('on');
+    els.toggleLabel.textContent = label;
+    els.live.hidden = true;
+    tickTimer();
+  }
+
+  function failRecording(message, status = '麥克風無聲音') {
+    if (state.recording) state.elapsedBase = elapsedSec();
+    state.recording = false;
+    state.paused = false;
+    stopRecognizer();
+    resetRecordingUi();
+    els.finish.disabled = !(state.meeting?.lines?.length);
+    els.transcriptCard.hidden = false;
+    setStatus(status, 'bad');
+    setMicCheck(message, 'bad', { retry: true });
+    toast(message);
+  }
+
   function appendLine(text) {
     const clean = String(text || '').trim();
     if (!clean) return;
     const m = ensureMeeting();
     m.lines.push({ t: elapsedSec(), text: clean });
+    state.speechErrorCount = 0;
+    setStatus('錄音中 · 已收到聲音', 'ok');
+    setMicCheck('已收到聲音，正在即時轉成文字', 'ok');
     renderLines();
     persist();
   }
 
   function startRecognizer() {
-    if (!SR) return;
+    if (!SR) return false;
     const rec = new SR();
     rec.lang = 'zh-TW';
     rec.interimResults = true;
     rec.continuous = true;
     rec.maxAlternatives = 1;
+    rec.onstart = () => {
+      if (state.recognizer !== rec) return;
+      state.recognizerStarted = true;
+      setStatus('錄音中 · 等待說話', 'ok');
+      els.interim.textContent = '請對著麥克風說話…';
+    };
     rec.onresult = (e) => {
       let interim = '';
       for (let i = e.resultIndex; i < e.results.length; i++) {
@@ -225,17 +344,37 @@ export function initMeetingNotes(container, { getApiKey, setApiKey, getModel, on
     };
     rec.onerror = (e) => {
       if (e.error === 'not-allowed' || e.error === 'service-not-allowed') {
-        toast('瀏覽器拒絕使用麥克風，請在網址列允許麥克風後再試');
-        stopRecording({ finish: false });
-        setStatus('麥克風被拒', 'bad');
+        failRecording(describeSpeechError(e.error), '麥克風被拒');
         return;
       }
-      if (e.error === 'network') setStatus('網路辨識暫時失敗，重試中…', 'warn');
-      // no-speech / aborted：onend 會自動重啟
+      if (e.error === 'audio-capture') {
+        failRecording(describeSpeechError(e.error), '找不到麥克風');
+        return;
+      }
+      if (e.error === 'language-not-supported') {
+        failRecording(describeSpeechError(e.error), '不支援中文辨識');
+        return;
+      }
+      if (e.error === 'network') {
+        state.speechErrorCount++;
+        if (state.speechErrorCount >= 2) {
+          failRecording(describeSpeechError(e.error), '辨識服務連線失敗');
+          return;
+        }
+        setStatus('辨識服務連線失敗，重試中…', 'warn');
+        setMicCheck(describeSpeechError(e.error), 'warn', { retry: true });
+      }
+      if (e.error === 'no-speech') {
+        setStatus('錄音中 · 尚未聽到聲音', 'warn');
+        setMicCheck(describeSpeechError(e.error), 'warn', { retry: true });
+        els.interim.textContent = '沒有偵測到聲音，請確認麥克風未靜音…';
+      }
+      // aborted 通常是暫停／結束造成；onend 會依 state 決定是否重啟。
     };
     rec.onend = () => {
       if (state.recognizer !== rec) return;
       state.recognizer = null;
+      state.recognizerStarted = false;
       // Chrome 會在靜音或約一分鐘後自動停止；錄音中就接著開
       if (state.recording && !state.paused) {
         setTimeout(() => {
@@ -246,8 +385,15 @@ export function initMeetingNotes(container, { getApiKey, setApiKey, getModel, on
     state.recognizer = rec;
     try {
       rec.start();
-    } catch {
+      return true;
+    } catch (error) {
       state.recognizer = null;
+      state.recognizerStarted = false;
+      failRecording(
+        error?.message ? `語音辨識無法啟動：${error.message}` : describeSpeechError('start-failed'),
+        '啟動失敗'
+      );
+      return false;
     }
   }
 
@@ -261,21 +407,36 @@ export function initMeetingNotes(container, { getApiKey, setApiKey, getModel, on
     }
   }
 
-  function startRecording() {
-    if (!SR) return;
+  async function startRecording() {
+    if (!SR || state.starting) return;
+    state.starting = true;
+    els.toggle.disabled = true;
+    els.toggleLabel.textContent = '檢查麥克風…';
+    setStatus('檢查麥克風', 'warn');
+    try {
+      await ensureMicrophoneAccess();
+    } catch (error) {
+      resetRecordingUi();
+      setStatus('無法使用麥克風', 'bad');
+      toast(error?.userMessage || describeMicrophoneAccessError(error, { secureContext: window.isSecureContext }));
+      return;
+    }
     ensureMeeting();
+    state.starting = false;
     state.recording = true;
     state.paused = false;
     state.startedAt = Date.now();
+    state.speechErrorCount = 0;
     clearInterval(state.timer);
     state.timer = setInterval(tickTimer, 500);
-    startRecognizer();
     els.toggle.classList.add('on');
     els.toggleLabel.textContent = '暫停';
+    els.toggle.disabled = false;
     els.finish.disabled = false;
     els.live.hidden = false;
-    els.interim.textContent = '聆聽中…';
-    setStatus('錄音中', 'ok');
+    els.interim.textContent = '正在啟動語音辨識…';
+    setStatus('啟動辨識中', 'warn');
+    if (!startRecognizer()) return;
     persist(true);
   }
 
@@ -298,6 +459,8 @@ export function initMeetingNotes(container, { getApiKey, setApiKey, getModel, on
     if (state.recording) state.elapsedBase = elapsedSec();
     state.recording = false;
     state.paused = false;
+    state.starting = false;
+    state.recognizerStarted = false;
     state.startedAt = 0;
     clearInterval(state.timer);
     stopRecognizer();
@@ -539,6 +702,9 @@ export function initMeetingNotes(container, { getApiKey, setApiKey, getModel, on
       if (state.meeting?.endedAt && !state.paused) newSession();
       startRecording();
     }
+  });
+  els.micRetry.addEventListener('click', () => {
+    if (!state.recording && !state.starting) startRecording();
   });
   els.finish.addEventListener('click', () => stopRecording({ finish: true }));
   els.title.addEventListener('input', () => persist());
