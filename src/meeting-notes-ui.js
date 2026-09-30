@@ -418,6 +418,7 @@ export function initMeetingNotes(container, { getApiKey, setApiKey, getModel, on
     } catch (error) {
       resetRecordingUi();
       setStatus('無法使用麥克風', 'bad');
+      els.transcriptCard.hidden = false;
       toast(error?.userMessage || describeMicrophoneAccessError(error, { secureContext: window.isSecureContext }));
       return;
     }
