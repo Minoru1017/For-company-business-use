@@ -39,7 +39,9 @@ export function describeSpeechError(code) {
     return '瀏覽器語音辨識服務連線失敗。即時辨識需要網路；請確認公司網路沒有封鎖 Google 語音服務後再試。';
   }
   if (key === 'language-not-supported') return '瀏覽器不支援繁體中文語音辨識，請改用最新版 Chrome 或 Edge。';
-  if (key === 'no-speech') return '目前沒有偵測到聲音，請靠近麥克風說話，並確認輸入音量沒有靜音。';
+  if (key === 'no-speech') {
+    return '目前沒有偵測到聲音。請取消靜音、提高 Windows 輸入音量，或點網址列設定改選正確的麥克風。';
+  }
   return '語音辨識沒有成功啟動，請重新檢查麥克風後再試。';
 }
 
@@ -138,7 +140,7 @@ export function initMeetingNotes(container, { getApiKey, setApiKey, getModel, on
           <audio id="bfAudio" controls preload="metadata"></audio>
           <div class="row brief-audio-actions">
             <button type="button" class="primary" id="bfAudioTranscribe">用 Gemini 轉成逐字稿</button>
-            <span class="hint" id="bfAudioStatus">若即時文字沒有出現，可用實際錄下的音訊補轉。</span>
+            <span class="hint" id="bfAudioStatus">若即時文字沒有出現，可用實際錄下的音訊補轉；按下後錄音會送到 Google Gemini。</span>
           </div>
         </div>
         <p class="hint brief-unsupported" id="bfUnsupported" hidden>這個瀏覽器不支援即時語音辨識（建議用 Chrome 或 Edge）。你仍可在下方貼上逐字稿再萃取重點。</p>
@@ -406,7 +408,7 @@ export function initMeetingNotes(container, { getApiKey, setApiKey, getModel, on
     const kb = Math.max(1, Math.round(blob.size / 1024));
     els.audioMeta.textContent = ` · ${formatClock(state.elapsedBase)} · ${kb} KB`;
     els.audioStatus.textContent = state.hasSignal
-      ? '已錄到音訊。可先播放確認；若即時文字不完整，再用 Gemini 補轉。'
+      ? '已錄到音訊。可先播放確認；若即時文字不完整，可送到 Google Gemini 補轉。'
       : '錄音檔已建立，但音量一直很低。請先播放確認是否有聲音。';
     els.audioReview.hidden = false;
   }
@@ -447,8 +449,7 @@ export function initMeetingNotes(container, { getApiKey, setApiKey, getModel, on
       if (state.recording && !state.hasSignal) {
         setMicCheck(
           '麥克風已開啟，但音量仍是 0。請取消靜音、提高 Windows 輸入音量，或在網址列改選正確麥克風。',
-          'warn',
-          { retry: true }
+          'warn'
         );
       }
     }, 4000);
@@ -563,11 +564,11 @@ export function initMeetingNotes(container, { getApiKey, setApiKey, getModel, on
           return;
         }
         setStatus('辨識服務連線失敗，重試中…', 'warn');
-        setMicCheck(describeSpeechError(e.error), 'warn', { retry: true });
+        setMicCheck(describeSpeechError(e.error), 'warn');
       }
       if (e.error === 'no-speech') {
         setStatus('錄音中 · 尚未聽到聲音', 'warn');
-        setMicCheck(describeSpeechError(e.error), 'warn', { retry: true });
+        setMicCheck(describeSpeechError(e.error), 'warn');
         els.interim.textContent = '沒有偵測到聲音，請確認麥克風未靜音…';
       }
       // aborted 通常是暫停／結束造成；onend 會依 state 決定是否重啟。
