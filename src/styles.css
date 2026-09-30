@@ -1564,6 +1564,12 @@ button.primary:hover { background:linear-gradient(180deg,#ffffff,#e6e0d1);
 .brief-mic-check.bad { color:var(--bad); border-color:rgba(255,75,51,.5); background:rgba(255,75,51,.055); }
 .brief-mic-check.bad .brief-mic-check-dot { background:var(--bad); }
 .brief-mic-check .slog-mini { flex:0 0 auto; white-space:nowrap; }
+.brief-input-settings { display:flex; align-items:flex-end; flex-wrap:wrap; gap:8px 12px; margin:-3px 0 6px; }
+.brief-input-settings > label:first-child { display:flex; flex:1 1 280px; flex-direction:column; gap:5px; color:var(--muted); font-size:.72rem; }
+.brief-input-settings select { width:100%; min-height:34px; padding:6px 9px; color-scheme:dark; }
+.brief-input-settings .brief-speaker-audio { display:flex; flex:1 1 270px; align-items:center; gap:7px; min-height:34px; color:var(--text); font-size:.76rem; cursor:pointer; }
+.brief-speaker-audio input { flex:0 0 auto; width:15px; height:15px; }
+.brief-input-hint { margin:0 0 12px; }
 .brief-level { display:grid; grid-template-columns:auto minmax(80px,1fr) auto; align-items:center; gap:9px; margin:-4px 0 12px; }
 .brief-level-label, .brief-level-text { font-family:var(--mono); font-size:.62rem; letter-spacing:.1em; color:var(--muted); }
 .brief-level-track { height:6px; overflow:hidden; border-radius:999px; background:rgba(255,255,255,.1); }

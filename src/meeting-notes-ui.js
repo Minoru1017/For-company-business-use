@@ -63,6 +63,20 @@ export function pickRecorderMime(isTypeSupported = () => false) {
   ) || '';
 }
 
+export function buildMicrophoneConstraints({ deviceId = '', preserveSpeakerAudio = false } = {}) {
+  return {
+    ...(deviceId ? { deviceId: { exact: deviceId } } : {}),
+    echoCancellation: !preserveSpeakerAudio,
+    noiseSuppression: !preserveSpeakerAudio,
+    autoGainControl: true,
+    channelCount: 1,
+  };
+}
+
+export function shouldSampleAudioLevel({ recorderState = '', paused = false } = {}) {
+  return recorderState === 'recording' && !paused;
+}
+
 function dateKeyOf(ts) {
   const d = new Date(ts);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -101,6 +115,8 @@ export function initMeetingNotes(container, { getApiKey, setApiKey, getModel, on
     hasSignal: false,
     signalWarnTimer: 0,
     transcribeBusy: false,
+    micDeviceId: '',
+    preserveSpeakerAudio: false,
   };
 
   container.innerHTML = `
@@ -119,6 +135,14 @@ export function initMeetingNotes(container, { getApiKey, setApiKey, getModel, on
           <span id="bfMicText">按「開始錄音」後會先檢查麥克風，第一次使用請在瀏覽器跳出的視窗按「允許」。</span>
           <button type="button" class="btn slog-mini" id="bfMicRetry" hidden>重新檢查</button>
         </div>
+        <div class="brief-input-settings">
+          <label>錄音來源
+            <select class="field" id="bfMicDevice"><option value="">Windows／瀏覽器預設麥克風</option></select>
+          </label>
+          <button type="button" class="btn slog-mini" id="bfMicDevices">重新載入裝置</button>
+          <label class="brief-speaker-audio"><input type="checkbox" id="bfPreserveSpeaker"> 線上早會：保留喇叭傳進麥克風的聲音</label>
+        </div>
+        <p class="hint brief-input-hint">若音量條不動，先在「錄音來源」改選實際使用的耳機／麥克風。線上會議若只錄到自己，請勾選「保留喇叭聲」並讓會議聲音由喇叭播放。</p>
         <div class="brief-level" id="bfLevel" hidden>
           <span class="brief-level-label">MIC</span>
           <span class="brief-level-track"><span id="bfLevelFill"></span></span>
@@ -202,6 +226,9 @@ export function initMeetingNotes(container, { getApiKey, setApiKey, getModel, on
     micCheck: q('#bfMicCheck'),
     micText: q('#bfMicText'),
     micRetry: q('#bfMicRetry'),
+    micDevice: q('#bfMicDevice'),
+    micDevices: q('#bfMicDevices'),
+    preserveSpeaker: q('#bfPreserveSpeaker'),
     level: q('#bfLevel'),
     levelFill: q('#bfLevelFill'),
     levelText: q('#bfLevelText'),
@@ -295,6 +322,25 @@ export function initMeetingNotes(container, { getApiKey, setApiKey, getModel, on
     els.micRetry.hidden = !retry;
   }
 
+  async function refreshMicrophoneDevices({ selected = state.micDeviceId } = {}) {
+    const media = typeof navigator !== 'undefined' ? navigator.mediaDevices : null;
+    if (!media?.enumerateDevices) return;
+    try {
+      const devices = (await media.enumerateDevices()).filter((device) => device.kind === 'audioinput');
+      const options = ['<option value="">Windows／瀏覽器預設麥克風</option>'];
+      devices.forEach((device, index) => {
+        options.push(
+          `<option value="${escapeHTML(device.deviceId)}">${escapeHTML(device.label || `麥克風 ${index + 1}`)}</option>`
+        );
+      });
+      els.micDevice.innerHTML = options.join('');
+      if (selected && devices.some((device) => device.deviceId === selected)) els.micDevice.value = selected;
+      else if (selected) state.micDeviceId = '';
+    } catch {
+      // 部分瀏覽器要取得權限後才允許列出裝置；開始錄音時會再載入。
+    }
+  }
+
   async function ensureMicrophoneAccess() {
     const secureContext = typeof window === 'undefined' || window.isSecureContext;
     if (!secureContext) throw Object.assign(new Error('insecure-context'), { name: 'SecurityError' });
@@ -306,11 +352,10 @@ export function initMeetingNotes(container, { getApiKey, setApiKey, getModel, on
     let stream;
     try {
       stream = await media.getUserMedia({
-        audio: {
-          echoCancellation: true,
-          noiseSuppression: true,
-          autoGainControl: true,
-        },
+        audio: buildMicrophoneConstraints({
+          deviceId: state.micDeviceId,
+          preserveSpeakerAudio: state.preserveSpeakerAudio,
+        }),
       });
       const track = stream.getAudioTracks()[0];
       if (!track || track.readyState !== 'live') {
@@ -318,6 +363,7 @@ export function initMeetingNotes(container, { getApiKey, setApiKey, getModel, on
       }
       const label = track.label?.trim();
       setMicCheck(`麥克風已連線${label ? `：${label}` : ''}`, 'ok');
+      refreshMicrophoneDevices({ selected: track.getSettings?.().deviceId || state.micDeviceId });
       return stream;
     } catch (error) {
       const message = describeMicrophoneAccessError(error, { secureContext });
@@ -350,6 +396,7 @@ export function initMeetingNotes(container, { getApiKey, setApiKey, getModel, on
     }
     try {
       const ctx = new Ctx();
+      ctx.resume?.().catch?.(() => {});
       const analyser = ctx.createAnalyser();
       analyser.fftSize = 512;
       analyser.smoothingTimeConstant = 0.72;
@@ -358,7 +405,10 @@ export function initMeetingNotes(container, { getApiKey, setApiKey, getModel, on
       state.analyser = analyser;
       const samples = new Uint8Array(analyser.fftSize);
       const draw = () => {
-        if (!state.recording || state.paused || state.analyser !== analyser) return;
+        if (
+          state.analyser !== analyser ||
+          !shouldSampleAudioLevel({ recorderState: state.mediaRecorder?.state, paused: state.paused })
+        ) return;
         analyser.getByteTimeDomainData(samples);
         let sum = 0;
         for (const sample of samples) {
@@ -568,8 +618,13 @@ export function initMeetingNotes(container, { getApiKey, setApiKey, getModel, on
       }
       if (e.error === 'no-speech') {
         setStatus('錄音中 · 尚未聽到聲音', 'warn');
-        setMicCheck(describeSpeechError(e.error), 'warn');
-        els.interim.textContent = '沒有偵測到聲音，請確認麥克風未靜音…';
+        if (state.hasSignal) {
+          setMicCheck('音訊有收到；即時文字暫時沒有辨識結果，錄音仍會保留。', 'ok');
+          els.interim.textContent = '錄音有聲音；等待下一段即時文字…';
+        } else {
+          setMicCheck(describeSpeechError(e.error), 'warn');
+          els.interim.textContent = '沒有偵測到聲音，請確認麥克風未靜音…';
+        }
       }
       // aborted 通常是暫停／結束造成；onend 會依 state 決定是否重啟。
     };
@@ -995,6 +1050,24 @@ export function initMeetingNotes(container, { getApiKey, setApiKey, getModel, on
   els.micRetry.addEventListener('click', () => {
     if (!state.recording && !state.starting) startRecording();
   });
+  els.micDevices.addEventListener('click', () => refreshMicrophoneDevices());
+  els.micDevice.addEventListener('change', () => {
+    state.micDeviceId = els.micDevice.value;
+    try {
+      localStorage.setItem('callCoachBriefMicDevice', state.micDeviceId);
+    } catch {
+      /* storage unavailable */
+    }
+    setMicCheck('錄音來源已更新；按「開始錄音」確認音量條會跳動。', '');
+  });
+  els.preserveSpeaker.addEventListener('change', () => {
+    state.preserveSpeakerAudio = els.preserveSpeaker.checked;
+    try {
+      localStorage.setItem('callCoachBriefPreserveSpeaker', state.preserveSpeakerAudio ? '1' : '0');
+    } catch {
+      /* storage unavailable */
+    }
+  });
   els.finish.addEventListener('click', () => stopRecording({ finish: true }));
   els.audioTranscribe.addEventListener('click', transcribeRecordedAudio);
   els.title.addEventListener('input', () => persist());
@@ -1082,6 +1155,14 @@ export function initMeetingNotes(container, { getApiKey, setApiKey, getModel, on
   renderDirectives();
   renderHistory();
   tickTimer();
+  try {
+    state.micDeviceId = localStorage.getItem('callCoachBriefMicDevice') || '';
+    state.preserveSpeakerAudio = localStorage.getItem('callCoachBriefPreserveSpeaker') === '1';
+  } catch {
+    /* storage unavailable */
+  }
+  els.preserveSpeaker.checked = state.preserveSpeakerAudio;
+  refreshMicrophoneDevices();
 
   return {
     activate() {
