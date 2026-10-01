@@ -1096,6 +1096,11 @@ button.primary:hover { background:linear-gradient(180deg,#ffffff,#e6e0d1);
 .rj-summary .rj-ok { color:var(--ok,#6bc06b); }
 .rj-archive-summary { color:var(--muted); white-space:nowrap; }
 .reflection-journal-dialog { width:min(720px,100%); }
+.rj-draft-status { margin:8px 0 12px; padding:7px 10px; border-left:3px solid var(--muted); background:rgba(0,0,0,.1); }
+.rj-draft-status.saving { border-color:var(--warn); color:var(--warn); }
+.rj-draft-status.saved { border-color:var(--ok); color:var(--ok); }
+.rj-draft-status.recovered { border-color:var(--accent); color:var(--accent); }
+.rj-draft-status.error { border-color:var(--bad); color:var(--bad); }
 .rj-entry { border:1px solid var(--line,#333); border-radius:10px; padding:12px 14px; margin:0 0 14px; }
 .rj-entry legend { font-family:var(--disp); padding:0 6px; }
 .rj-field { display:block; margin:10px 0; font-size:.85rem; }

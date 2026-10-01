@@ -9,19 +9,23 @@ function mockLocalStorage() {
   });
 }
 import {
+  JOURNAL_DRAFT_STORAGE_KEY,
   JOURNAL_STORAGE_KEY,
   appendReflectionToPrompt,
+  clearDayJournalDraft,
   countCompleteEntries,
   entryHasContent,
   fieldComplete,
   findEntryForSource,
   formatEntryForPrompt,
+  getDayJournalDraft,
   getDayJournal,
   isAiAnalysisUnlocked,
   isEntryComplete,
   journalTrajectoryStats,
   listJournalDays,
   saveDayJournal,
+  saveDayJournalDraft,
   unlockStatusMessage,
 } from '../src/reflection-journal.js';
 
@@ -31,6 +35,7 @@ describe('reflection-journal', () => {
   beforeEach(() => {
     mockLocalStorage();
     localStorage.removeItem(JOURNAL_STORAGE_KEY);
+    localStorage.removeItem(JOURNAL_DRAFT_STORAGE_KEY);
   });
 
   it('requires four fields per entry', () => {
@@ -74,6 +79,28 @@ describe('reflection-journal', () => {
     const hit = findEntryForSource(day, '20250925-黃烱桐.wav');
     expect(hit?.callTitle).toBe('黃烱桐');
     expect(formatEntryForPrompt(hit)).toContain('我做了什麼');
+  });
+
+  it('keeps an unfinished draft separate and can restore or clear it', () => {
+    const dateKey = '2026-10-01';
+    saveDayJournalDraft(dateKey, [
+      {
+        slot: 0,
+        callTitle: '還沒寫完',
+        iDid: '保留輸入中的空白  ',
+        customerSaid: '剛寫到一半',
+      },
+    ]);
+    expect(getDayJournal(dateKey).entries[0].iDid).toBe('');
+    const draft = getDayJournalDraft(dateKey);
+    expect(draft?.dateKey).toBe(dateKey);
+    expect(draft?.entries[0]).toMatchObject({
+      callTitle: '還沒寫完',
+      iDid: '保留輸入中的空白  ',
+      customerSaid: '剛寫到一半',
+    });
+    expect(clearDayJournalDraft(dateKey)).toBe(true);
+    expect(getDayJournalDraft(dateKey)).toBeNull();
   });
 
   it('appends crosscheck instruction when reflection provided', () => {

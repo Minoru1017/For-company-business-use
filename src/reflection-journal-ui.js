@@ -6,13 +6,16 @@ import {
   JOURNAL_FIELD_LABELS,
   REQUIRED_CALLS_PER_DAY,
   countCompleteEntries,
+  clearDayJournalDraft,
   entryHasContent,
+  getDayJournalDraft,
   getDayJournal,
   isAiAnalysisUnlocked,
   isEntryComplete,
   journalTrajectoryStats,
   listJournalDays,
   saveDayJournal,
+  saveDayJournalDraft,
   unlockStatusMessage,
 } from './reflection-journal.js';
 import { escapeHTML } from './utils.js';
@@ -29,6 +32,7 @@ export function initReflectionJournal(deps = {}) {
   const formHost = modal.querySelector('#rjFormHost');
   const saveBtn = modal.querySelector('#rjSave');
   const closeBtn = modal.querySelector('#rjClose');
+  const draftStatusEl = modal.querySelector('#rjDraftStatus');
   const trajectoryOpenBtn = panel.querySelector('#rjTrajectoryOpen');
   const sidebarTrajectoryBtn = document.getElementById('sidebarTrajectory');
   const trajectoryCloseBtn = trajectoryModal?.querySelector('#rjtClose');
@@ -36,9 +40,21 @@ export function initReflectionJournal(deps = {}) {
   const trajectoryTimelineEl = trajectoryModal?.querySelector('#rjtTimeline');
 
   let editing = getDayJournal();
+  let draftTimer = null;
+  let draftDirty = false;
 
   function renderForm() {
-    editing = getDayJournal();
+    const saved = getDayJournal();
+    const draft = getDayJournalDraft(saved.dateKey);
+    editing = draft && draft.updatedAt > saved.updatedAt ? draft : saved;
+    draftDirty = false;
+    if (draftStatusEl) {
+      draftStatusEl.textContent =
+        draft && draft.updatedAt > saved.updatedAt
+          ? '已恢復上次未完成草稿'
+          : '輸入內容會自動保存在這台電腦';
+      draftStatusEl.className = `hint rj-draft-status ${draft && draft.updatedAt > saved.updatedAt ? 'recovered' : ''}`;
+    }
     const n = countCompleteEntries(editing);
     formHost.innerHTML = editing.entries
       .map(
@@ -77,7 +93,9 @@ export function initReflectionJournal(deps = {}) {
         const title = fs?.querySelector('.rj-callTitle');
         if (title && !title.value.trim()) title.value = src.replace(/\.[^.]+$/, '').slice(0, 40);
         if (fs) fs.dataset.linkedSource = src;
-        showToast?.('已綁定檔名（儲存後生效）');
+        draftDirty = true;
+        flushDraft();
+        showToast?.('已綁定檔名並保存草稿');
       });
     });
   }
@@ -97,6 +115,37 @@ export function initReflectionJournal(deps = {}) {
         customerMind: fs.querySelector('.rj-customerMind')?.value || '',
       };
     });
+  }
+
+  function flushDraft() {
+    clearTimeout(draftTimer);
+    draftTimer = null;
+    if (!draftDirty || !editing?.dateKey || !formHost.children.length) return;
+    try {
+      const draft = saveDayJournalDraft(editing.dateKey, readForm());
+      editing = draft;
+      draftDirty = false;
+      if (draftStatusEl) {
+        const time = new Date(draft.updatedAt).toLocaleTimeString('zh-TW', { hour: '2-digit', minute: '2-digit' });
+        draftStatusEl.textContent = `草稿已自動保存 ${time}`;
+        draftStatusEl.className = 'hint rj-draft-status saved';
+      }
+    } catch {
+      if (draftStatusEl) {
+        draftStatusEl.textContent = '草稿保存失敗，請先不要關閉頁面並按「儲存今日複盤」';
+        draftStatusEl.className = 'hint rj-draft-status error';
+      }
+    }
+  }
+
+  function scheduleDraftSave() {
+    draftDirty = true;
+    if (draftStatusEl) {
+      draftStatusEl.textContent = '正在保存草稿…';
+      draftStatusEl.className = 'hint rj-draft-status saving';
+    }
+    clearTimeout(draftTimer);
+    draftTimer = setTimeout(flushDraft, 120);
   }
 
   function refreshSummary() {
@@ -191,6 +240,7 @@ export function initReflectionJournal(deps = {}) {
   }
 
   function closeModal() {
+    flushDraft();
     modal.hidden = true;
     refreshSummary();
   }
@@ -199,9 +249,13 @@ export function initReflectionJournal(deps = {}) {
   trajectoryOpenBtn?.addEventListener('click', openTrajectory);
   sidebarTrajectoryBtn?.addEventListener('click', openTrajectory);
   closeBtn?.addEventListener('click', closeModal);
+  formHost.addEventListener('input', scheduleDraftSave);
   trajectoryCloseBtn?.addEventListener('click', closeTrajectory);
   modal.addEventListener('click', (e) => {
-    if (e.target === modal) closeModal();
+    if (e.target === modal) {
+      flushDraft();
+      showToast?.('草稿已保存；請按「關閉」離開複盤');
+    }
   });
   trajectoryModal?.addEventListener('click', (e) => {
     if (e.target === trajectoryModal) closeTrajectory();
@@ -212,6 +266,13 @@ export function initReflectionJournal(deps = {}) {
   saveBtn?.addEventListener('click', () => {
     const entries = readForm();
     saveDayJournal(editing.dateKey, entries);
+    clearDayJournalDraft(editing.dateKey);
+    editing = getDayJournal(editing.dateKey);
+    draftDirty = false;
+    if (draftStatusEl) {
+      draftStatusEl.textContent = '今日複盤已正式儲存';
+      draftStatusEl.className = 'hint rj-draft-status saved';
+    }
     showToast?.(
       isAiAnalysisUnlocked()
         ? `已儲存 — 今日 ${REQUIRED_CALLS_PER_DAY} 通複盤完成，AI 分析已解鎖`
@@ -220,6 +281,7 @@ export function initReflectionJournal(deps = {}) {
     refreshSummary();
     onChange?.(unlockStatusMessage());
   });
+  window.addEventListener('beforeunload', flushDraft);
 
   refreshSummary();
 
