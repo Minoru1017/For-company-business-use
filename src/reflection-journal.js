@@ -5,6 +5,7 @@
 import { PHILOSOPHY } from './coach-philosophy.js';
 
 export const JOURNAL_STORAGE_KEY = 'call_coach_reflection_journal_v1';
+export const JOURNAL_DRAFT_STORAGE_KEY = 'call_coach_reflection_journal_drafts_v1';
 export const REQUIRED_CALLS_PER_DAY = 3;
 
 /** 各欄最少字元（避免空泛一句帶過） */
@@ -39,6 +40,15 @@ function loadRoot() {
 
 function saveRoot(root) {
   localStorage.setItem(JOURNAL_STORAGE_KEY, JSON.stringify(root));
+}
+
+function loadDraftRoot() {
+  try {
+    const parsed = JSON.parse(localStorage.getItem(JOURNAL_DRAFT_STORAGE_KEY) || '{"days":{}}');
+    return parsed?.days && typeof parsed.days === 'object' ? parsed : { days: {} };
+  } catch {
+    return { days: {} };
+  }
 }
 
 export function normalizeSourceName(name) {
@@ -144,6 +154,53 @@ export function saveDayJournal(dateKey, entries) {
   root.days[dateKey] = { entries: cleaned, updatedAt: Date.now() };
   saveRoot(root);
   return getDayJournal(dateKey);
+}
+
+/** 尚未按正式儲存的逐字草稿；保留原始空白，輸入時即可安全寫入。 */
+export function saveDayJournalDraft(dateKey, entries) {
+  const root = loadDraftRoot();
+  const updatedAt = Date.now();
+  root.days[dateKey] = {
+    dateKey,
+    entries: [0, 1, 2].map((slot) => {
+      const entry = entries?.[slot] || {};
+      return {
+        ...emptyEntry(slot),
+        callTitle: String(entry.callTitle || ''),
+        linkedSource: normalizeSourceName(entry.linkedSource),
+        iDid: String(entry.iDid || ''),
+        customerSaid: String(entry.customerSaid || ''),
+        toneEffect: String(entry.toneEffect || ''),
+        customerMind: String(entry.customerMind || ''),
+        updatedAt,
+      };
+    }),
+    updatedAt,
+  };
+  localStorage.setItem(JOURNAL_DRAFT_STORAGE_KEY, JSON.stringify(root));
+  return root.days[dateKey];
+}
+
+export function getDayJournalDraft(dateKey = todayKey()) {
+  const draft = loadDraftRoot().days[dateKey];
+  if (!draft?.entries?.length) return null;
+  return {
+    dateKey,
+    entries: [0, 1, 2].map((slot) => ({
+      ...emptyEntry(slot),
+      ...(draft.entries.find((entry) => entry.slot === slot) || draft.entries[slot]),
+      slot,
+    })),
+    updatedAt: Number(draft.updatedAt) || 0,
+  };
+}
+
+export function clearDayJournalDraft(dateKey = todayKey()) {
+  const root = loadDraftRoot();
+  if (!root.days[dateKey]) return false;
+  delete root.days[dateKey];
+  localStorage.setItem(JOURNAL_DRAFT_STORAGE_KEY, JSON.stringify(root));
+  return true;
 }
 
 export function fieldComplete(value) {
