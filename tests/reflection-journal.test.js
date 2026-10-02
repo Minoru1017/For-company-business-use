@@ -24,6 +24,7 @@ import {
   isEntryComplete,
   journalTrajectoryStats,
   listJournalDays,
+  reflectionFieldsFromMarkers,
   saveDayJournal,
   saveDayJournalDraft,
   unlockStatusMessage,
@@ -79,6 +80,37 @@ describe('reflection-journal', () => {
     const hit = findEntryForSource(day, '20250925-黃烱桐.wav');
     expect(hit?.callTitle).toBe('黃烱桐');
     expect(formatEntryForPrompt(hit)).toContain('我做了什麼');
+  });
+
+  it('stores customer information and conditional invite outcome fields', () => {
+    const dateKey = '2026-10-02';
+    saveDayJournal(dateKey, [
+      {
+        slot: 0,
+        customerInfo: '遠端影像設計師，偏好雲端生成',
+        inviteResult: 'not_invited',
+        noInviteReason: '沒有把預算困擾連到下一次討論價值',
+      },
+    ]);
+    expect(getDayJournal(dateKey).entries[0]).toMatchObject({
+      customerInfo: '遠端影像設計師，偏好雲端生成',
+      inviteResult: 'not_invited',
+      noInviteReason: '沒有把預算困擾連到下一次討論價值',
+    });
+    expect(formatEntryForPrompt(getDayJournal(dateKey).entries[0])).toContain('邀約結果：無邀約');
+  });
+
+  it('maps symptom-log marker notes into both reflection blocks', () => {
+    const fields = reflectionFieldsFromMarkers([
+      { sec: 65, text: '我：先確認他目前使用的工具' },
+      { sec: 92, text: '客戶：公司一個月預算兩萬' },
+      { sec: 120, text: '這裡沒有接著問工作目標' },
+    ]);
+    expect(fields.count).toBe(3);
+    expect(fields.iDid).toContain('[01:05] 我：先確認');
+    expect(fields.iDid).toContain('[02:00] 這裡沒有接著問');
+    expect(fields.customerSaid).toContain('[01:32] 客戶：公司');
+    expect(fields.customerSaid).toContain('[02:00] 這裡沒有接著問');
   });
 
   it('keeps an unfinished draft separate and can restore or clear it', () => {

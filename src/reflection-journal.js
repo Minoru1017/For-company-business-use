@@ -63,6 +63,9 @@ export function emptyEntry(slot = 0) {
     slot,
     callTitle: '',
     linkedSource: '',
+    customerInfo: '',
+    inviteResult: '',
+    noInviteReason: '',
     iDid: '',
     customerSaid: '',
     toneEffect: '',
@@ -91,7 +94,17 @@ export function getDayJournal(dateKey = todayKey()) {
 /** 任一欄有內容就算一筆曾經寫過的複盤（完整度另由 isEntryComplete 判斷）。 */
 export function entryHasContent(entry) {
   if (!entry) return false;
-  return ['callTitle', 'linkedSource', 'iDid', 'customerSaid', 'toneEffect', 'customerMind'].some(
+  return [
+    'callTitle',
+    'linkedSource',
+    'customerInfo',
+    'inviteResult',
+    'noInviteReason',
+    'iDid',
+    'customerSaid',
+    'toneEffect',
+    'customerMind',
+  ].some(
     (key) => String(entry[key] || '').trim()
   );
 }
@@ -145,6 +158,9 @@ export function saveDayJournal(dateKey, entries) {
     slot: i,
     callTitle: String(e.callTitle || '').trim(),
     linkedSource: normalizeSourceName(e.linkedSource),
+    customerInfo: String(e.customerInfo || '').trim(),
+    inviteResult: e.inviteResult === 'invited' || e.inviteResult === 'not_invited' ? e.inviteResult : '',
+    noInviteReason: String(e.noInviteReason || '').trim(),
     iDid: String(e.iDid || '').trim(),
     customerSaid: String(e.customerSaid || '').trim(),
     toneEffect: String(e.toneEffect || '').trim(),
@@ -168,6 +184,10 @@ export function saveDayJournalDraft(dateKey, entries) {
         ...emptyEntry(slot),
         callTitle: String(entry.callTitle || ''),
         linkedSource: normalizeSourceName(entry.linkedSource),
+        customerInfo: String(entry.customerInfo || ''),
+        inviteResult:
+          entry.inviteResult === 'invited' || entry.inviteResult === 'not_invited' ? entry.inviteResult : '',
+        noInviteReason: String(entry.noInviteReason || ''),
         iDid: String(entry.iDid || ''),
         customerSaid: String(entry.customerSaid || ''),
         toneEffect: String(entry.toneEffect || ''),
@@ -270,11 +290,42 @@ export function formatEntryForPrompt(entry) {
   const head = entry.callTitle || entry.linkedSource || '（未命名通話）';
   return [
     `通話：${head}`,
+    `客戶資訊：${entry.customerInfo || '未填'}`,
+    `邀約結果：${entry.inviteResult === 'invited' ? '有邀約' : entry.inviteResult === 'not_invited' ? '無邀約' : '未標記'}`,
+    ...(entry.inviteResult === 'not_invited' ? [`我認為邀約不到的原因：${entry.noInviteReason || '未填'}`] : []),
     `1. 我做了什麼：${entry.iDid}`,
     `2. 客戶回應了什麼：${entry.customerSaid}`,
     `3. 語氣／講法與客戶反應：${entry.toneEffect}`,
     `4. 客戶當下可能在想：${entry.customerMind}`,
   ].join('\n');
+}
+
+function markerTime(sec) {
+  const value = Math.max(0, Math.floor(Number(sec) || 0));
+  return `${String(Math.floor(value / 60)).padStart(2, '0')}:${String(value % 60).padStart(2, '0')}`;
+}
+
+/**
+ * 將症狀紀錄播放器的時間點筆記帶入自寫複盤。
+ * 支援「我：」「客戶：」等前綴；沒有前綴時保留為共同參考，避免漏掉使用者已寫內容。
+ */
+export function reflectionFieldsFromMarkers(markers) {
+  const mine = [];
+  const customer = [];
+  for (const marker of markers || []) {
+    const text = String(marker?.text || '').trim();
+    if (!text) continue;
+    const line = `[${markerTime(marker.sec)}] ${text}`;
+    const isMine = /^(我|我的|我做了什麼|話術|語氣|做法)[：:]/.test(text);
+    const isCustomer = /^(客戶|對方|客戶回應|客戶說|他說)[：:]/.test(text);
+    if (isMine) mine.push(line);
+    if (isCustomer) customer.push(line);
+    if (!isMine && !isCustomer) {
+      mine.push(line);
+      customer.push(line);
+    }
+  }
+  return { iDid: mine.join('\n'), customerSaid: customer.join('\n'), count: (markers || []).filter((m) => String(m?.text || '').trim()).length };
 }
 
 export const REFLECTION_CROSSCHECK_INSTRUCTION = `

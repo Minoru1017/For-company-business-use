@@ -1105,6 +1105,11 @@ button.primary:hover { background:linear-gradient(180deg,#ffffff,#e6e0d1);
 .rj-entry legend { font-family:var(--disp); padding:0 6px; }
 .rj-field { display:block; margin:10px 0; font-size:.85rem; }
 .rj-field textarea, .rj-field input { width:100%; margin-top:6px; }
+.rj-invite-tags { display:flex; flex-wrap:wrap; gap:8px; margin-top:7px; }
+.rj-invite-tags label { display:inline-flex; align-items:center; gap:7px; padding:7px 12px; border:1px solid var(--border); border-radius:999px; color:var(--muted); cursor:pointer; }
+.rj-invite-tags label.on { border-color:var(--accent); background:rgba(255,95,69,.08); color:var(--text); }
+.rj-invite-tags input { width:auto; margin:0; accent-color:var(--accent); }
+.rj-no-invite-reason { padding:9px 11px; border-left:3px solid var(--warn); background:rgba(218,184,92,.06); }
 .ai-reflection-lock { margin:0 0 12px; padding:10px 12px; border:1px solid var(--warn); border-radius:8px; color:var(--warn); }
 
 /* ---- 每日自寫複盤 · 學習軌跡 ---- */
