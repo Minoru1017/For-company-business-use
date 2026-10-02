@@ -14,6 +14,7 @@ import {
   isEntryComplete,
   journalTrajectoryStats,
   listJournalDays,
+  reflectionFieldsFromMarkers,
   saveDayJournal,
   saveDayJournalDraft,
   unlockStatusMessage,
@@ -21,7 +22,7 @@ import {
 import { escapeHTML } from './utils.js';
 
 export function initReflectionJournal(deps = {}) {
-  const { onChange, getLinkedSource, showToast } = deps;
+  const { onChange, getLinkedSource, getLinkedReflection, showToast } = deps;
   const panel = document.getElementById('reflectionJournalPanel');
   const modal = document.getElementById('reflectionJournalModal');
   const trajectoryModal = document.getElementById('reflectionTrajectoryModal');
@@ -64,6 +65,19 @@ export function initReflectionJournal(deps = {}) {
         <label class="rj-field">通話名稱（選填，例：黃烱桐）
           <input type="text" class="field rj-callTitle" value="${escapeHTML(e.callTitle)}" autocomplete="off">
         </label>
+        <label class="rj-field">我了解到的客戶資訊
+          <textarea class="field rj-customerInfo" rows="2" placeholder="例：全職遠端設計師、公司每月 AI 預算約 2 萬、偏好雲端生成">${escapeHTML(e.customerInfo)}</textarea>
+        </label>
+        <div class="rj-field">
+          <span>這通邀約結果</span>
+          <div class="rj-invite-tags" role="radiogroup" aria-label="這通邀約結果">
+            <label class="${e.inviteResult === 'invited' ? 'on' : ''}"><input type="radio" name="rjInvite${i}" value="invited" ${e.inviteResult === 'invited' ? 'checked' : ''}>有邀約</label>
+            <label class="${e.inviteResult === 'not_invited' ? 'on' : ''}"><input type="radio" name="rjInvite${i}" value="not_invited" ${e.inviteResult === 'not_invited' ? 'checked' : ''}>無邀約</label>
+          </div>
+        </div>
+        <label class="rj-field rj-no-invite-reason" ${e.inviteResult === 'not_invited' ? '' : 'hidden'}>我認為邀約不到的原因
+          <textarea class="field rj-noInviteReason" rows="2" placeholder="例：有聊到工具，但沒有把工作痛點連到下一次討論的價值">${escapeHTML(e.noInviteReason)}</textarea>
+        </label>
         <label class="rj-field">${escapeHTML(JOURNAL_FIELD_LABELS.iDid)} <span class="hint">至少 ${FIELD_MIN_LEN} 字</span>
           <textarea class="field rj-iDid" rows="3">${escapeHTML(e.iDid)}</textarea>
         </label>
@@ -76,13 +90,13 @@ export function initReflectionJournal(deps = {}) {
         <label class="rj-field">${escapeHTML(JOURNAL_FIELD_LABELS.customerMind)}
           <textarea class="field rj-customerMind" rows="2">${escapeHTML(e.customerMind)}</textarea>
         </label>
-        <button type="button" class="btn rj-bind" data-slot="${i}">綁定目前這通逐字稿</button>
+        <button type="button" class="btn rj-bind" data-slot="${i}">綁定並帶入症狀紀錄筆記</button>
         ${e.linkedSource ? `<p class="hint rj-linked">已綁定：${escapeHTML(e.linkedSource)}</p>` : ''}
       </fieldset>`
       )
       .join('');
     formHost.querySelectorAll('.rj-bind').forEach((btn) => {
-      btn.addEventListener('click', () => {
+      btn.addEventListener('click', async () => {
         const src = getLinkedSource?.();
         if (!src) {
           showToast?.('請先在上方載入逐字稿，再綁定');
@@ -93,9 +107,26 @@ export function initReflectionJournal(deps = {}) {
         const title = fs?.querySelector('.rj-callTitle');
         if (title && !title.value.trim()) title.value = src.replace(/\.[^.]+$/, '').slice(0, 40);
         if (fs) fs.dataset.linkedSource = src;
+        let call = null;
+        try {
+          call = await getLinkedReflection?.(src);
+        } catch {
+          showToast?.('無法讀取症狀紀錄；已先綁定目前通話');
+        }
+        const imported = reflectionFieldsFromMarkers(call?.devMarkers);
+        if (fs && imported.count) {
+          const iDid = fs.querySelector('.rj-iDid');
+          const customerSaid = fs.querySelector('.rj-customerSaid');
+          if (iDid && !iDid.value.trim()) iDid.value = imported.iDid;
+          if (customerSaid && !customerSaid.value.trim()) customerSaid.value = imported.customerSaid;
+        }
         draftDirty = true;
         flushDraft();
-        showToast?.('已綁定檔名並保存草稿');
+        showToast?.(
+          imported.count
+            ? `已帶入症狀紀錄的 ${imported.count} 則複盤話點`
+            : '已綁定通話；症狀紀錄尚無複盤話點可帶入'
+        );
       });
     });
   }
@@ -109,6 +140,9 @@ export function initReflectionJournal(deps = {}) {
         ...base,
         callTitle: fs.querySelector('.rj-callTitle')?.value || '',
         linkedSource: fs.dataset.linkedSource || base.linkedSource || '',
+        customerInfo: fs.querySelector('.rj-customerInfo')?.value || '',
+        inviteResult: fs.querySelector('[type="radio"]:checked')?.value || '',
+        noInviteReason: fs.querySelector('.rj-noInviteReason')?.value || '',
         iDid: fs.querySelector('.rj-iDid')?.value || '',
         customerSaid: fs.querySelector('.rj-customerSaid')?.value || '',
         toneEffect: fs.querySelector('.rj-toneEffect')?.value || '',
@@ -204,6 +238,8 @@ export function initReflectionJournal(deps = {}) {
                 <span class="rjt-entry-state">${isEntryComplete(entry) ? '完整' : '未完成'}</span>
               </div>
               <dl class="rjt-entry-fields">
+                <div><dt>客戶資訊</dt><dd>${escapeHTML(entry.customerInfo || '—')}</dd></div>
+                <div><dt>邀約結果</dt><dd>${entry.inviteResult === 'invited' ? '有邀約' : entry.inviteResult === 'not_invited' ? `無邀約${entry.noInviteReason ? `｜${escapeHTML(entry.noInviteReason)}` : ''}` : '—'}</dd></div>
                 <div><dt>我做了什麼</dt><dd>${escapeHTML(entry.iDid || '—')}</dd></div>
                 <div><dt>客戶怎麼回</dt><dd>${escapeHTML(entry.customerSaid || '—')}</dd></div>
                 <div><dt>我的語氣／講法</dt><dd>${escapeHTML(entry.toneEffect || '—')}</dd></div>
@@ -250,6 +286,16 @@ export function initReflectionJournal(deps = {}) {
   sidebarTrajectoryBtn?.addEventListener('click', openTrajectory);
   closeBtn?.addEventListener('click', closeModal);
   formHost.addEventListener('input', scheduleDraftSave);
+  formHost.addEventListener('change', (event) => {
+    if (!event.target.matches('.rj-invite-tags input')) return;
+    const fieldset = event.target.closest('.rj-entry');
+    fieldset?.querySelectorAll('.rj-invite-tags label').forEach((label) => {
+      label.classList.toggle('on', label.contains(event.target));
+    });
+    const reason = fieldset?.querySelector('.rj-no-invite-reason');
+    if (reason) reason.hidden = event.target.value !== 'not_invited';
+    scheduleDraftSave();
+  });
   trajectoryCloseBtn?.addEventListener('click', closeTrajectory);
   modal.addEventListener('click', (e) => {
     if (e.target === modal) {

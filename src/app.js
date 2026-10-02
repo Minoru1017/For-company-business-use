@@ -47,6 +47,7 @@ import { initDemoPlayer, refreshDemoPlayerFromBridge, seekDemoTo, updateDemoPlay
 import { mountDevAudioUpload } from './dev-audio-upload.js';
 import { goToModeHome, initModeChooser, resolveMode } from './mode.js';
 import { initSymptomLog } from './symptom-log.js';
+import { findCallBySourceName } from './symptom-store.js';
 import { initMeetingNotes } from './meeting-notes-ui.js';
 import { appendDirectivesToPrompt } from './coach-directives.js';
 import { bindLabelCollapseHandlers, createLabelController } from './labels.js';
@@ -854,6 +855,7 @@ function init() {
     reflectionJournalCtrl = initReflectionJournal({
       showToast,
       getLinkedSource: () => sourceName,
+      getLinkedReflection: (source) => findCallBySourceName(source),
       onChange: () => refreshReflectionGateUI(),
     });
     refreshReflectionGateUI();

@@ -121,6 +121,25 @@ export function listCallsBetween(fromKey, toKey) {
   return withStore(STORE_CALLS, 'readonly', (s) => req(s.index('date').getAll(IDBKeyRange.bound(fromKey, toKey))));
 }
 
+export function normalizeCallSourceStem(name) {
+  return String(name || '')
+    .split(/[\\/]/)
+    .pop()
+    .replace(/\.[^.]+$/, '')
+    .trim()
+    .toLocaleLowerCase();
+}
+
+/** 依目前載入的逐字稿／音檔名稱，尋找症狀紀錄中的同一通。 */
+export function findCallBySourceName(sourceName) {
+  const wanted = normalizeCallSourceStem(sourceName);
+  if (!wanted) return Promise.resolve(null);
+  return withStore(STORE_CALLS, 'readonly', (store) => req(store.getAll())).then((calls) => {
+    const matches = (calls || []).filter((call) => normalizeCallSourceStem(call.name) === wanted);
+    return matches.sort((a, b) => (b.updatedAt || b.importedAt || 0) - (a.updatedAt || a.importedAt || 0))[0] || null;
+  });
+}
+
 export async function deleteCall(id) {
   await deleteAudio(id);
   return withStore(STORE_CALLS, 'readwrite', (s) => req(s.delete(id)));
