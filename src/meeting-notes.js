@@ -64,7 +64,7 @@ export function getMeeting(id) {
 }
 
 /**
- * @param {{ id?:string, title?:string, startedAt?:number, endedAt?:number, lines?:Array<{t:number,text:string}>, transcript?:string, points?:Array, applied?:boolean }} meeting
+ * @param {{ id?:string, title?:string, startedAt?:number, endedAt?:number, lines?:Array<{t:number,text:string}>, transcript?:string, points?:Array, applied?:boolean, audioSessionId?:string, audioMimeType?:string, audioBytes?:number }} meeting
  */
 export function saveMeeting(meeting) {
   const list = read();
@@ -79,6 +79,9 @@ export function saveMeeting(meeting) {
     points: normalizePoints(meeting.points),
     applied: !!meeting.applied,
     source: meeting.source || 'browser-speech',
+    audioSessionId: String(meeting.audioSessionId || ''),
+    audioMimeType: String(meeting.audioMimeType || ''),
+    audioBytes: Math.max(0, Number(meeting.audioBytes) || 0),
     updatedAt: now,
   };
   const idx = list.findIndex((m) => m.id === entry.id);

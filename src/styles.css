@@ -1591,6 +1591,10 @@ button.primary:hover { background:linear-gradient(180deg,#ffffff,#e6e0d1);
 .brief-rec-btn.on .brief-rec-dot { background:#fff; animation:briefPulse 1.4s ease-out infinite; }
 @keyframes briefPulse { 0% { box-shadow:0 0 0 0 rgba(255,255,255,.55); } 100% { box-shadow:0 0 0 12px rgba(255,255,255,0); } }
 .brief-timer { font-family:var(--mono); font-size:1.15rem; letter-spacing:.12em; color:var(--text); min-width:5ch; }
+.brief-save-state { padding:4px 8px; border:1px solid var(--border); border-radius:999px; font-family:var(--mono); font-size:.58rem; letter-spacing:.06em; color:var(--muted); white-space:nowrap; }
+.brief-save-state.ok { border-color:rgba(61,220,132,.45); color:var(--ok); }
+.brief-save-state.busy { border-color:rgba(218,184,92,.5); color:var(--warn); }
+.brief-save-state.bad { border-color:rgba(255,75,51,.5); color:var(--bad); }
 .brief-title { flex:1 1 220px; min-width:180px; }
 .brief-live { display:flex; align-items:center; gap:8px; margin:12px 0 0; padding:8px 12px; border-left:3px solid var(--accent); background:rgba(255,95,69,.08); border-radius:0 6px 6px 0; }
 .brief-live-dot { width:8px; height:8px; border-radius:50%; background:var(--accent); animation:briefBlink 1s steps(2) infinite; }
