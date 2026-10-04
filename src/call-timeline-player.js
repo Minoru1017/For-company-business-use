@@ -12,6 +12,10 @@ export function normalizeMarkers(markers, durationSec = Infinity) {
       sec: Math.max(0, Math.min(max, Number(m.sec) || 0)),
       text: String(m.text || ''),
       createdAt: m.createdAt || Date.now(),
+      // 心智圖的分析欄位（表層／真意／證據）由 marker-mindmap 編輯，播放器只負責帶著走
+      surface: String(m.surface || ''),
+      intent: String(m.intent || ''),
+      evidence: Array.isArray(m.evidence) ? m.evidence : [],
     }))
     .sort((a, b) => a.sec - b.sec || a.createdAt - b.createdAt);
 }
@@ -117,7 +121,7 @@ export function mountTimelinePlayer(container, opts) {
         <button type="button" class="ctp-m-btn" title="在目前位置標記（快捷鍵 M）">${ICON_MARK}<span class="ctp-m-label">M</span></button>
       </div>
     </div>
-    <p class="hint ctp-hint">播放中按 <kbd>M</kbd> 或右側標記鈕，在下方寫該句複盤筆記；<kbd>←</kbd> <kbd>→</kbd> 倒退／快轉 ${SKIP_SEC} 秒；<kbd>&lt;</kbd> <kbd>&gt;</kbd> 調整倍速。</p>
+    <p class="hint ctp-hint">播放中按 <kbd>M</kbd> 或右側標記鈕，在下方寫該句複盤筆記；<kbd>←</kbd> <kbd>→</kbd> 倒退／快轉 ${SKIP_SEC} 秒；<kbd>&lt;</kbd> <kbd>&gt;</kbd> 調整倍速。標記會出現在下方「話點心智圖」，可拆表層／真意／證據。</p>
     <ul class="ctp-notes"></ul>
   `;
   container.appendChild(root);
@@ -369,5 +373,11 @@ export function mountTimelinePlayer(container, opts) {
     getAudio: () => audio,
     getRate: () => rate,
     setRate,
+    /** 心智圖面板改了標記內容時同步回播放器，避免下一次 emit 用舊資料蓋掉 */
+    setMarkers(next) {
+      markers = normalizeMarkers(next, duration);
+      if (selectedId && !markers.some((m) => m.id === selectedId)) selectedId = markers[0]?.id || null;
+      renderMarkers();
+    },
   };
 }
