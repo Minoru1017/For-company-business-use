@@ -374,6 +374,7 @@ export function mountMarkerMindmap(container, opts) {
   let lastDayKey = null;
   let todoOnly = false;
   let maximized = false;
+  let hideWatch = null;
 
   container.innerHTML = `
     <div class="mm" tabindex="-1">
@@ -514,7 +515,7 @@ export function mountMarkerMindmap(container, opts) {
         return `<button type="button" role="tab" class="mm-tab${on ? ' active' : ''}${t.id === 'all' ? ' overview' : ''}" aria-selected="${on}" tabindex="${on ? 0 : -1}" data-tab="${escapeHTML(t.id)}" title="${escapeHTML(t.title)}"><span class="mm-tab-label">${escapeHTML(t.label)}</span>${prog}</button>`;
       })
       .join('');
-    container.querySelectorAll('[data-overview-only]').forEach((b) => {
+    root.querySelectorAll('[data-overview-only]').forEach((b) => {
       b.hidden = !isOverview();
     });
   }
@@ -627,7 +628,7 @@ export function mountMarkerMindmap(container, opts) {
       <label class="mm-field">內心真意 <small>你認為他真正想傳達的——這是推論，要靠下面的證據撐</small>
         <textarea class="field" data-field="intent" rows="2" placeholder="例：不是沒時間，是還不信任我、怕被推銷">${escapeHTML(a.intent)}</textarea></label>
       <div class="mm-strength-slot">${strengthHtml(st)}</div>
-      <div class="mm-evidence">
+      <div class="mm-evidence-box">
         <div class="mm-evidence-head">證據 <span class="slog-count">${a.evidence.length}</span></div>
         <ul class="mm-ev-list">${evItems || '<li class="hint mm-ev-none">還沒有證據。從下面逐字稿點一句原句，或寫下你聽到的行為（停頓、回答變短、語氣變化）。</li>'}</ul>
         <div class="mm-evidence-head">這段前後的逐字稿 <small>點一句加入證據</small></div>
@@ -719,6 +720,18 @@ export function mountMarkerMindmap(container, opts) {
 
   function setMaximized(on) {
     maximized = on;
+    // 卡片有 backdrop-filter，會讓 position:fixed 只相對卡片定位；最大化時把視窗移到 body 底下
+    if (on) {
+      document.body.appendChild(root);
+      hideWatch = new MutationObserver(() => {
+        if (!container.isConnected || container.offsetParent === null) setMaximized(false);
+      });
+      hideWatch.observe(document.body, { attributes: true, attributeFilter: ['hidden'], subtree: true });
+    } else {
+      hideWatch?.disconnect();
+      hideWatch = null;
+      container.appendChild(root);
+    }
     root.classList.toggle('max', on);
     document.body.classList.toggle('mm-max-open', on);
     maxBtn.setAttribute('aria-pressed', String(on));
@@ -971,7 +984,9 @@ export function mountMarkerMindmap(container, opts) {
     },
     destroy() {
       clearTimeout(saveTimer);
+      hideWatch?.disconnect();
       document.body.classList.remove('mm-max-open');
+      root.remove();
       container.innerHTML = '';
     },
   };

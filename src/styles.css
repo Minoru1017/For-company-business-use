@@ -1546,8 +1546,8 @@ body.mm-max-open { overflow:hidden; }
 .mm-ev { display:grid; grid-template-columns:auto auto minmax(0,1fr) auto; align-items:center; gap:6px; padding:6px 8px; border:1px solid var(--border); border-radius:6px; background:rgba(13,17,23,.4); font-size:.76rem; }
 .mm-ev.behavior { border-style:dashed; }
 .mm-ev-kind { font-family:var(--mono); font-size:.6rem; letter-spacing:.08em; color:var(--muted); border:1px solid var(--border); border-radius:3px; padding:1px 5px; white-space:nowrap; }
-.mm-ev-text { word-break:break-word; }
-.mm-ev-del { padding:2px 7px; font-size:.66rem; }
+.mm-ev-text { grid-column:3; word-break:break-word; }
+.mm-ev-del { grid-column:4; padding:2px 7px; font-size:.66rem; }
 .mm-ev-none { margin:0; }
 .mm-sugg { display:grid; grid-template-columns:auto auto minmax(0,1fr); align-items:baseline; gap:6px; width:100%; padding:6px 8px; border:1px solid var(--border); border-radius:6px; background:transparent; color:var(--text); text-align:left; font-size:.76rem; font-family:var(--sans); letter-spacing:0; cursor:pointer; box-shadow:none; }
 .mm-sugg:hover { border-color:var(--ok); transform:none; box-shadow:none; }
