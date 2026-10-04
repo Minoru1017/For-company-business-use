@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import {
   autoLayout,
+  markerOutline,
+  markerStats,
+  mindmapTabs,
+  nextTodoMarker,
+  stepMarker,
   buildMindmap,
   evidenceStrength,
   normalizeEvidence,
@@ -194,5 +199,56 @@ describe('autoLayout', () => {
     expect(Object.keys(only).every((k) => k.includes(':c2'))).toBe(true);
     expect(only.root).toBeUndefined();
     expect(Object.keys(only).length).toBeGreaterThan(5);
+  });
+});
+
+describe('tabbed window helpers', () => {
+  const solid = { id: 's', sec: 10, text: 'ok', intent: 'x', evidence: [{ text: 'a' }, { kind: 'behavior', text: 'b' }] };
+  const weak = { id: 'w', sec: 20, text: 'w', intent: 'x', evidence: [{ text: 'a' }] };
+  const none = { id: 'n', sec: 5, text: 'n', intent: 'x' };
+  const calls = [
+    { id: 'c1', name: 'a.wav', startTime: '09:10', devMarkers: [solid, none] },
+    { id: 'c2', name: 'b.wav', devMarkers: [] },
+    { id: 'c3', name: 'c.wav', startTime: '11:00', devMarkers: [weak, { id: 'e', sec: 1, text: '' }] },
+  ];
+
+  it('builds a single-call graph rooted at the call node', () => {
+    const g = buildMindmap([calls[0]], { single: true, collapsed: new Set(['c1']) });
+    expect(g.nodes.some((n) => n.type === 'root')).toBe(false);
+    const callNode = g.nodes.find((n) => n.type === 'call');
+    expect(callNode).toMatchObject({ parent: null, depth: 0, collapsed: false });
+    expect(g.nodes.find((n) => n.type === 'marker').depth).toBe(1);
+    expect(g.edges.every((e) => e.from)).toBe(true);
+    const { positions } = autoLayout(g, {}, { colW: 100, padX: 0 });
+    expect(positions['call:c1'].x).toBe(0);
+    expect(positions['mk:c1:s'].x).toBe(100);
+  });
+
+  it('counts evidence strength per tab', () => {
+    const s = markerStats(calls);
+    expect(s).toMatchObject({ total: 4, solid: 1, weak: 1, none: 1, empty: 1, todo: 3, worst: 'none' });
+    expect(markerStats([]).worst).toBe('empty');
+  });
+
+  it('makes an overview tab plus one tab per call with markers', () => {
+    const tabs = mindmapTabs(calls);
+    expect(tabs.map((t) => t.id)).toEqual(['all', 'c1', 'c3']);
+    expect(tabs[1].label).toBe('1. 09:10');
+    expect(tabs[2].stats).toMatchObject({ total: 2, solid: 0, worst: 'empty' });
+    expect(tabs[0].stats.total).toBe(4);
+  });
+
+  it('outlines markers by call then time, and steps / finds next todo cyclically', () => {
+    const o = markerOutline(calls);
+    expect(o.map((x) => x.markerId)).toEqual(['n', 's', 'e', 'w']);
+    expect(o[1]).toMatchObject({ level: 'solid', evidenceCount: 2, startTime: '09:10' });
+    expect(stepMarker(o, null, 1).markerId).toBe('n');
+    expect(stepMarker(o, null, -1).markerId).toBe('w');
+    expect(stepMarker(o, { callId: 'c3', markerId: 'w' }, 1).markerId).toBe('n');
+    expect(stepMarker([], null, 1)).toBeNull();
+    expect(nextTodoMarker(o, null).markerId).toBe('n');
+    expect(nextTodoMarker(o, { callId: 'c1', markerId: 'n' }).markerId).toBe('e');
+    expect(nextTodoMarker(o, { callId: 'c3', markerId: 'w' }).markerId).toBe('n');
+    expect(nextTodoMarker(markerOutline([{ id: 'x', devMarkers: [solid] }]), null)).toBeNull();
   });
 });
