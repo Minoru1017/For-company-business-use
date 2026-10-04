@@ -84,6 +84,7 @@ import {
   writeSheetCells,
 } from './sheet-sync.js';
 import { mountTimelinePlayer } from './call-timeline-player.js';
+import { mountMarkerMindmap } from './marker-mindmap.js';
 import { buildDirectivesPromptAddendum } from './coach-directives.js';
 import { escapeHTML } from './utils.js';
 
@@ -175,6 +176,7 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
     playingId: null,
     playingUrl: null,
     playerCtrl: null,
+    mindmap: null,
     activated: false,
     dbError: '',
     sheet: { rows: null, model: null, loadedAt: 0, error: '', busy: false, writing: false, flash: false },
@@ -350,6 +352,12 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
             </div>
             <div class="bridge-upload-status hidden" id="slStatus"></div>
           </div>
+        </div>
+
+        <div class="card slog-mindmap">
+          <h2>話點心智圖 <span class="slog-count">表層資訊 → 內心真意 → 證據</span></h2>
+          <p class="hint">資料來自播放器的 <kbd>M</kbd> 標記。每個話點拆成「客戶字面上說的」和「他真正想傳達的」；真意是推論，<strong>沒有原句或行為證據就只是「我覺得」</strong>，不能寫進複盤。節點可拖曳，位置會記住；點時間可回放該段。</p>
+          <div id="slMindmap"></div>
         </div>
 
         <div class="card slog-agg">
@@ -988,7 +996,49 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
       if (state.playingId && state.playingUrl) mountPlayer(state.playingId, state.playingUrl);
     }
     refreshBatchButton();
+    state.mindmap?.refresh();
   }
+
+  /** 心智圖點時間 → 開啟（或沿用）那通的播放器並跳到該秒 */
+  async function jumpToCall(callId, sec) {
+    if (state.playingId !== callId) await togglePlay(callId);
+    const audio = state.playerCtrl?.getAudio?.();
+    if (!audio || state.playingId !== callId) return;
+    const seek = () => {
+      audio.currentTime = Math.max(0, Number(sec) || 0);
+      audio.play?.()?.catch?.(() => {});
+    };
+    if (audio.readyState >= 1) seek();
+    else audio.addEventListener('loadedmetadata', seek, { once: true });
+    listEl.querySelector(`[data-player="${callId}"]`)?.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  state.mindmap = mountMarkerMindmap(q('#slMindmap'), {
+    getDay: () => ({ key: state.selected || '', label: state.selected ? fmtDateLabel(state.selected) : '當天' }),
+    getCalls: () => state.calls,
+    onJump: jumpToCall,
+    onMarkerChange: async (callId, markers) => {
+      const c = state.calls.find((x) => x.id === callId);
+      if (!c) return;
+      c.devMarkers = markers;
+      if (state.playingId === callId) state.playerCtrl?.setMarkers?.(markers);
+      try {
+        await putCall(c);
+      } catch (e) {
+        showDbError(e);
+      }
+    },
+    onPositionsChange: async (callId, positions) => {
+      const c = state.calls.find((x) => x.id === callId);
+      if (!c) return;
+      c.mindmapPos = positions;
+      try {
+        await putCall(c);
+      } catch (e) {
+        showDbError(e);
+      }
+    },
+  });
 
   function mountPlayer(id, url) {
     const slot = listEl.querySelector(`[data-player="${id}"]`);
@@ -1006,6 +1056,7 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
         const c = state.calls.find((x) => x.id === id);
         if (!c) return;
         c.devMarkers = markers;
+        state.mindmap?.refresh();
         try {
           await putCall(c);
         } catch (e) {
