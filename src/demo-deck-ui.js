@@ -1,6 +1,6 @@
 /**
- * 「有邀約開發 → DEMO 簡報」工作區：左側簡報清單、客戶資料表單、簡報編輯器（縮圖／投影片／講者備註）、
- * 全螢幕簡報模式與 PPTX 下載。
+ * 「有邀約開發 → DEMO 簡報」工作區：左側簡報清單、客戶資料表單、專案式彈出視窗的簡報編輯器
+ * （分頁＝開啟中的簡報；縮圖／投影片／講者備註）、全螢幕簡報模式與 PPTX 下載。
  */
 import { callGeminiResilient, describeApiKeyProblem } from './gemini.js';
 import { listJournalDays } from './reflection-journal.js';
@@ -66,7 +66,25 @@ export function initDemoDeck(container, { getApiKey, setApiKey, getModel, onGemi
             <span class="hint" id="dkKeyHint"></span>
           </div>
         </section>
-        <section class="card dk-viewer" id="dkViewer" tabindex="-1" hidden>
+        <section class="card dk-open" id="dkOpenCard" hidden>
+          <div class="dk-open-info"><b id="dkOpenTitle"></b><small id="dkOpenMeta"></small></div>
+          <button type="button" class="primary" id="dkOpenEditor">開啟簡報編輯器</button>
+        </section>
+      </div>
+    </div>`;
+
+  const win = document.createElement('div');
+  win.className = 'dk-win-layer';
+  win.hidden = true;
+  win.innerHTML = `
+        <section class="dk-win dk-viewer" id="dkViewer" tabindex="-1" role="dialog" aria-modal="true" aria-label="簡報編輯器">
+          <header class="dk-win-titlebar">
+            <div class="dk-win-tabs" id="dkTabs" role="tablist" aria-label="開啟中的簡報"></div>
+            <span class="dk-win-ctrl">
+              <button type="button" class="btn slog-mini" data-win="max" aria-pressed="false" title="最大化視窗（F）">最大化</button>
+              <button type="button" class="btn slog-mini dk-win-close" data-win="close" title="關閉編輯器（Esc）" aria-label="關閉編輯器">×</button>
+            </span>
+          </header>
           <div class="dk-toolbar">
             <b class="dk-deck-title" id="dkDeckTitle"></b>
             <span class="dk-toolbar-actions">
@@ -83,20 +101,24 @@ export function initDemoDeck(container, { getApiKey, setApiKey, getModel, onGemi
           </div>
           ${formatBarHtml()}
           <div class="dk-viewer-body">
-            <ol class="dk-thumbs" id="dkThumbs"></ol>
-            <div class="dk-stage-wrap"><div class="dk-stage" id="dkStage"></div><p class="dk-stage-meta" id="dkStageMeta"></p></div>
+            <ol class="dk-thumbs" id="dkThumbs" aria-label="投影片"></ol>
+            <div class="dk-stage-wrap"><div class="dk-stage" id="dkStage"></div></div>
             <aside class="dk-notes">
               <div class="dk-why"><span class="dk-notes-label">這頁回應客戶的</span><p id="dkWhy"></p></div>
               <label class="dk-notes-label" for="dkNotesText">講者備註 <small>只有你看得到；PPTX 也會帶</small></label>
-              <textarea class="field" id="dkNotesText" rows="5"></textarea>
-              <p class="hint">投影片上的字可直接點進去改；不在輸入框時按 ← → 換頁。</p>
+              <textarea class="field" id="dkNotesText" rows="8"></textarea>
+              <p class="hint">投影片上的字可直接點進去改。</p>
             </aside>
           </div>
-        </section>
-      </div>
-    </div>`;
+          <footer class="dk-win-status">
+            <span id="dkStageMeta"></span>
+            <span id="dkSaveState"></span>
+            <span class="dk-win-keys"><kbd>←</kbd><kbd>→</kbd> 換頁 · <kbd>F</kbd> 最大化 · <kbd>Esc</kbd> 離開輸入／關閉</span>
+          </footer>
+        </section>`;
+  document.body.appendChild(win);
 
-  const q = (sel) => container.querySelector(sel);
+  const q = (sel) => container.querySelector(sel) || win.querySelector(sel);
   const els = {
     list: q('#dkList'),
     fields: q('#dkFields'),
@@ -117,7 +139,14 @@ export function initDemoDeck(container, { getApiKey, setApiKey, getModel, onGemi
     stageMeta: q('#dkStageMeta'),
     why: q('#dkWhy'),
     notes: q('#dkNotesText'),
+    tabs: q('#dkTabs'),
+    maxBtn: q('[data-win="max"]'),
+    saveState: q('#dkSaveState'),
+    openCard: q('#dkOpenCard'),
+    openTitle: q('#dkOpenTitle'),
+    openMeta: q('#dkOpenMeta'),
   };
+  const editor = { open: false, max: false, ids: [], watch: null };
 
   els.fields.innerHTML = INPUT_FIELDS.map(
     (f) => `<label class="dk-field${f.short ? ' short' : ''}${f.rows ? ' wide' : ''}"><span>${escapeHTML(f.label)}</span>${
@@ -135,6 +164,7 @@ export function initDemoDeck(container, { getApiKey, setApiKey, getModel, onGemi
     state.saveT = null;
     try {
       saveDecks(state.decks);
+      els.saveState.textContent = '已儲存';
     } catch (e) {
       toast(`簡報儲存失敗：${e?.message || e}`);
     }
@@ -144,6 +174,7 @@ export function initDemoDeck(container, { getApiKey, setApiKey, getModel, onGemi
     const rec = current();
     if (rec) rec.updatedAt = Date.now();
     clearTimeout(state.saveT);
+    els.saveState.textContent = '儲存中…';
     state.saveT = setTimeout(persistNow, 400);
   }
 
@@ -215,15 +246,89 @@ export function initDemoDeck(container, { getApiKey, setApiKey, getModel, onGemi
     fmtBar?.afterRender();
   }
 
+  function renderOpenCard() {
+    const rec = current();
+    els.openCard.hidden = !rec?.deck;
+    if (!rec?.deck) return;
+    const style = DECK_STYLES.find((x) => x.key === rec.deck.theme?.style)?.label || DECK_STYLES[0].label;
+    els.openTitle.textContent = rec.deck.title;
+    els.openMeta.textContent = `${rec.deck.slides.length} 頁 · ${style}${rec.source === 'template' ? ' · 範本' : ''}`;
+  }
+
+  function renderTabs() {
+    editor.ids = editor.ids.filter((id) => state.decks.some((d) => d.id === id && d.deck));
+    els.tabs.innerHTML = editor.ids
+      .map((id) => {
+        const rec = state.decks.find((d) => d.id === id);
+        const on = id === state.currentId;
+        return `<span class="dk-win-tab${on ? ' active' : ''}"><button type="button" role="tab" class="dk-win-tab-label" aria-selected="${on}" tabindex="${on ? 0 : -1}" data-tab="${escapeHTML(id)}" title="${escapeHTML(rec.deck.title)}">${escapeHTML(recLabel(rec))}</button><button type="button" class="dk-win-tab-x" data-tab-close="${escapeHTML(id)}" title="關閉分頁" aria-label="關閉分頁">×</button></span>`;
+      })
+      .join('');
+  }
+
   function renderViewer() {
     const rec = current();
-    els.viewer.hidden = !rec?.deck;
-    if (!rec?.deck) return;
+    renderOpenCard();
+    if (!editor.open) return;
+    if (!rec?.deck) return closeEditor();
+    renderTabs();
     state.idx = Math.min(Math.max(0, state.idx), rec.deck.slides.length - 1);
     els.title.textContent = rec.deck.title;
     els.style.value = rec.deck.theme?.style || 'classic';
     renderThumbs();
     renderStage();
+  }
+
+  /* ---- 專案式彈出視窗：每份開過的簡報一個分頁；掛在 body，避免卡片的 backdrop-filter 困住 position:fixed ---- */
+  function openEditor(id = state.currentId) {
+    const rec = state.decks.find((d) => d.id === id);
+    if (!rec?.deck) return;
+    if (!editor.ids.includes(id)) editor.ids.push(id);
+    if (id !== state.currentId) select(id);
+    if (!editor.open) {
+      editor.open = true;
+      win.hidden = false;
+      document.body.classList.add('dk-win-open');
+      editor.watch = new MutationObserver(() => {
+        if (!container.isConnected || container.offsetParent === null) closeEditor();
+      });
+      editor.watch.observe(document.body, { attributes: true, attributeFilter: ['hidden'], subtree: true });
+    }
+    els.saveState.textContent = '';
+    renderViewer();
+    els.viewer.focus({ preventScroll: true });
+  }
+
+  function closeEditor() {
+    if (!editor.open) return;
+    if (state.saveT) persistNow();
+    editor.open = false;
+    editor.watch?.disconnect();
+    editor.watch = null;
+    fmtBar?.clear();
+    win.hidden = true;
+    document.body.classList.remove('dk-win-open');
+    renderList();
+    renderOpenCard();
+    els.openCard.querySelector('#dkOpenEditor')?.focus({ preventScroll: true });
+  }
+
+  function closeTab(id) {
+    const i = editor.ids.indexOf(id);
+    if (i < 0) return;
+    editor.ids.splice(i, 1);
+    if (!editor.ids.length) return closeEditor();
+    if (id === state.currentId) select(editor.ids[Math.min(i, editor.ids.length - 1)]);
+    else renderTabs();
+  }
+
+  function setMaximized(on) {
+    editor.max = on;
+    win.classList.toggle('max', on);
+    els.maxBtn.setAttribute('aria-pressed', String(on));
+    els.maxBtn.textContent = on ? '還原' : '最大化';
+    els.maxBtn.title = on ? '還原視窗（F）' : '最大化視窗（F）';
+    els.viewer.focus({ preventScroll: true });
   }
 
   function render() {
@@ -274,7 +379,7 @@ export function initDemoDeck(container, { getApiKey, setApiKey, getModel, onGemi
     persist();
     persistNow();
     render();
-    els.viewer.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+    openEditor(rec.id);
   }
 
   function generateTemplate() {
@@ -534,8 +639,26 @@ export function initDemoDeck(container, { getApiKey, setApiKey, getModel, onGemi
     if (isTyping(e.target) || e.ctrlKey || e.metaKey || e.altKey) return;
     if (e.key === 'ArrowRight' || e.key === 'PageDown') goto(state.idx + 1);
     else if (e.key === 'ArrowLeft' || e.key === 'PageUp') goto(state.idx - 1);
+    else if (e.key === 'f' || e.key === 'F') setMaximized(!editor.max);
+    else if (e.key === 'Escape') closeEditor();
     else return;
     e.preventDefault();
+  });
+
+  q('#dkOpenEditor').addEventListener('click', () => openEditor());
+
+  els.tabs.addEventListener('click', (e) => {
+    const x = e.target.closest('[data-tab-close]');
+    if (x) return closeTab(x.dataset.tabClose);
+    const t = e.target.closest('[data-tab]');
+    if (t && t.dataset.tab !== state.currentId) select(t.dataset.tab);
+    els.viewer.focus({ preventScroll: true });
+  });
+
+  q('.dk-win-ctrl').addEventListener('click', (e) => {
+    const b = e.target.closest('[data-win]');
+    if (b?.dataset.win === 'max') setMaximized(!editor.max);
+    else if (b?.dataset.win === 'close') closeEditor();
   });
 
   els.style.addEventListener('change', () => {
@@ -591,6 +714,7 @@ export function initDemoDeck(container, { getApiKey, setApiKey, getModel, onGemi
       renderImport();
       renderViewer();
     },
+    openEditor,
     syncApiKey(v) {
       els.apiKey.value = v || '';
     },
