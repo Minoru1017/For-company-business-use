@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import PptxGenJS from 'pptxgenjs';
 import {
   DECKS_STORAGE_KEY,
+  DECK_STYLES,
   buildDeckPrompt,
   deckFileName,
   hasCustomerInput,
@@ -14,6 +15,7 @@ import {
   normalizeSlide,
   parseDeckResponse,
   saveDecks,
+  sectionNumbers,
   setByPath,
   slideNumbers,
   templateDeck,
@@ -339,6 +341,58 @@ describe('digital nomad style', () => {
     expect(cards).toContain('prstGeom prst="ellipse"');
     expect(cards).toContain('Consolas');
     expect(cards).toContain('B83A2E');
-    expect(cards).toContain('rot=');
+    const rotated = (cards.match(/<p:sp>[\s\S]*?<\/p:sp>/g) || []).filter((sp) => /<a:xfrm[^>]*rot=/.test(sp));
+    expect(rotated.length).toBeGreaterThan(0);
+    expect(rotated.every((sp) => !sp.includes('prst="roundRect"'))).toBe(true);
+  });
+});
+
+describe('gallery brand style', () => {
+  const PNG_1PX =
+    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+  const galleryDeck = (withPhoto = false) =>
+    normalizeDeck({
+      ...aiJson,
+      theme: { style: 'gallery' },
+      slides: aiJson.slides.map((s, i) => (i === 0 && withPhoto ? { ...s, images: [{ id: 'img_photo1', bg: true, ratio: 1.5 }] } : s)),
+    });
+
+  it('is a selectable deck style', () => {
+    expect(DECK_STYLES.map((x) => x.key)).toContain('gallery');
+    expect(normalizeDeck({ theme: { style: 'gallery' }, slides: [{ title: 'a' }] }).theme.style).toBe('gallery');
+    expect(sectionNumbers([{ type: 'cover' }, { type: 'section' }, { type: 'cards' }, { type: 'section' }])).toEqual([0, 1, 0, 2]);
+  });
+
+  it('renders brand-guide footer, checkerboard cover, oversized section number', () => {
+    const html = renderDeckSlides(galleryDeck());
+    expect(html[0]).toContain('t-gallery');
+    expect(html[0]).toContain('dk-gl-panel');
+    expect(html[0]).toContain('<b class="dk-gl-brand">劉○○</b>');
+    expect(html[1]).toContain('<b class="dk-gl-big" aria-hidden="true">01</b>');
+    expect(html[3]).toContain('<span class="dk-page">04</span>');
+    expect(html.at(-1)).toContain('WATCHING.');
+    const photo = renderDeckSlides(galleryDeck(true), { resolveImage: () => PNG_1PX });
+    expect(photo[0]).toContain('t-gallery has-photo');
+    expect(photo[0]).not.toContain('dk-gl-panel');
+  });
+
+  it('exports the gallery look to pptx', async () => {
+    const pptx = buildDeckPptx(PptxGenJS, galleryDeck(true), { images: new Map([['img_photo1', PNG_1PX]]) });
+    const JSZip = (await import('jszip')).default;
+    const zip = await JSZip.loadAsync(await pptx.write({ outputType: 'nodebuffer' }));
+    const cover = await zip.file('ppt/slides/slide1.xml').async('string');
+    const section = await zip.file('ppt/slides/slide2.xml').async('string');
+    const cards = await zip.file('ppt/slides/slide4.xml').async('string');
+    expect(cover).toContain('<p:pic>');
+    expect(cover).toContain('D8B48C');
+    expect(cover).toContain('REPORT');
+    expect(section).toContain('F4EFE6');
+    expect(section).toContain('Arial Black');
+    expect(cards).toContain('6B3A1E');
+    expect(cards).toContain('CDC3B4');
+    expect(cards).toContain('Demo Guidelines');
+    const rotated = (cards.match(/<p:sp>[\s\S]*?<\/p:sp>/g) || []).filter((sp) => /<a:xfrm[^>]*rot=/.test(sp));
+    expect(rotated.length).toBeGreaterThan(0);
+    expect(rotated.every((sp) => sp.includes('prst="ellipse"') || sp.includes('rot="5400000"'))).toBe(true);
   });
 });

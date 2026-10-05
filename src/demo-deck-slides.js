@@ -3,7 +3,7 @@
  * editable 時文字節點帶 data-path、圖塊帶 data-block、圖片帶 data-img，供編輯器選取與套用格式。
  */
 import { escapeHTML } from './utils.js';
-import { fontCss, ptToCqw, slideNumbers } from './demo-deck.js';
+import { fontCss, ptToCqw, sectionNumbers, slideNumbers } from './demo-deck.js';
 
 const CN_NUM = ['一', '二', '三', '四', '五', '六'];
 const pad = (n) => String(n).padStart(2, '0');
@@ -123,25 +123,48 @@ function images(c, resolveImage, bg) {
  * @param {object} slide normalizeSlide 後的投影片
  * @param {{index:number,total:number,num?:number,editable?:boolean,font?:string,style?:string,tag?:string,resolveImage?:(id:string)=>string}} opts
  */
-export function renderSlideHtml(slide, { index = 0, total = 1, num = 0, editable = false, font = '', style: deckStyle = 'classic', tag = '', resolveImage } = {}) {
+/** 藝廊品牌：品牌手冊式頁尾（品牌字標＋箭頭欄位）、右側直書、封面字標／棋盤格、章節巨型編號 */
+function galleryDeco(slide, { brand, meta, part, hasPhoto }) {
+  const side = '<span class="dk-gl-side" aria-hidden="true">Demo Report · Call Coach</span>';
+  const foot = `<div class="dk-gl-foot" aria-hidden="true"><b class="dk-gl-brand">${escapeHTML(brand || 'DEMO')}</b><span>→ Call Coach<br>Demo Guidelines</span><span>→ ${escapeHTML(meta || '有邀約開發')}</span></div>`;
+  let extra = '';
+  if (slide.type === 'cover') {
+    extra = `<div class="dk-gl-mark" aria-hidden="true"><i></i><b>DEMO</b><b>REPORT</b></div>
+      <div class="dk-gl-nav" aria-hidden="true"><span>規劃</span><span>作品</span><span>自由</span></div>${hasPhoto ? '' : '<div class="dk-gl-panel" aria-hidden="true"></div>'}`;
+  } else if (slide.type === 'section') {
+    extra = `<b class="dk-gl-big" aria-hidden="true">${pad(part || 1)}</b>`;
+  } else if (slide.type === 'closing') {
+    extra = '<div class="dk-gl-mark" aria-hidden="true"><i></i><b>THANKS FOR</b><b>WATCHING.</b></div>';
+  }
+  return side + extra + foot;
+}
+
+export function renderSlideHtml(
+  slide,
+  { index = 0, total = 1, num = 0, part = 0, editable = false, font = '', style: deckStyle = 'classic', tag = '', brand = '', meta = '', resolveImage } = {}
+) {
   const c = { p: `slides.${index}`, ed: !!editable, slide, fmt: slide.fmt || { bg: '', text: {}, blocks: {} } };
   const css = [];
   if (c.fmt.bg) css.push(`background:${c.fmt.bg}`);
   if (font) css.push(`font-family:${fontCss(font)}`);
   const style = css.length ? ` style="${escapeHTML(css.join(';'))}"` : '';
   const nomad = deckStyle === 'nomad';
+  const gallery = deckStyle === 'gallery';
   const dark = slide.type === 'cover' || slide.type === 'section' || slide.type === 'closing';
-  const foot = `<span class="dk-page">${nomad ? 'N° ' : ''}${pad(index + 1)} / ${pad(total)}</span>`;
+  const foot = `<span class="dk-page">${gallery ? pad(index + 1) : `${nomad ? 'N° ' : ''}${pad(index + 1)} / ${pad(total)}`}</span>`;
   const bgImgs = images(c, resolveImage, true);
   const fgImgs = images(c, resolveImage, false);
   const label = escapeHTML(tag || 'Digital Nomad');
-  const deco = !nomad
-    ? ''
-    : dark
-      ? `<span class="dk-pill">${label}</span>`
-      : `<div class="dk-deco-stamp" aria-hidden="true"><small>ADMITTED</small><b>DEMO</b><small>NOMAD NOTES</small></div>`;
+  const deco = gallery
+    ? galleryDeco(slide, { brand, meta, part, hasPhoto: !!bgImgs })
+    : !nomad
+      ? ''
+      : dark
+        ? `<span class="dk-pill">${label}</span>`
+        : `<div class="dk-deco-stamp" aria-hidden="true"><small>ADMITTED</small><b>DEMO</b><small>NOMAD NOTES</small></div>`;
+  const theme = nomad ? ' t-nomad' : gallery ? ' t-gallery' : '';
   const wrap = (cls, inner) =>
-    `<div class="dk-slide ${cls}${nomad ? ' t-nomad' : ''}${nomad && bgImgs ? ' has-photo' : ''}"${style}>${bgImgs}${deco}${inner}${fgImgs}${foot}</div>`;
+    `<div class="dk-slide ${cls}${theme}${(nomad || gallery) && bgImgs ? ' has-photo' : ''}"${style}>${bgImgs}${deco}${inner}${fgImgs}${foot}</div>`;
   const nav = nomad ? '<div class="dk-nav" aria-hidden="true"><span>規劃</span><span>作品</span><span>自由</span></div>' : '';
   if (slide.type === 'cover' || slide.type === 'section') {
     return wrap(
@@ -174,15 +197,20 @@ export function renderSlideHtml(slide, { index = 0, total = 1, num = 0, editable
 
 export function renderDeckSlides(deck, opts = {}) {
   const nums = slideNumbers(deck.slides);
+  const parts = sectionNumbers(deck.slides);
+  const meta = deck.slides.find((s) => s.type === 'cover')?.meta || '';
   return deck.slides.map((s, i) =>
     renderSlideHtml(s, {
       font: deck.theme?.font || '',
       style: deck.theme?.style || 'classic',
       tag: deck.customer ? `${deck.customer} · Nomad Notes` : '',
+      brand: deck.customer || '',
+      meta,
       ...opts,
       index: i,
       total: deck.slides.length,
       num: nums[i],
+      part: parts[i],
     })
   );
 }
