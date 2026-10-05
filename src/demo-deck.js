@@ -71,6 +71,7 @@ const FONT_KEYS = new Set(FONT_OPTIONS.map((f) => f.key));
 export const DECK_STYLES = [
   { key: 'classic', label: '經典深藍' },
   { key: 'nomad', label: '數位游牧' },
+  { key: 'gallery', label: '藝廊品牌' },
 ];
 
 export function normStyle(v) {
@@ -268,6 +269,12 @@ export function parseDeckResponse(raw) {
 export function slideNumbers(slides) {
   let n = 0;
   return (slides || []).map((s) => (NUMBERED_TYPES.has(s.type) ? ++n : 0));
+}
+
+/** 章節頁的序號（第幾個 section，其他頁為 0） */
+export function sectionNumbers(slides) {
+  let n = 0;
+  return (slides || []).map((s) => (s.type === 'section' ? ++n : 0));
 }
 
 export function hasCustomerInput(input = {}) {
