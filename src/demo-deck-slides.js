@@ -121,22 +121,32 @@ function images(c, resolveImage, bg) {
 
 /**
  * @param {object} slide normalizeSlide 後的投影片
- * @param {{index:number,total:number,num?:number,editable?:boolean,font?:string,resolveImage?:(id:string)=>string}} opts
+ * @param {{index:number,total:number,num?:number,editable?:boolean,font?:string,style?:string,tag?:string,resolveImage?:(id:string)=>string}} opts
  */
-export function renderSlideHtml(slide, { index = 0, total = 1, num = 0, editable = false, font = '', resolveImage } = {}) {
+export function renderSlideHtml(slide, { index = 0, total = 1, num = 0, editable = false, font = '', style: deckStyle = 'classic', tag = '', resolveImage } = {}) {
   const c = { p: `slides.${index}`, ed: !!editable, slide, fmt: slide.fmt || { bg: '', text: {}, blocks: {} } };
   const css = [];
   if (c.fmt.bg) css.push(`background:${c.fmt.bg}`);
   if (font) css.push(`font-family:${fontCss(font)}`);
   const style = css.length ? ` style="${escapeHTML(css.join(';'))}"` : '';
-  const foot = `<span class="dk-page">${pad(index + 1)} / ${pad(total)}</span>`;
+  const nomad = deckStyle === 'nomad';
+  const dark = slide.type === 'cover' || slide.type === 'section' || slide.type === 'closing';
+  const foot = `<span class="dk-page">${nomad ? 'N° ' : ''}${pad(index + 1)} / ${pad(total)}</span>`;
   const bgImgs = images(c, resolveImage, true);
   const fgImgs = images(c, resolveImage, false);
-  const wrap = (cls, inner) => `<div class="dk-slide ${cls}"${style}>${bgImgs}${inner}${fgImgs}${foot}</div>`;
+  const label = escapeHTML(tag || 'Digital Nomad');
+  const deco = !nomad
+    ? ''
+    : dark
+      ? `<span class="dk-pill">${label}</span>`
+      : `<div class="dk-deco-stamp" aria-hidden="true"><small>ADMITTED</small><b>DEMO</b><small>${label}</small></div>`;
+  const wrap = (cls, inner) =>
+    `<div class="dk-slide ${cls}${nomad ? ' t-nomad' : ''}${nomad && bgImgs ? ' has-photo' : ''}"${style}>${bgImgs}${deco}${inner}${fgImgs}${foot}</div>`;
+  const nav = nomad ? '<div class="dk-nav" aria-hidden="true"><span>規劃</span><span>作品</span><span>自由</span></div>' : '';
   if (slide.type === 'cover' || slide.type === 'section') {
     return wrap(
       `dark ${slide.type}`,
-      `<div class="dk-center">
+      `<div class="dk-center">${nav}
       ${t(c, 'div', 'dk-kicker', 'kicker', slide.kicker, slide.type === 'cover' ? 'DEMO' : '第一部分')}
       ${t(c, 'h2', 'dk-title', 'title', slide.title, '標題')}
       <span class="dk-rule"></span>
@@ -150,7 +160,7 @@ export function renderSlideHtml(slide, { index = 0, total = 1, num = 0, editable
     const confirm = slide.confirm || c.ed ? `<div class="dk-confirm"${blk(c, 'confirm')}>${t(c, 'span', '', 'confirm', slide.confirm, '所以你真正想要的是…我理解對嗎？')}</div>` : '';
     return wrap(
       'dark closing',
-      `<div class="dk-center">
+      `<div class="dk-center">${nav}
       ${t(c, 'div', 'dk-kicker', 'kicker', slide.kicker, '下一步')}
       ${t(c, 'h2', 'dk-title', 'title', slide.title, '標題')}
       ${t(c, 'p', 'dk-sub', 'subtitle', slide.subtitle, '副標')}
@@ -165,6 +175,14 @@ export function renderSlideHtml(slide, { index = 0, total = 1, num = 0, editable
 export function renderDeckSlides(deck, opts = {}) {
   const nums = slideNumbers(deck.slides);
   return deck.slides.map((s, i) =>
-    renderSlideHtml(s, { font: deck.theme?.font || '', ...opts, index: i, total: deck.slides.length, num: nums[i] })
+    renderSlideHtml(s, {
+      font: deck.theme?.font || '',
+      style: deck.theme?.style || 'classic',
+      tag: deck.customer ? `${deck.customer} · Nomad Notes` : '',
+      ...opts,
+      index: i,
+      total: deck.slides.length,
+      num: nums[i],
+    })
   );
 }

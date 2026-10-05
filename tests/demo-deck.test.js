@@ -300,3 +300,45 @@ describe('formatting & images', () => {
     expect(Object.keys(zip.files).filter((f) => f.startsWith('ppt/media/') && !zip.files[f].dir)).toHaveLength(2);
   });
 });
+
+describe('digital nomad style', () => {
+  const PNG_1PX =
+    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+  const nomadDeck = () =>
+    normalizeDeck({ ...aiJson, theme: { style: 'nomad' }, slides: aiJson.slides.map((s, i) => (i === 0 ? { ...s, images: [{ id: 'img_photo1', bg: true, ratio: 1.5 }] } : s)) });
+
+  it('validates the deck style', () => {
+    expect(normalizeDeck({ slides: [{ title: 'a' }] }).theme.style).toBe('classic');
+    expect(normalizeDeck({ theme: { style: 'nomad' }, slides: [{ title: 'a' }] }).theme.style).toBe('nomad');
+    expect(normalizeDeck({ theme: { style: 'neon' }, slides: [{ title: 'a' }] }).theme.style).toBe('classic');
+  });
+
+  it('renders glass cards on dark slides and passport stamps on light slides', () => {
+    const html = renderDeckSlides(nomadDeck(), { resolveImage: () => PNG_1PX });
+    expect(html[0]).toContain('t-nomad has-photo');
+    expect(html[0]).toContain('class="dk-nav"');
+    expect(html[0]).toContain('<span class="dk-pill">劉○○ · Nomad Notes</span>');
+    expect(html[1]).not.toContain('has-photo');
+    expect(html[3]).toContain('dk-deco-stamp');
+    expect(html[3]).toContain('N° 04 / 10');
+    expect(renderDeckSlides(normalizeDeck(aiJson))[3]).not.toContain('t-nomad');
+  });
+
+  it('exports the nomad look to pptx', async () => {
+    const pptx = buildDeckPptx(PptxGenJS, nomadDeck(), { images: new Map([['img_photo1', PNG_1PX]]) });
+    const JSZip = (await import('jszip')).default;
+    const zip = await JSZip.loadAsync(await pptx.write({ outputType: 'nodebuffer' }));
+    const cover = await zip.file('ppt/slides/slide1.xml').async('string');
+    const section = await zip.file('ppt/slides/slide2.xml').async('string');
+    const cards = await zip.file('ppt/slides/slide4.xml').async('string');
+    expect(cover).toContain('<p:pic>');
+    expect(cover).toContain('Nomad Notes');
+    expect(cover).toContain('Segoe Script');
+    expect(section).toContain('E8B04B');
+    expect(cards).toContain('EEEBE3');
+    expect(cards).toContain('prstGeom prst="ellipse"');
+    expect(cards).toContain('Consolas');
+    expect(cards).toContain('B83A2E');
+    expect(cards).toContain('rot=');
+  });
+});

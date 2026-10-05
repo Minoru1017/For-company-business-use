@@ -67,6 +67,16 @@ export const FONT_OPTIONS = [
 ];
 const FONT_KEYS = new Set(FONT_OPTIONS.map((f) => f.key));
 
+/** 整份簡報的版型風格 */
+export const DECK_STYLES = [
+  { key: 'classic', label: '經典深藍' },
+  { key: 'nomad', label: '數位游牧' },
+];
+
+export function normStyle(v) {
+  return DECK_STYLES.some((x) => x.key === v) ? v : 'classic';
+}
+
 export function fontCss(key) {
   return (FONT_OPTIONS.find((f) => f.key === key) || FONT_OPTIONS[0]).css;
 }
@@ -235,7 +245,7 @@ export function normalizeDeck(d = {}, { keepEmpty = false } = {}) {
   return {
     title: str(d.title, LIMITS.title + 20) || slides[0].title || 'DEMO 簡報',
     customer: str(d.customer, 30),
-    theme: { font: normFont(d.theme?.font) },
+    theme: { font: normFont(d.theme?.font), style: normStyle(d.theme?.style) },
     slides,
   };
 }
