@@ -103,7 +103,7 @@ export function renderSlideHtml(slide, { index = 0, total = 1, num = 0, editable
       ${steps ? `<ol class="dk-next">${steps}</ol>` : ''}
     </div>${foot}</div>`;
   }
-  return `<div class="dk-slide light ${slide.type}">${header(slide, p, num, ed)}${body(slide, p, ed)}${foot}</div>`;
+  return `<div class="dk-slide light ${slide.type}"><div class="dk-in">${header(slide, p, num, ed)}${body(slide, p, ed)}</div>${foot}</div>`;
 }
 
 export function renderDeckSlides(deck, opts = {}) {

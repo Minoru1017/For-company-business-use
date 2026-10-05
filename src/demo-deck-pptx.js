@@ -167,7 +167,7 @@ function lightSlide(pptx, slide, i, total, num) {
     pair(pptx, s, 4.0, { label: slide.goalLabel, text: slide.goal }, { label: slide.alsoLabel, text: slide.also });
   } else if (slide.type === 'quote') {
     const n = Math.max(1, slide.quotes.length);
-    const h = slide.confirm ? Math.min(0.95, 2.6 / n) : Math.min(1.2, 3.6 / n);
+    const h = slide.confirm ? Math.min(0.9, (2.85 - 0.18 * (n - 1)) / n) : Math.min(1.2, 3.6 / n);
     slide.quotes.forEach((q, k) => {
       const y = top + k * (h + 0.18);
       rect(pptx, s, { x: M, y, w: CW, h, fill: { color: C.white }, line: { color: C.line, width: 1 } });
@@ -176,8 +176,8 @@ function lightSlide(pptx, slide, i, total, num) {
       txt(s, q.who, { x: W - M - 2.1, y, w: 1.9, h, fontSize: 11, color: C.grey, align: 'right', valign: 'middle' });
     });
     if (slide.confirm) {
-      rect(pptx, s, { x: M, y: 5.6, w: CW, h: 0.95, fill: { color: C.navy } });
-      txt(s, slide.confirm, { x: M + 0.4, y: 5.6, w: CW - 0.8, h: 0.95, fontSize: 18, bold: true, color: C.white, align: 'center', valign: 'middle' });
+      rect(pptx, s, { x: M, y: 5.75, w: CW, h: 0.95, fill: { color: C.navy } });
+      txt(s, slide.confirm, { x: M + 0.4, y: 5.75, w: CW - 0.8, h: 0.95, fontSize: 18, bold: true, color: C.white, align: 'center', valign: 'middle' });
     }
   } else if (slide.type === 'qa') {
     const n = slide.items.length;

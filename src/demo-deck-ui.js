@@ -79,7 +79,7 @@ export function initDemoDeck(container, { getApiKey, setApiKey, getModel, onGemi
             <aside class="dk-notes">
               <div class="dk-why"><span class="dk-notes-label">這頁回應客戶的</span><p id="dkWhy"></p></div>
               <label class="dk-notes-label" for="dkNotesText">講者備註 <small>只有你看得到；PPTX 也會帶</small></label>
-              <textarea class="field" id="dkNotesText" rows="9"></textarea>
+              <textarea class="field" id="dkNotesText" rows="5"></textarea>
               <p class="hint">投影片上的字可直接點進去改；不在輸入框時按 ← → 換頁。</p>
             </aside>
           </div>
