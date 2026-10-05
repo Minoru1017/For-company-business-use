@@ -2078,3 +2078,5 @@ body.dk-presenting { overflow:hidden; }
   box-shadow:inset 0 0 0 .35cqw var(--nm-paper), inset 0 0 0 .5cqw var(--nm-red); transform:rotate(-.8deg); }
 .dk-style-pick { display:inline-flex; align-items:center; gap:6px; margin-right:6px; font-size:.74rem; color:var(--muted); }
 .dk-style-pick select.field { width:auto; padding:4px 8px; font-size:.76rem; }
+.dk-slide.t-nomad.cover .dk-center { width:58%; }
+.dk-slide.t-nomad.cover .dk-title { font-size:4.6cqw; }

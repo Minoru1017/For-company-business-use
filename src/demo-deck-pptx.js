@@ -235,7 +235,7 @@ function closingSlide(pptx, s, slide) {
 /* ---- nomad 深色頁：動態模糊底＋右側玻璃卡＋膠囊標籤 ---- */
 function nomadBackdrop(pptx, s, hasPhoto) {
   if (hasPhoto) {
-    rect(pptx, s, { x: 0, y: 0, w: W, h: H, fill: { color: '000000', transparency: 62 } });
+    rect(pptx, s, { x: 0, y: 0, w: W, h: H, fill: { color: '000000', transparency: 62 }, line: { color: P.darkAccent, transparency: 100 } });
     return;
   }
   [
@@ -245,7 +245,7 @@ function nomadBackdrop(pptx, s, hasPhoto) {
     [4.6, 0.1, 40],
     [4.85, 0.3, 82],
     [5.5, 0.05, 60],
-  ].forEach(([y, h, t]) => rect(pptx, s, { x: 0, y, w: W, h, fill: { color: P.darkAccent, transparency: t } }));
+  ].forEach(([y, h, t]) => rect(pptx, s, { x: 0, y, w: W, h, fill: { color: P.darkAccent, transparency: t }, line: { color: P.darkAccent, transparency: 100 } }));
 }
 
 function glassCard(pptx, s, x, y, w, h) {
@@ -296,7 +296,7 @@ function nomadDark(pptx, s, slide, tag, hasPhoto) {
 }
 
 /* ---- nomad 淺色頁：護照紙＋圓形入境章 ---- */
-function nomadPaper(pptx, s, tag) {
+function nomadPaper(pptx, s) {
   s.addShape(pptx.ShapeType.roundRect, { x: 0.25, y: 0.22, w: W - 0.5, h: H - 0.44, rectRadius: 0.08, fill: { color: P.bg, transparency: 100 }, line: { color: P.ink, width: 0.75, dashType: 'sysDot', transparency: 55 } });
   const sx = W - 2.55;
   const sy = 0.3;
@@ -305,7 +305,7 @@ function nomadPaper(pptx, s, tag) {
   s.addShape(pptx.ShapeType.ellipse, { x: sx + 0.1, y: sy + 0.1, w: d - 0.2, h: d - 0.2, fill: { color: P.bg, transparency: 100 }, line: { color: P.inks[2], width: 0.75, transparency: 25 } });
   txt(s, 'ADMITTED', { x: sx, y: sy + 0.38, w: d, h: 0.25, fontSize: 8, color: P.inks[2], align: 'center', charSpacing: 3, rotate: -14 });
   txt(s, 'DEMO', { x: sx, y: sy + 0.6, w: d, h: 0.5, fontSize: 24, bold: true, color: P.inks[2], align: 'center', valign: 'middle', fontFace: P.titleFont, rotate: -14 });
-  txt(s, tag.slice(0, 28), { x: sx + 0.1, y: sy + 1.1, w: d - 0.2, h: 0.25, fontSize: 7, color: P.inks[2], align: 'center', rotate: -14 });
+  txt(s, 'NOMAD NOTES', { x: sx + 0.1, y: sy + 1.1, w: d - 0.2, h: 0.25, fontSize: 7, color: P.inks[2], align: 'center', rotate: -14 });
 }
 
 function lightSlide(pptx, s, slide, num) {
@@ -443,7 +443,7 @@ export function buildDeckPptx(PptxGenJS, deck, { images } = {}) {
     else if (slide.type === 'cover' || slide.type === 'section') darkSlide(pptx, s, slide);
     else if (slide.type === 'closing') closingSlide(pptx, s, slide);
     else {
-      if (NOMAD) nomadPaper(pptx, s, tag);
+      if (NOMAD) nomadPaper(pptx, s);
       lightSlide(pptx, s, slide, nums[i]);
     }
     addImages(s, slide, images, false);

@@ -139,7 +139,7 @@ export function renderSlideHtml(slide, { index = 0, total = 1, num = 0, editable
     ? ''
     : dark
       ? `<span class="dk-pill">${label}</span>`
-      : `<div class="dk-deco-stamp" aria-hidden="true"><small>ADMITTED</small><b>DEMO</b><small>${label}</small></div>`;
+      : `<div class="dk-deco-stamp" aria-hidden="true"><small>ADMITTED</small><b>DEMO</b><small>NOMAD NOTES</small></div>`;
   const wrap = (cls, inner) =>
     `<div class="dk-slide ${cls}${nomad ? ' t-nomad' : ''}${nomad && bgImgs ? ' has-photo' : ''}"${style}>${bgImgs}${deco}${inner}${fgImgs}${foot}</div>`;
   const nav = nomad ? '<div class="dk-nav" aria-hidden="true"><span>規劃</span><span>作品</span><span>自由</span></div>' : '';
