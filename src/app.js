@@ -49,6 +49,7 @@ import { goToModeHome, initModeChooser, resolveMode } from './mode.js';
 import { initSymptomLog } from './symptom-log.js';
 import { findCallBySourceName } from './symptom-store.js';
 import { initMeetingNotes } from './meeting-notes-ui.js';
+import { initDemoDeck } from './demo-deck-ui.js';
 import { appendDirectivesToPrompt } from './coach-directives.js';
 import { bindLabelCollapseHandlers, createLabelController } from './labels.js';
 import { applyBuiltinSpeakerLabels, enrichSegments, parse, parseVibeJson } from './parser.js';
@@ -83,6 +84,7 @@ let currentHistoryId = null;
 let devAudio = null;
 let symptomLog = null;
 let meetingNotes = null;
+let demoDeck = null;
 let recentSidebar = null;
 
 const keyStorage = {
@@ -226,6 +228,10 @@ function scrollToNewUpload() {
   }
   if (mode === 'drill') {
     $('drillSection')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    return;
+  }
+  if (mode === 'deck') {
+    $('deckSection')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     return;
   }
   if (mode === 'brief') {
@@ -574,6 +580,7 @@ function bindApiKey() {
     keyStorage.save($('apiKey').value.trim());
     devAudio?.syncApiKey($('apiKey').value.trim());
     symptomLog?.syncApiKey($('apiKey').value.trim());
+    demoDeck?.syncApiKey($('apiKey').value.trim());
   };
   $('quotaLimit').value = localStorage.getItem('gemini_limit') || 250;
   $('quotaLimit').onchange = () => {
@@ -833,6 +840,7 @@ function init() {
       if (mode === 'demo') window.__refreshBridge?.();
       if (mode === 'log') symptomLog?.activate();
       if (mode === 'brief') meetingNotes?.activate();
+      if (mode === 'deck') demoDeck?.activate();
       refreshReflectionGateUI();
     },
   });
@@ -895,6 +903,7 @@ function init() {
     devAudio?.syncApiKey(value);
     symptomLog?.syncApiKey(value);
     meetingNotes?.syncApiKey(value);
+    demoDeck?.syncApiKey(value);
   };
   const getModel = () => {
     const m = $('aiModel').value.trim() || DEFAULT_MODEL;
@@ -957,6 +966,15 @@ function init() {
     if (resolveMode() === 'brief') meetingNotes.activate();
   } catch (e) {
     console.error('meeting notes init failed', e);
+  }
+
+  // 有邀約開發 → DEMO 簡報：依客戶資料產生投其所好的簡報，可全螢幕簡報或下載 PPTX
+  try {
+    demoDeck = initDemoDeck($('deckPanel'), { getApiKey, setApiKey, getModel, onGeminiUsed, showToast });
+    demoDeck.syncApiKey(getApiKey());
+    if (resolveMode() === 'deck') demoDeck.activate();
+  } catch (e) {
+    console.error('demo deck init failed', e);
   }
 
   initDrill({

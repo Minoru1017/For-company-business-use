@@ -1,5 +1,5 @@
 const MODE_KEY = 'call_coach_mode';
-const MODES = new Set(['dev', 'demo', 'drill', 'log', 'brief']);
+const MODES = new Set(['dev', 'demo', 'drill', 'log', 'brief', 'deck']);
 
 import { MODE_ROLES, PHILOSOPHY } from './coach-philosophy.js';
 
@@ -9,6 +9,7 @@ const TAGLINES = {
   drill: `${MODE_ROLES.drill.title}。<br><span>${MODE_ROLES.drill.blurb} ・ 通話中不看逐字稿</span>`,
   log: `${MODE_ROLES.log.title}。<br><span>${MODE_ROLES.log.blurb} ・ wav 只存本機</span>`,
   brief: `${MODE_ROLES.brief.title}。<br><span>${MODE_ROLES.brief.blurb} ・ 逐字稿與方向只存本機</span>`,
+  deck: `${MODE_ROLES.deck.title}。<br><span>${MODE_ROLES.deck.blurb} ・ 簡報只存本機</span>`,
 };
 
 const TITLES = {
@@ -17,6 +18,7 @@ const TITLES = {
   drill: 'CALL COACH｜電訪開發陪練',
   log: 'CALL COACH｜開發症狀紀錄',
   brief: 'CALL COACH｜主管早會語音紀錄',
+  deck: 'CALL COACH｜DEMO 簡報',
 };
 
 /** 工作區頁首：模式短名與檔案碼（對應首頁五張頁籤卡） */
@@ -26,6 +28,7 @@ export const WS_HEADINGS = {
   drill: { title: '臨場反應陪練', code: 'CODE_003' },
   log: { title: '開發症狀紀錄', code: 'CODE_004' },
   brief: { title: '主管早會 · 語音紀錄', code: 'CODE_005' },
+  deck: { title: 'DEMO 簡報', code: 'CODE_006' },
 };
 
 export function resolveMode() {
@@ -35,6 +38,7 @@ export function resolveMode() {
   if (hash === 'drill' || hash === 'practice') return 'drill';
   if (hash === 'log' || hash === 'symptom') return 'log';
   if (hash === 'brief' || hash === 'meeting') return 'brief';
+  if (hash === 'deck' || hash === 'slides') return 'deck';
   const saved = sessionStorage.getItem(MODE_KEY) || '';
   return MODES.has(saved) ? saved : '';
 }
@@ -54,6 +58,7 @@ export function applyMode(mode) {
   const drillSection = document.getElementById('drillSection');
   const logSection = document.getElementById('logSection');
   const briefSection = document.getElementById('briefSection');
+  const deckSection = document.getElementById('deckSection');
   const modeBar = document.getElementById('modeBar');
   const tagline = document.getElementById('heroTagline');
   const wsTitle = document.getElementById('wsTitle');
@@ -79,6 +84,7 @@ export function applyMode(mode) {
   if (drillSection) drillSection.hidden = mode !== 'drill';
   if (logSection) logSection.hidden = mode !== 'log';
   if (briefSection) briefSection.hidden = mode !== 'brief';
+  if (deckSection) deckSection.hidden = mode !== 'deck';
 
   if (modeBar) {
     modeBar.hidden = !active;
