@@ -5,6 +5,7 @@
 import { callGeminiResilient, describeApiKeyProblem } from './gemini.js';
 import { listJournalDays } from './reflection-journal.js';
 import {
+  DECK_STYLES,
   INPUT_FIELDS,
   SLIDE_TYPE_LABELS,
   buildDeckPrompt,
@@ -69,6 +70,9 @@ export function initDemoDeck(container, { getApiKey, setApiKey, getModel, onGemi
           <div class="dk-toolbar">
             <b class="dk-deck-title" id="dkDeckTitle"></b>
             <span class="dk-toolbar-actions">
+              <label class="dk-style-pick" title="整份簡報的版型風格">樣式
+                <select class="field" id="dkStyle">${DECK_STYLES.map((x) => `<option value="${x.key}">${escapeHTML(x.label)}</option>`).join('')}</select>
+              </label>
               <button type="button" class="btn slog-mini" data-dk="up" title="上移這頁">↑</button>
               <button type="button" class="btn slog-mini" data-dk="down" title="下移這頁">↓</button>
               <button type="button" class="btn slog-mini" data-dk="dup">複製此頁</button>
@@ -107,6 +111,7 @@ export function initDemoDeck(container, { getApiKey, setApiKey, getModel, onGemi
     keyHint: q('#dkKeyHint'),
     viewer: q('#dkViewer'),
     title: q('#dkDeckTitle'),
+    style: q('#dkStyle'),
     thumbs: q('#dkThumbs'),
     stage: q('#dkStage'),
     stageMeta: q('#dkStageMeta'),
@@ -216,6 +221,7 @@ export function initDemoDeck(container, { getApiKey, setApiKey, getModel, onGemi
     if (!rec?.deck) return;
     state.idx = Math.min(Math.max(0, state.idx), rec.deck.slides.length - 1);
     els.title.textContent = rec.deck.title;
+    els.style.value = rec.deck.theme?.style || 'classic';
     renderThumbs();
     renderStage();
   }
@@ -261,6 +267,7 @@ export function initDemoDeck(container, { getApiKey, setApiKey, getModel, onGemi
   }
 
   function applyDeck(rec, deck, source) {
+    if (rec.deck?.theme) deck.theme = { ...deck.theme, ...rec.deck.theme };
     rec.deck = deck;
     rec.source = source;
     state.idx = 0;
@@ -529,6 +536,15 @@ export function initDemoDeck(container, { getApiKey, setApiKey, getModel, onGemi
     else if (e.key === 'ArrowLeft' || e.key === 'PageUp') goto(state.idx - 1);
     else return;
     e.preventDefault();
+  });
+
+  els.style.addEventListener('change', () => {
+    const deck = current()?.deck;
+    if (!deck) return;
+    deck.theme = { ...(deck.theme || {}), style: els.style.value };
+    persist();
+    renderViewer();
+    if (state.present) renderPresent();
   });
 
   q('.dk-toolbar-actions').addEventListener('click', (e) => {
