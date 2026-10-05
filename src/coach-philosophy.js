@@ -44,6 +44,13 @@ export const MODE_ROLES = {
     blurb: '按錄音即時轉文字，萃取重點、你確認後套用成專案方向——AI 分析與頁首都會跟著對齊。',
     cta: '開始錄音',
   },
+  deck: {
+    step: 'do',
+    stepLabel: '備 DEMO',
+    title: 'DEMO 簡報 = 投其所好、有憑有據',
+    blurb: '從有邀約的開發紀錄出發，每一頁都回應客戶說過的話；DEMO 時讓他自己點頭說「對」。',
+    cta: '做簡報',
+  },
 };
 
 export const PHILOSOPHY = {
