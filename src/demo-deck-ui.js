@@ -10,6 +10,7 @@ import {
   buildDeckPrompt,
   deckFileName,
   hasCustomerInput,
+  imageIdsInDecks,
   invitedReflectionEntries,
   loadCourseNotes,
   loadDecks,
@@ -23,6 +24,8 @@ import {
   templateDeck,
 } from './demo-deck.js';
 import { renderDeckSlides } from './demo-deck-slides.js';
+import { formatBarHtml, mountDeckFormatBar } from './demo-deck-format-ui.js';
+import { deleteDeckImages, loadAllDeckImages } from './demo-deck-images.js';
 import { escapeHTML } from './utils.js';
 
 const isTyping = (el) => !!el?.closest?.('input, textarea, select, [contenteditable]:not([contenteditable="false"])');
@@ -30,7 +33,8 @@ const isTyping = (el) => !!el?.closest?.('input, textarea, select, [contentedita
 export function initDemoDeck(container, { getApiKey, setApiKey, getModel, onGeminiUsed, showToast } = {}) {
   if (!container) return { activate() {}, syncApiKey() {} };
   const toast = (m) => showToast?.(m);
-  const state = { decks: loadDecks(), currentId: null, idx: 0, busy: false, saveT: null, present: null };
+  const state = { decks: loadDecks(), currentId: null, idx: 0, busy: false, saveT: null, present: null, images: new Map() };
+  let fmtBar = null;
 
   container.innerHTML = `
     <div class="dk-app">
@@ -73,6 +77,7 @@ export function initDemoDeck(container, { getApiKey, setApiKey, getModel, onGemi
               <button type="button" class="primary" data-dk="present">▶ 簡報模式</button>
             </span>
           </div>
+          ${formatBarHtml()}
           <div class="dk-viewer-body">
             <ol class="dk-thumbs" id="dkThumbs"></ol>
             <div class="dk-stage-wrap"><div class="dk-stage" id="dkStage"></div><p class="dk-stage-meta" id="dkStageMeta"></p></div>
@@ -171,7 +176,7 @@ export function initDemoDeck(container, { getApiKey, setApiKey, getModel, onGemi
 
   function slideHtmlList(editable) {
     const rec = current();
-    return rec?.deck ? renderDeckSlides(rec.deck, { editable }) : [];
+    return rec?.deck ? renderDeckSlides(rec.deck, { editable, resolveImage: (id) => state.images.get(id) }) : [];
   }
 
   function renderThumbs() {
@@ -202,6 +207,7 @@ export function initDemoDeck(container, { getApiKey, setApiKey, getModel, onGemi
     els.why.textContent = slide.why || '（沒有標註依據——想一想這頁是回應他的哪句話？）';
     els.why.classList.toggle('empty', !slide.why);
     els.notes.value = slide.notes || '';
+    fmtBar?.afterRender();
   }
 
   function renderViewer() {
@@ -224,6 +230,7 @@ export function initDemoDeck(container, { getApiKey, setApiKey, getModel, onGemi
     if (state.saveT) persistNow();
     state.currentId = id;
     state.idx = 0;
+    fmtBar?.clear();
     els.status.textContent = '';
     render();
   }
@@ -240,7 +247,9 @@ export function initDemoDeck(container, { getApiKey, setApiKey, getModel, onGemi
     const rec = current();
     if (!rec?.deck) return;
     const n = rec.deck.slides.length;
-    state.idx = Math.min(Math.max(0, i), n - 1);
+    const next = Math.min(Math.max(0, i), n - 1);
+    if (next !== state.idx) fmtBar?.clear();
+    state.idx = next;
     els.thumbs.querySelectorAll('.dk-thumb').forEach((b) => b.classList.toggle('active', Number(b.dataset.slide) === state.idx));
     els.thumbs.querySelector('.dk-thumb.active')?.scrollIntoView?.({ block: 'nearest' });
     renderStage();
@@ -324,7 +333,7 @@ export function initDemoDeck(container, { getApiKey, setApiKey, getModel, onGemi
     btn.textContent = '產生中…';
     try {
       const { exportDeckPptx } = await import('./demo-deck-pptx.js');
-      await exportDeckPptx(rec.deck, deckFileName(rec));
+      await exportDeckPptx(rec.deck, deckFileName(rec), { images: state.images });
       toast('已下載 PPTX');
     } catch (e) {
       toast(`PPTX 產生失敗：${e?.message || e}`);
@@ -406,6 +415,27 @@ export function initDemoDeck(container, { getApiKey, setApiKey, getModel, onGemi
     els.viewer.focus({ preventScroll: true });
   }
 
+  /** 刪掉沒有任何簡報引用的圖片（複製頁會共用同一張圖，所以不在移除當下刪） */
+  function gcImages() {
+    const used = imageIdsInDecks(state.decks);
+    const unused = [...state.images.keys()].filter((id) => !used.has(id));
+    unused.forEach((id) => state.images.delete(id));
+    deleteDeckImages(unused).catch(() => {});
+  }
+
+  fmtBar = mountDeckFormatBar(q('#dkFmt'), els.stage, {
+    getDeck: () => current()?.deck || null,
+    getIndex: () => state.idx,
+    images: state.images,
+    toast,
+    keyTarget: els.viewer,
+    onChange: () => {
+      persist();
+      renderThumbs();
+      renderStage();
+    },
+  });
+
   /* ---- 事件 ---- */
   q('#dkNew').addEventListener('click', createDeck);
 
@@ -416,6 +446,7 @@ export function initDemoDeck(container, { getApiKey, setApiKey, getModel, onGemi
       if (!rec || !window.confirm(`刪除「${recLabel(rec)}」的簡報？`)) return;
       state.decks = state.decks.filter((d) => d.id !== rec.id);
       persistNow();
+      gcImages();
       if (!state.decks.length) createDeck();
       else if (state.currentId === rec.id) select(state.decks[0].id);
       else renderList();
@@ -530,6 +561,14 @@ export function initDemoDeck(container, { getApiKey, setApiKey, getModel, onGemi
   state.currentId = state.decks[0].id;
   render();
   renderImport();
+  loadAllDeckImages()
+    .then((map) => {
+      map.forEach((v, k) => state.images.set(k, v));
+      gcImages();
+      renderViewer();
+      if (state.present) renderPresent();
+    })
+    .catch((e) => console.warn('deck images unavailable', e));
 
   return {
     activate() {

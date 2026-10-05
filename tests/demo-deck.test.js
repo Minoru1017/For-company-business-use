@@ -5,6 +5,7 @@ import {
   buildDeckPrompt,
   deckFileName,
   hasCustomerInput,
+  imageIdsInDecks,
   invitedReflectionEntries,
   loadDecks,
   moveSlide,
@@ -202,5 +203,100 @@ describe('pptx export', () => {
     const buf = await pptx.write({ outputType: 'nodebuffer' });
     expect(buf.subarray(0, 2).toString()).toBe('PK');
     expect(buf.length).toBeGreaterThan(20000);
+  });
+});
+
+describe('formatting & images', () => {
+  const PNG_1PX =
+    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+
+  it('keeps only valid colors, sizes, fonts and image boxes', () => {
+    const s = normalizeSlide({
+      type: 'cards',
+      title: 'x',
+      fmt: {
+        bg: '#AABBCC',
+        text: { title: { color: '#ff0000', size: 200, font: 'DFKai-SB' }, 'cards.0.text': { color: 'red', size: 'big', font: 'Comic' }, 'bad key!': { color: '#000000' } },
+        blocks: { 'cards.1': { fill: '#123456' }, banner: { fill: 'nope' } },
+      },
+      images: [
+        { id: 'img_abc123', x: 500, y: -90, w: 1, ratio: 0.5, bg: 1 },
+        { id: 'javascript:alert(1)', x: 1 },
+      ],
+    });
+    expect(s.fmt).toEqual({ bg: '#aabbcc', text: { title: { color: '#ff0000', size: 96, font: 'DFKai-SB' } }, blocks: { 'cards.1': { fill: '#123456' } } });
+    expect(s.images).toEqual([{ id: 'img_abc123', x: 100, y: -50, w: 3, ratio: 0.5, bg: true }]);
+    expect(normalizeDeck({ theme: { font: 'PMingLiU' }, slides: [{ title: 'a' }] }).theme.font).toBe('PMingLiU');
+    expect(normalizeDeck({ theme: { font: 'Evil' }, slides: [{ title: 'a' }] }).theme.font).toBe('');
+  });
+
+  it('keeps slides whose title the user cleared when loading saved decks', () => {
+    const d = { slides: [{ type: 'cards', title: '' }, { type: 'cards', title: 'b' }] };
+    expect(normalizeDeck(d).slides).toHaveLength(1);
+    expect(normalizeDeck(d, { keepEmpty: true }).slides).toHaveLength(2);
+  });
+
+  it('collects referenced image ids across decks', () => {
+    const deck = normalizeDeck({ slides: [{ title: 'a', images: [{ id: 'img_aaaa1' }] }, { title: 'b', images: [{ id: 'img_bbbb2' }, { id: 'img_aaaa1' }] }] });
+    expect([...imageIdsInDecks([{ deck }, { deck: null }])].sort()).toEqual(['img_aaaa1', 'img_bbbb2']);
+  });
+
+  it('renders text styles, block fills, slide bg, deck font and images', () => {
+    const deck = normalizeDeck({
+      theme: { font: 'PMingLiU' },
+      slides: [
+        {
+          type: 'cards',
+          title: 'T',
+          cards: [{ title: 'A' }],
+          banner: 'B',
+          fmt: { bg: '#101010', text: { title: { color: '#ff0000', size: 48, font: 'DFKai-SB' } }, blocks: { 'cards.0': { fill: '#00ff00' }, banner: { fill: '#0000ff' } } },
+          images: [{ id: 'img_fg0001', x: 10, y: 20, w: 30, ratio: 0.5 }, { id: 'img_bg0001', bg: true }, { id: 'img_none01' }],
+        },
+      ],
+    });
+    const map = new Map([['img_fg0001', PNG_1PX], ['img_bg0001', PNG_1PX]]);
+    const [view] = renderDeckSlides(deck, { resolveImage: (id) => map.get(id) });
+    expect(view).toContain('background:#101010');
+    expect(view).toContain('&quot;PMingLiU&quot;');
+    expect(view).toContain('color:#ff0000;font-size:5cqw;font-family:&quot;DFKai-SB&quot;');
+    expect(view).toContain('class="dk-card" style="background:#00ff00"');
+    expect(view).toContain('class="dk-banner" style="background:#0000ff"');
+    expect(view).toContain('left:10%;top:20%;width:30%;aspect-ratio:1 / 0.5');
+    expect(view).toContain('dk-img bg');
+    expect(view).toContain('圖片載入中');
+    expect(view).not.toContain('data-img=');
+    const [ed] = renderDeckSlides(deck, { editable: true, resolveImage: (id) => map.get(id) });
+    expect(ed).toContain('data-block="cards.0"');
+    expect(ed).toContain('data-img="0"');
+    expect(ed).toContain('data-img-resize');
+  });
+
+  it('exports formatting and images to pptx', async () => {
+    const deck = normalizeDeck({
+      theme: { font: 'PMingLiU' },
+      slides: [
+        {
+          type: 'cards',
+          title: '標題',
+          cards: [{ title: 'A', text: 'a' }],
+          fmt: { bg: '#101010', text: { title: { color: '#ff0000', size: 44, font: 'DFKai-SB' } }, blocks: { 'cards.0': { fill: '#00ff00' } } },
+          images: [{ id: 'img_fg0001', x: 10, y: 20, w: 30, ratio: 1 }, { id: 'img_bg0001', bg: true, ratio: 1 }],
+        },
+      ],
+    });
+    const map = new Map([['img_fg0001', PNG_1PX], ['img_bg0001', PNG_1PX]]);
+    const pptx = buildDeckPptx(PptxGenJS, deck, { images: map });
+    const JSZip = (await import('jszip')).default;
+    const zip = await JSZip.loadAsync(await pptx.write({ outputType: 'nodebuffer' }));
+    const xml = await zip.file('ppt/slides/slide1.xml').async('string');
+    expect(xml).toContain('101010');
+    expect(xml).toContain('FF0000');
+    expect(xml).toContain('sz="4400"');
+    expect(xml).toContain('DFKai-SB');
+    expect(xml).toContain('00FF00');
+    expect(xml).toContain('PMingLiU');
+    expect((xml.match(/<p:pic>/g) || []).length).toBe(2);
+    expect(Object.keys(zip.files).filter((f) => f.startsWith('ppt/media/') && !zip.files[f].dir)).toHaveLength(2);
   });
 });

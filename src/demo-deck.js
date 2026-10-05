@@ -54,6 +54,95 @@ function strList(list, max, itemMax = LIMITS.short) {
     .slice(0, max);
 }
 
+/** 字體選單：key 同時是 PPTX fontFace；公司電腦是 Windows，以 Windows 內建字為主 */
+export const FONT_OPTIONS = [
+  { key: '', label: '預設（正黑體）', css: '"Noto Sans TC","Microsoft JhengHei","PingFang TC",sans-serif' },
+  { key: 'Microsoft JhengHei', label: '微軟正黑體', css: '"Microsoft JhengHei","Noto Sans TC","PingFang TC",sans-serif' },
+  { key: 'PMingLiU', label: '新細明體', css: '"PMingLiU","MingLiU","Noto Serif TC","Songti TC",serif' },
+  { key: 'DFKai-SB', label: '標楷體', css: '"DFKai-SB","BiauKai","Kaiti TC",serif' },
+  { key: 'Noto Serif TC', label: '思源宋體', css: '"Noto Serif TC","PMingLiU","Songti TC",serif' },
+  { key: 'Arial', label: 'Arial', css: 'Arial,"Microsoft JhengHei",sans-serif' },
+  { key: 'Georgia', label: 'Georgia', css: 'Georgia,"PMingLiU",serif' },
+  { key: 'Impact', label: 'Impact', css: 'Impact,"Microsoft JhengHei",sans-serif' },
+];
+const FONT_KEYS = new Set(FONT_OPTIONS.map((f) => f.key));
+
+export function fontCss(key) {
+  return (FONT_OPTIONS.find((f) => f.key === key) || FONT_OPTIONS[0]).css;
+}
+
+/** 字級以 PPTX 的 pt 存（寬螢幕投影片寬 960pt），HTML 換算成 cqw */
+export const FONT_SIZE_MIN = 8;
+export const FONT_SIZE_MAX = 96;
+export const ptToCqw = (pt) => Math.round((pt / 9.6) * 1000) / 1000;
+
+export const MAX_SLIDE_IMAGES = 12;
+const FMT_KEY_RE = /^[a-z]+(\.\d+(\.[a-z]+)?)?$/i;
+const clamp = (n, lo, hi) => Math.min(hi, Math.max(lo, n));
+
+export function normColor(v) {
+  const s = String(v || '').trim().toLowerCase();
+  return /^#[0-9a-f]{6}$/.test(s) ? s : '';
+}
+
+function normFont(v) {
+  const s = String(v || '');
+  return s && FONT_KEYS.has(s) ? s : '';
+}
+
+function normTextStyle(st) {
+  const out = {};
+  const color = normColor(st?.color);
+  const size = Number(st?.size);
+  const font = normFont(st?.font);
+  if (color) out.color = color;
+  if (Number.isFinite(size) && size > 0) out.size = clamp(Math.round(size), FONT_SIZE_MIN, FONT_SIZE_MAX);
+  if (font) out.font = font;
+  return Object.keys(out).length ? out : null;
+}
+
+export function normalizeFmt(f) {
+  const text = {};
+  const blocks = {};
+  Object.entries(f?.text && typeof f.text === 'object' ? f.text : {})
+    .slice(0, 80)
+    .forEach(([k, v]) => {
+      const st = FMT_KEY_RE.test(k) ? normTextStyle(v) : null;
+      if (st) text[k] = st;
+    });
+  Object.entries(f?.blocks && typeof f.blocks === 'object' ? f.blocks : {})
+    .slice(0, 40)
+    .forEach(([k, v]) => {
+      const fill = FMT_KEY_RE.test(k) ? normColor(v?.fill) : '';
+      if (fill) blocks[k] = { fill };
+    });
+  return { bg: normColor(f?.bg), text, blocks };
+}
+
+export function normalizeImages(list) {
+  return (Array.isArray(list) ? list : [])
+    .filter((im) => /^img_[\w-]{4,40}$/.test(String(im?.id || '')))
+    .slice(0, MAX_SLIDE_IMAGES)
+    .map((im) => {
+      const n = (v, d) => (Number.isFinite(Number(v)) ? Number(v) : d);
+      const w = clamp(n(im.w, 40), 3, 100);
+      return {
+        id: im.id,
+        x: clamp(n(im.x, 30), -50, 100),
+        y: clamp(n(im.y, 30), -50, 100),
+        w,
+        ratio: clamp(n(im.ratio, 0.75), 0.05, 20),
+        bg: !!im.bg,
+      };
+    });
+}
+
+export function imageIdsInDecks(records) {
+  const ids = new Set();
+  (records || []).forEach((r) => r?.deck?.slides?.forEach((s) => s.images?.forEach((im) => ids.add(im.id))));
+  return ids;
+}
+
 function rid(prefix) {
   return `${prefix}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
 }
@@ -68,6 +157,8 @@ export function normalizeSlide(s = {}) {
     subtitle: str(s.subtitle),
     notes: str(s.notes, LIMITS.notes),
     why: str(s.why, LIMITS.long),
+    fmt: normalizeFmt(s.fmt),
+    images: normalizeImages(s.images),
   };
   switch (type) {
     case 'cover':
@@ -135,12 +226,16 @@ export function normalizeSlide(s = {}) {
   }
 }
 
-export function normalizeDeck(d = {}) {
-  const slides = (Array.isArray(d?.slides) ? d.slides : []).map(normalizeSlide).filter((s) => s.title || s.type === 'quote');
+/** keepEmpty：本機存檔要保留使用者清空標題的頁；AI 回傳才過濾空頁 */
+export function normalizeDeck(d = {}, { keepEmpty = false } = {}) {
+  const slides = (Array.isArray(d?.slides) ? d.slides : [])
+    .map(normalizeSlide)
+    .filter((s) => keepEmpty || s.title || s.type === 'quote' || s.images.length);
   if (!slides.length) throw new Error('簡報沒有任何頁面');
   return {
     title: str(d.title, LIMITS.title + 20) || slides[0].title || 'DEMO 簡報',
     customer: str(d.customer, 30),
+    theme: { font: normFont(d.theme?.font) },
     slides,
   };
 }
@@ -391,7 +486,7 @@ export function loadDecks() {
       .map((r) => {
         let deck = null;
         try {
-          deck = r.deck ? normalizeDeck(r.deck) : null;
+          deck = r.deck ? normalizeDeck(r.deck, { keepEmpty: true }) : null;
         } catch {
           deck = null;
         }
