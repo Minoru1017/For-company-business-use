@@ -32,11 +32,13 @@ function blk(c, rel) {
   return `${c.ed ? ` data-block="${escapeHTML(rel)}"` : ''}${fill ? ` style="background:${fill}"` : ''}`;
 }
 
-function header(c, num) {
+function header(c, num, wrapKicker = false) {
   const { slide } = c;
   const k = num
     ? `<div class="dk-kicker"><span class="dk-num">${pad(num)}</span><span class="dk-sep">｜</span>${t(c, 'span', 'dk-k', 'kicker', slide.kicker, '主題')}</div>`
-    : t(c, 'div', 'dk-kicker', 'kicker', slide.kicker, '小標');
+    : wrapKicker
+      ? `<div class="dk-kicker">${t(c, 'span', 'dk-k', 'kicker', slide.kicker, '小標')}</div>`
+      : t(c, 'div', 'dk-kicker', 'kicker', slide.kicker, '小標');
   return `<header class="dk-head">${k}${t(c, 'h2', 'dk-title', 'title', slide.title, '標題')}${t(c, 'p', 'dk-sub', 'subtitle', slide.subtitle, '副標')}</header>`;
 }
 
@@ -119,10 +121,6 @@ function images(c, resolveImage, bg) {
     .join('');
 }
 
-/**
- * @param {object} slide normalizeSlide 後的投影片
- * @param {{index:number,total:number,num?:number,editable?:boolean,font?:string,style?:string,tag?:string,resolveImage?:(id:string)=>string}} opts
- */
 /** 藝廊品牌：品牌手冊式頁尾（品牌字標＋箭頭欄位）、右側直書、封面字標／棋盤格、章節巨型編號 */
 function galleryDeco(slide, { brand, meta, part, hasPhoto }) {
   const side = '<span class="dk-gl-side" aria-hidden="true">Demo Report · Call Coach</span>';
@@ -139,6 +137,24 @@ function galleryDeco(slide, { brand, meta, part, hasPhoto }) {
   return side + extra + foot;
 }
 
+/** 藝廊品牌的封面／章節／結尾也用內容頁同一個頁首，標題位置與字級整份一致 */
+function galleryDarkInner(c) {
+  const { slide } = c;
+  const ph = { cover: 'DEMO', section: '第一部分', closing: '下一步' }[slide.type];
+  let bodyHtml = '';
+  if (slide.type === 'cover') bodyHtml = t(c, 'p', 'dk-meta', 'meta', slide.meta, '日期・方案');
+  if (slide.type === 'closing') {
+    const steps = slide.steps.map((s, i) => `<li${blk(c, `steps.${i}`)}><span>${i + 1}</span>${t(c, 'b', '', `steps.${i}`, s)}</li>`).join('');
+    const confirm = slide.confirm || c.ed ? `<div class="dk-confirm"${blk(c, 'confirm')}>${t(c, 'span', '', 'confirm', slide.confirm, '所以你真正想要的是…我理解對嗎？')}</div>` : '';
+    bodyHtml = `${confirm}${steps ? `<ol class="dk-next">${steps}</ol>` : ''}`;
+  }
+  return `<div class="dk-in"><header class="dk-head"><div class="dk-kicker">${t(c, 'span', 'dk-k', 'kicker', slide.kicker, ph)}</div>${t(c, 'h2', 'dk-title', 'title', slide.title, '標題')}${t(c, 'p', 'dk-sub', 'subtitle', slide.subtitle, '副標')}</header><div class="dk-gl-body">${bodyHtml}</div></div>`;
+}
+
+/**
+ * @param {object} slide normalizeSlide 後的投影片
+ * @param {{index:number,total:number,num?:number,part?:number,editable?:boolean,font?:string,style?:string,tag?:string,brand?:string,meta?:string,resolveImage?:(id:string)=>string}} opts
+ */
 export function renderSlideHtml(
   slide,
   { index = 0, total = 1, num = 0, part = 0, editable = false, font = '', style: deckStyle = 'classic', tag = '', brand = '', meta = '', resolveImage } = {}
@@ -166,6 +182,7 @@ export function renderSlideHtml(
   const wrap = (cls, inner) =>
     `<div class="dk-slide ${cls}${theme}${(nomad || gallery) && bgImgs ? ' has-photo' : ''}"${style}>${bgImgs}${deco}${inner}${fgImgs}${foot}</div>`;
   const nav = nomad ? '<div class="dk-nav" aria-hidden="true"><span>規劃</span><span>作品</span><span>自由</span></div>' : '';
+  if (gallery && dark) return wrap(`dark ${slide.type}`, galleryDarkInner(c));
   if (slide.type === 'cover' || slide.type === 'section') {
     return wrap(
       `dark ${slide.type}`,
@@ -192,7 +209,7 @@ export function renderSlideHtml(
     </div>`
     );
   }
-  return wrap(`light ${slide.type}`, `<div class="dk-in">${header(c, num)}${body(c)}</div>`);
+  return wrap(`light ${slide.type}`, `<div class="dk-in">${header(c, num, gallery)}${body(c)}</div>`);
 }
 
 export function renderDeckSlides(deck, opts = {}) {
