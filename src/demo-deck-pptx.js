@@ -5,7 +5,7 @@
  * 編輯器的文字格式、圖塊色、背景色、圖片都會帶過去；講者備註＝notes＋這頁回應客戶的哪一點。
  */
 import { sectionNumbers, slideNumbers } from './demo-deck.js';
-import { MARBLE_RATIO, marbleJpeg } from './demo-deck-texture.js';
+import { MARBLE_RATIO, marbleJpeg, ringEllipses } from './demo-deck-texture.js';
 
 const PALETTES = {
   classic: {
@@ -133,6 +133,35 @@ function violetTone(lav) {
 }
 PALETTES.violet = violetTone(false);
 
+PALETTES.noir = {
+  bg: 'FFFFFF',
+  darkBg: '0B0B0B',
+  ink: '0B0B0B',
+  accent: '0B0B0B',
+  sub: '555555',
+  line: 'DADADA',
+  cardFill: 'F1F1F1',
+  bar: '',
+  navy: '0B0B0B',
+  onNavyAccent: 'FFFFFF',
+  navyLabel: 'BDBDBD',
+  last: '0B0B0B',
+  warm: '0B0B0B',
+  cool: 'FFFFFF',
+  muted: 'FFFFFF',
+  mutedText: '8C8C8C',
+  darkText: 'FFFFFF',
+  darkSub: 'BDBDBD',
+  darkAccent: 'FFFFFF',
+  darkBox: 'FFFFFF',
+  darkPage: '8C8C8C',
+  font: 'Microsoft JhengHei',
+  titleFont: '',
+  dotFont: '',
+  numFont: 'Arial',
+  stepLine: '0B0B0B',
+};
+
 const W = 13.333;
 const H = 7.5;
 const M = 0.75;
@@ -147,10 +176,11 @@ let P = PALETTES.classic;
 let NOMAD = false;
 let GALLERY = false;
 let VIOLET = false;
-/** 卡片上的次要文字色：藝廊品牌的可可棕卡片要用淺色；紫色潮流跟著塊色 */
-const subOf = (ink) => (VIOLET ? ink : GALLERY && ink === P.onNavyAccent ? P.navyLabel : P.sub);
+let NOIR = false;
+/** 卡片上的次要文字色：藝廊品牌的可可棕卡片要用淺色；紫色潮流跟著塊色；黑色俐落黑塊用淺灰 */
+const subOf = (ink) => (VIOLET ? ink : NOIR ? (ink === 'FFFFFF' ? P.navyLabel : P.sub) : GALLERY && ink === P.onNavyAccent ? P.navyLabel : P.sub);
 /** 卡片標題等主要文字是否跟著卡片墨色走 */
-const inked = () => NOMAD || GALLERY || VIOLET;
+const inked = () => NOMAD || GALLERY || VIOLET || NOIR;
 
 function styled(o, key) {
   const st = key ? F.text[key] : null;
@@ -183,6 +213,16 @@ function round(pptx, s, o, key) {
 
 /** 淺底卡片：classic＝白卡＋橘色上緣；nomad＝護照印章（雙框、輪替墨色、保持水平） */
 function card(pptx, s, o, key, k = 0) {
+  if (NOIR) {
+    const base = { x: o.x, y: o.y, w: o.w, h: o.h, rectRadius: 0.1 };
+    if (o.muted) {
+      round(pptx, s, { ...base, fill: { color: P.bg }, line: { color: P.line, width: 1, dashType: 'dash' } }, key);
+      return P.mutedText;
+    }
+    const solid = k % 2 === 0;
+    round(pptx, s, { ...base, fill: { color: solid ? P.navy : P.cardFill } }, key);
+    return solid ? P.onNavyAccent : P.ink;
+  }
   if (VIOLET) {
     if (o.muted) {
       rect(pptx, s, { x: o.x, y: o.y, w: o.w, h: o.h, fill: { color: P.bg }, line: { color: P.line, width: 1, dashType: 'dash' } }, key);
@@ -229,6 +269,12 @@ function card(pptx, s, o, key, k = 0) {
 
 /** 深色圖塊（橫幅、確認句）：nomad 變成紅色雙框印章 */
 function banner(pptx, s, o, key, text) {
+  if (NOIR) {
+    round(pptx, s, { ...o, rectRadius: 0.1, fill: { color: P.navy } }, key);
+    s.addShape(pptx.ShapeType.ellipse, { x: o.x + 0.21, y: o.y + o.h / 2 - 0.067, w: 0.133, h: 0.133, fill: { color: P.navy, transparency: 100 }, line: { color: 'FFFFFF', width: 1.25 } });
+    txt(s, text, { x: o.x + 0.55, y: o.y, w: o.w - 0.85, h: o.h, fontSize: 17, bold: true, color: 'FFFFFF', valign: 'middle' }, key);
+    return;
+  }
   if (VIOLET) {
     rect(pptx, s, { ...o, fill: { color: P.accent } }, key);
     sparkle(pptx, s, o.x + 0.2, o.y + o.h / 2 - 0.09, 0.18, P.bg);
@@ -314,7 +360,42 @@ function violetHead(pptx, s, slide, num) {
   s.addShape(pptx.ShapeType.line, { x: x + o, y: y + o, w: d - 2 * o, h: d - 2 * o, flipH: true, line: { color: P.accent, width: 0.75 } });
 }
 
+/** 黑色俐落頁首：位置／字級同藝廊品牌；內容頁先鋪黑色頁首帶＋右上小光環 */
+function noirHead(pptx, s, slide, num, dark) {
+  if (!dark) {
+    rect(pptx, s, { x: 0, y: 0, w: W, h: 2.3, fill: { color: P.navy } });
+    ring(pptx, s, W - M - 1.05, 1.15, 2.1, 0.3);
+  }
+  rect(pptx, s, { x: M, y: 0.45, w: 0.42, h: 0.06, fill: { color: 'FFFFFF' } });
+  const kx = num ? M + 0.75 : M;
+  if (num) {
+    txt(s, pad(num), { x: M, y: 0.68, w: 0.5, h: 0.3, fontFace: P.numFont, fontSize: 12, bold: true, color: 'FFFFFF' });
+    txt(s, '｜', { x: M + 0.45, y: 0.68, w: 0.3, h: 0.3, fontSize: 12, color: '444444' });
+  }
+  txt(s, slide.kicker, { x: kx, y: 0.68, w: CW - 3.2, h: 0.3, fontSize: 12, bold: true, color: P.mutedText, charSpacing: 3 }, 'kicker');
+  txt(s, slide.title, { x: M, y: 1.0, w: CW - 2.4, h: 0.88, fontSize: 26, bold: true, color: 'FFFFFF', valign: 'top', lineSpacingMultiple: 1.1, fit: 'none' }, 'title');
+  txt(s, slide.subtitle, { x: M, y: 1.92, w: CW - 2.4, h: 0.3, fontSize: 13, color: P.navyLabel, fit: 'none' }, 'subtitle');
+}
+
+/** 線條光環：與 HTML 同一組旋轉橢圓（ringEllipses） */
+function ring(pptx, s, cx, cy, d, width) {
+  const ox = cx - d / 2;
+  const oy = cy - d / 2;
+  ringEllipses().forEach((e) =>
+    s.addShape(pptx.ShapeType.ellipse, {
+      x: ox + (e.cx - e.rx) * d,
+      y: oy + (e.cy - e.ry) * d,
+      w: e.rx * 2 * d,
+      h: e.ry * 2 * d,
+      rotate: Math.round(e.rot * 10) / 10,
+      fill: { color: '000000', transparency: 100 },
+      line: { color: 'FFFFFF', width, transparency: 40 },
+    })
+  );
+}
+
 function head(pptx, s, slide, num) {
+  if (NOIR) return noirHead(pptx, s, slide, num, false);
   if (VIOLET) return violetHead(pptx, s, slide, num);
   if (GALLERY) return galleryHead(pptx, s, slide, num);
   const kOpts = NOMAD ? { fontFace: P.dotFont, fontSize: 13, color: P.ink, charSpacing: 4 } : { fontSize: 12, color: P.accent, charSpacing: 2 };
@@ -339,6 +420,13 @@ function chips(pptx, s, list, y, fill, prefix, inkIdx = 2) {
   const w = Math.min(2.4, (CW - 0.2 * (list.length - 1)) / Math.max(1, list.length));
   list.forEach((c, i) => {
     const x = M + i * (w + 0.2);
+    if (NOIR) {
+      const solid = fill === P.warm;
+      const f = fillOf({ fill: { color: solid ? P.navy : P.bg } }, `${prefix}.${i}`);
+      s.addShape(pptx.ShapeType.roundRect, { x, y, w, h: 0.5, rectRadius: 0.25, fill: f, line: { color: P.navy, width: 1 } });
+      txt(s, c, { x, y, w, h: 0.5, fontSize: 13, align: 'center', valign: 'middle', color: solid ? 'FFFFFF' : P.ink }, `${prefix}.${i}`);
+      return;
+    }
     if (VIOLET) {
       const solid = fill === P.warm;
       const f = fillOf({ fill: { color: solid ? P.cardFill : P.bg } }, `${prefix}.${i}`);
@@ -365,13 +453,13 @@ function chips(pptx, s, list, y, fill, prefix, inkIdx = 2) {
 
 function pair(pptx, s, y, left, right) {
   const h = 1.35;
-  const ink = card(pptx, s, { x: M, y, w: 5.4, h, bar: false }, left.key, VIOLET ? 1 : 0);
+  const ink = card(pptx, s, { x: M, y, w: 5.4, h, bar: false }, left.key, VIOLET || NOIR ? 1 : 0);
   txt(s, left.label, { x: M + 0.3, y: y + 0.2, w: 4.8, h: 0.3, fontSize: 12, color: P.sub });
   txt(s, left.text, { x: M + 0.3, y: y + 0.55, w: 4.8, h: 0.65, fontSize: 18, bold: true, color: inked() ? ink : P.ink }, left.key);
   const rx = M + 5.8;
   const box = { x: rx, y, w: CW - 5.8, h, fill: { color: P.navy } };
   if (GALLERY) rect(pptx, s, { x: rx + 0.11, y: y + 0.11, w: box.w, h, fill: { color: P.shadow } });
-  if (NOMAD) round(pptx, s, { ...box, rectRadius: 0.14 }, right.key);
+  if (NOMAD || NOIR) round(pptx, s, { ...box, rectRadius: NOIR ? 0.1 : 0.14 }, right.key);
   else rect(pptx, s, box, right.key);
   txt(s, right.label, { x: rx + 0.3, y: y + 0.2, w: CW - 6.4, h: 0.3, fontSize: 12, color: P.navyLabel });
   txt(s, right.text, { x: rx + 0.3, y: y + 0.55, w: CW - 6.4, h: 0.65, fontSize: 18, bold: true, color: P.onNavyAccent }, right.key);
@@ -613,6 +701,48 @@ function violetDark(pptx, s, slide, part, hasPhoto, marble) {
   });
 }
 
+/* ---- 黑色俐落：全黑封面／章節／結尾＋右側大光環、膠囊標籤、頁尾頁碼＋品牌 ---- */
+const NR_PHOTO = { x: W - 5.867, y: 0, w: 5.867, h: H };
+
+function noirPill(pptx, s, text, y, key) {
+  if (!text) return;
+  const w = Math.min(6.6, 0.45 + [...String(text)].reduce((n, ch) => n + (ch.charCodeAt(0) > 255 ? 0.16 : 0.1), 0));
+  s.addShape(pptx.ShapeType.roundRect, { x: M, y, w, h: 0.35, rectRadius: 0.175, fill: { color: P.navy, transparency: 100 }, line: { color: 'FFFFFF', width: 1 } });
+  txt(s, text, { x: M, y, w, h: 0.35, fontSize: 10.5, bold: true, color: 'FFFFFF', align: 'center', valign: 'middle', charSpacing: 1 }, key);
+}
+
+function noirFrame(s, i, brand) {
+  txt(s, pad(i + 1), { x: M, y: 6.93, w: 1, h: 0.25, fontFace: P.numFont, fontSize: 9, bold: true, color: P.mutedText });
+  txt(s, String(brand || 'DEMO').toUpperCase(), { x: W - M - 4, y: 6.93, w: 4, h: 0.25, fontFace: P.numFont, fontSize: 9, bold: true, color: P.mutedText, align: 'right', charSpacing: 2 });
+}
+
+function noirDark(pptx, s, slide, part, hasPhoto, meta) {
+  if (!hasPhoto) ring(pptx, s, 10.0, 4.45, 4.6, 0.6);
+  noirHead(pptx, s, slide, 0, true);
+  if (slide.type === 'cover') {
+    noirPill(pptx, s, slide.meta, 2.6, 'meta');
+    return;
+  }
+  if (slide.type === 'section') {
+    txt(s, pad(part || 1), { x: M, y: 2.5, w: 5, h: 2.2, fontFace: P.numFont, fontSize: 134, bold: true, color: 'FFFFFF', fit: 'none' });
+    return;
+  }
+  const tw = 6.6;
+  let y = 2.6;
+  if (slide.confirm) {
+    round(pptx, s, { x: M, y, w: tw, h: 1.0, rectRadius: 0.1, fill: { color: 'FFFFFF' } }, 'confirm');
+    txt(s, slide.confirm, { x: M + 0.27, y, w: tw - 0.54, h: 1.0, fontSize: 13, bold: true, color: P.ink, valign: 'middle' }, 'confirm');
+    y += 1.2;
+  }
+  slide.steps.forEach((step, k) => {
+    txt(s, `${k + 1}`, { x: M, y, w: 0.5, h: 0.5, fontFace: P.numFont, fontSize: 13, bold: true, color: P.mutedText, valign: 'middle' });
+    txt(s, step, { x: M + 0.55, y, w: tw - 0.55, h: 0.5, fontSize: 13, bold: true, color: 'FFFFFF', valign: 'middle' }, `steps.${k}`);
+    s.addShape(pptx.ShapeType.line, { x: M, y: y + 0.52, w: tw, h: 0, line: { color: '333333', width: 0.75 } });
+    y += 0.6;
+  });
+  noirPill(pptx, s, meta, 6.27);
+}
+
 function lightSlide(pptx, s, slide, num) {
   head(pptx, s, slide, num);
   const top = 2.6;
@@ -640,7 +770,7 @@ function lightSlide(pptx, s, slide, num) {
       txt(s, c.label || `方向${CN_NUM[k] || k + 1}`, { x: x + 0.3, y: y + 0.25, w: w - 0.6, h: 0.28, fontSize: 11, bold: true, color: c.muted ? P.mutedText : ink }, `items.${k}.label`);
       txt(s, c.title, { x: x + 0.3, y: y + 0.55, w: w - 0.6, h: 0.5, fontSize: 20, bold: true, color: c.muted ? P.sub : inked() ? ink : P.ink }, `items.${k}.title`);
       txt(s, c.tags, { x: x + 0.3, y: y + 1.1, w: w - 0.6, h: 0.32, fontSize: 12, color: subOf(ink) }, `items.${k}.tags`);
-      txt(s, c.flow, { x: x + 0.3, y: y + 1.45, w: w - 0.6, h: 0.35, fontSize: 12, italic: true, color: c.muted ? P.mutedText : GALLERY || VIOLET ? ink : P.ink }, `items.${k}.flow`);
+      txt(s, c.flow, { x: x + 0.3, y: y + 1.45, w: w - 0.6, h: 0.35, fontSize: 12, italic: true, color: c.muted ? P.mutedText : GALLERY || VIOLET || NOIR ? ink : P.ink }, `items.${k}.flow`);
     });
   } else if (slide.type === 'flow') {
     let y = top;
@@ -658,7 +788,9 @@ function lightSlide(pptx, s, slide, num) {
         const x = M + k * (w + aw);
         const last = k === n - 1;
         const box = { x, y: y + 0.35, w, h: 0.95 };
-        if (VIOLET && !last) {
+        if (NOIR) {
+          round(pptx, s, { ...box, rectRadius: 0.1, fill: { color: last ? P.navy : P.cardFill } }, `steps.${k}`);
+        } else if (VIOLET && !last) {
           rect(pptx, s, { ...box, fill: { color: P.bg }, line: { color: P.stepLine, width: 1.25 } }, `steps.${k}`);
         } else if (GALLERY && !last) {
           rect(pptx, s, { ...box, fill: { color: P.cardFill }, line: { color: P.stepLine, width: 1.25 } }, `steps.${k}`);
@@ -668,9 +800,9 @@ function lightSlide(pptx, s, slide, num) {
         } else {
           rect(pptx, s, { ...box, fill: { color: last ? P.last : P.navy } }, `steps.${k}`);
         }
-        const stepInk = VIOLET ? (last ? P.bg : P.ink) : (NOMAD || GALLERY) && !last ? P.stepLine : 'FFFFFF';
+        const stepInk = VIOLET ? (last ? P.bg : P.ink) : (NOMAD || GALLERY || NOIR) && !last ? P.stepLine : 'FFFFFF';
         txt(s, st, { x: x + 0.1, y: y + 0.35, w: w - 0.2, h: 0.95, fontSize: 16, bold: true, color: stepInk, align: 'center', valign: 'middle' }, `steps.${k}`);
-        if (!last) txt(s, '→', { x: x + w, y: y + 0.35, w: aw, h: 0.95, fontSize: 18, color: VIOLET ? P.accent : P.sub, align: 'center', valign: 'middle' });
+        if (!last) txt(s, '→', { x: x + w, y: y + 0.35, w: aw, h: 0.95, fontSize: 18, color: VIOLET ? P.accent : NOIR ? P.mutedText : P.sub, align: 'center', valign: 'middle' });
       });
       y += 1.5;
     }
@@ -685,7 +817,7 @@ function lightSlide(pptx, s, slide, num) {
     slide.quotes.forEach((q, k) => {
       const y = top + k * (h + 0.18);
       const ink = card(pptx, s, { x: M, y, w: CW, h, bar: false }, `quotes.${k}`, k);
-      if (!NOMAD && !VIOLET) rect(pptx, s, { x: M, y, w: GALLERY ? 0.1 : 0.08, h, fill: { color: GALLERY ? P.ink : P.accent } });
+      if (!NOMAD && !VIOLET && !NOIR) rect(pptx, s, { x: M, y, w: GALLERY ? 0.1 : 0.08, h, fill: { color: GALLERY ? P.ink : P.accent } });
       txt(s, GALLERY ? `“${q.text}”` : `「${q.text}」`, { x: M + 0.35, y, w: CW - 2.6, h, fontSize: 17, valign: 'middle', color: inked() ? ink : P.ink }, `quotes.${k}.text`);
       txt(s, q.who, { x: W - M - 2.1, y, w: 1.9, h, fontSize: 11, color: subOf(ink), align: 'right', valign: 'middle', ...(NOMAD ? { fontFace: P.dotFont } : {}) }, `quotes.${k}.who`);
     });
@@ -696,15 +828,15 @@ function lightSlide(pptx, s, slide, num) {
     const gap = 0.35;
     const w = (CW - gap * (cols - 1)) / cols;
     const rows = Math.ceil(n / cols);
-    const h = ((VIOLET ? 4.0 : 4.3) - 0.3 * (rows - 1)) / Math.max(1, rows);
+    const h = ((VIOLET || NOIR ? 4.0 : 4.3) - 0.3 * (rows - 1)) / Math.max(1, rows);
     slide.items.forEach((x, k) => {
       const cx = M + (k % cols) * (w + gap);
       const cy = top + Math.floor(k / cols) * (h + 0.3);
       const ink = card(pptx, s, { x: cx, y: cy, w, h, bar: false }, `items.${k}`, k);
       s.addText(
         [
-          { text: 'Q  ', options: { color: NOMAD || VIOLET ? ink : GALLERY && ink === P.onNavyAccent ? P.navyLabel : P.accent, bold: true } },
-          { text: x.q, options: styled({ color: GALLERY || VIOLET ? ink : P.ink, bold: true }, `items.${k}.q`) },
+          { text: 'Q  ', options: { color: NOMAD || VIOLET || NOIR ? ink : GALLERY && ink === P.onNavyAccent ? P.navyLabel : P.accent, bold: true } },
+          { text: x.q, options: styled({ color: GALLERY || VIOLET || NOIR ? ink : P.ink, bold: true }, `items.${k}.q`) },
         ],
         { x: cx + 0.3, y: cy + 0.2, w: w - 0.6, h: 0.6, fontFace: F.font, fontSize: 16, valign: 'top', margin: 0, fit: 'shrink' }
       );
@@ -746,6 +878,7 @@ export function buildDeckPptx(PptxGenJS, deck, { images, textures } = {}) {
   NOMAD = deck.theme?.style === 'nomad';
   GALLERY = deck.theme?.style === 'gallery';
   VIOLET = deck.theme?.style === 'violet';
+  NOIR = deck.theme?.style === 'noir';
   P = PALETTES[deck.theme?.style] || PALETTES.classic;
   const tag = deck.customer ? `${deck.customer} · Nomad Notes` : 'Digital Nomad';
   const parts = sectionNumbers(deck.slides);
@@ -757,7 +890,13 @@ export function buildDeckPptx(PptxGenJS, deck, { images, textures } = {}) {
     const hasPhoto = (slide.images || []).some((im) => im.bg && images?.get?.(im.id));
     const s = pptx.addSlide();
     s.background = { color: slide.fmt?.bg ? hex(slide.fmt.bg) : dark && !(GALLERY && slide.type === 'section') ? P.darkBg : P.bg };
-    if (VIOLET && dark) {
+    if (NOIR && dark) {
+      addImages(s, slide, images, true, NR_PHOTO);
+      noirDark(pptx, s, slide, parts[i], hasPhoto, meta);
+    } else if (NOIR) {
+      addImages(s, slide, images, true);
+      lightSlide(pptx, s, slide, nums[i]);
+    } else if (VIOLET && dark) {
       addImages(s, slide, images, true, VT_PANEL[slide.type]);
       violetDark(pptx, s, slide, parts[i], hasPhoto, textures?.marble);
     } else if (GALLERY && dark) {
@@ -777,7 +916,8 @@ export function buildDeckPptx(PptxGenJS, deck, { images, textures } = {}) {
       }
     }
     addImages(s, slide, images, false);
-    if (VIOLET) violetFrame(pptx, s, i, total, deck.customer);
+    if (NOIR) noirFrame(s, i, deck.customer);
+    else if (VIOLET) violetFrame(pptx, s, i, total, deck.customer);
     else if (GALLERY) galleryFrame(pptx, s, i, deck.customer, meta);
     else page(s, i, total, dark);
     const notes = [slide.notes, slide.why && `【這頁回應客戶】${slide.why}`].filter(Boolean).join('\n\n');
@@ -788,6 +928,7 @@ export function buildDeckPptx(PptxGenJS, deck, { images, textures } = {}) {
   NOMAD = false;
   GALLERY = false;
   VIOLET = false;
+  NOIR = false;
   return pptx;
 }
 

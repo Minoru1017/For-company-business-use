@@ -485,6 +485,51 @@ describe('violet trend style', () => {
   });
 });
 
+describe('black sleek (noir) style', () => {
+  const noirDeck = () => normalizeDeck({ ...aiJson, theme: { style: 'noir' } });
+
+  it('is a selectable deck style', () => {
+    expect(DECK_STYLES.map((x) => x.key)).toContain('noir');
+    expect(DECK_STYLES.find((x) => x.key === 'noir').label).toBe('黑色俐落');
+    expect(normalizeDeck({ theme: { style: 'noir' }, slides: [{ title: 'a' }] }).theme.style).toBe('noir');
+  });
+
+  it('renders a black header band with a small ring on content slides and a large ring on dark slides', () => {
+    const html = renderDeckSlides(noirDeck());
+    html.forEach((h) => {
+      expect(h).toContain('t-noir');
+      expect(h).toContain('<header class="dk-head"><div class="dk-kicker">');
+      expect(h).toContain('<ellipse');
+    });
+    expect(html[0]).toContain('dk-nr-ring cover');
+    expect(html[0]).not.toContain('dk-nr-pill');
+    expect(html[1]).toContain('<b class="dk-nr-big" aria-hidden="true">01</b>');
+    expect(html[2]).toContain('dk-nr-band');
+    expect(html[2]).toContain('dk-nr-ring sm');
+    expect(html.at(-1)).toContain('dk-nr-pill');
+  });
+
+  it('exports the same fixed header and ring shapes to pptx', async () => {
+    const deck = noirDeck();
+    const JSZip = (await import('jszip')).default;
+    const zip = await JSZip.loadAsync(await buildDeckPptx(PptxGenJS, deck).write({ outputType: 'nodebuffer' }));
+    for (let i = 1; i <= deck.slides.length; i += 1) {
+      const xml = await zip.file(`ppt/slides/slide${i}.xml`).async('string');
+      const title = (xml.match(/<p:sp>[\s\S]*?<\/p:sp>/g) || []).find((sp) => sp.includes('<a:off x="685800" y="914400"/>'));
+      expect(title, `slide ${i}`).toBeTruthy();
+      expect(title).toContain('sz="2600"');
+      expect(title).not.toContain('normAutofit');
+      expect((xml.match(/prst="ellipse"/g) || []).length).toBeGreaterThanOrEqual(56);
+    }
+    const cover = await zip.file('ppt/slides/slide1.xml').async('string');
+    const cards = await zip.file('ppt/slides/slide4.xml').async('string');
+    expect(cover).toContain('0B0B0B');
+    expect(cover).toContain('prst="roundRect"');
+    expect(cards).toContain('F1F1F1');
+    expect(cards).toContain('<a:off x="0" y="0"/><a:ext cx="12191695" cy="2103120"/>');
+  });
+});
+
 function pad2(n) {
   return String(n).padStart(2, '0');
 }
