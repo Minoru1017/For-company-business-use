@@ -415,3 +415,76 @@ describe('gallery brand style', () => {
     expect(rotated.every((sp) => sp.includes('prst="ellipse"') || sp.includes('rot="5400000"'))).toBe(true);
   });
 });
+
+describe('violet trend style', () => {
+  const PNG_1PX =
+    'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mP8z8BQDwAEhQGAhKmMIQAAAABJRU5ErkJggg==';
+  const violetDeck = (withPhoto = false) =>
+    normalizeDeck({
+      ...aiJson,
+      theme: { style: 'violet' },
+      slides: aiJson.slides.map((s, i) => (i === 0 && withPhoto ? { ...s, images: [{ id: 'img_photo1', bg: true, ratio: 1.5 }] } : s)),
+    });
+  const slideXml = async (pptx) => {
+    const JSZip = (await import('jszip')).default;
+    const zip = await JSZip.loadAsync(await pptx.write({ outputType: 'nodebuffer' }));
+    return (i) => zip.file(`ppt/slides/slide${i}.xml`).async('string');
+  };
+
+  it('is a selectable deck style', () => {
+    expect(DECK_STYLES.map((x) => x.key)).toContain('violet');
+    expect(normalizeDeck({ theme: { style: 'violet' }, slides: [{ title: 'a' }] }).theme.style).toBe('violet');
+  });
+
+  it('renders the frame, marble panels with display words, and alternating lavender slides', () => {
+    const html = renderDeckSlides(violetDeck());
+    html.forEach((h) => {
+      expect(h).toContain('t-violet');
+      expect(h).toContain('dk-vt-frame');
+      expect(h).toContain('劉○○ · Demo plan');
+      expect(h).toContain('<header class="dk-head"><div class="dk-kicker">');
+    });
+    expect(html[0]).toContain('dk-vt-marble');
+    expect(html[0]).toContain('>DEMO PLAN</b>');
+    expect(html[1]).toContain('<b class="dk-vt-word">01</b>');
+    expect(html.at(-1)).toContain('>THANK YOU</b>');
+    expect(html[3]).toContain('vt-lav');
+    expect(html[2]).not.toContain('vt-lav');
+    expect(html[0]).toContain(`01 / ${pad2(html.length)}`);
+    const photo = renderDeckSlides(violetDeck(true), { resolveImage: () => PNG_1PX });
+    expect(photo[0]).toContain('has-photo');
+    expect(photo[0]).not.toContain('dk-vt-marble');
+  });
+
+  it('keeps the fixed header geometry in pptx and embeds the marble texture', async () => {
+    const deck = violetDeck();
+    const read = await slideXml(buildDeckPptx(PptxGenJS, deck, { textures: { marble: PNG_1PX } }));
+    for (let i = 1; i <= deck.slides.length; i += 1) {
+      const xml = await read(i);
+      const title = (xml.match(/<p:sp>[\s\S]*?<\/p:sp>/g) || []).find((sp) => sp.includes('<a:off x="685800" y="914400"/>'));
+      expect(title, `slide ${i}`).toBeTruthy();
+      expect(title).toContain('sz="2600"');
+      expect(title).not.toContain('normAutofit');
+      expect(xml).toContain('prst="star4"');
+    }
+    const cover = await read(1);
+    const lav = await read(4);
+    expect(cover).toContain('<p:pic>');
+    expect(cover).toContain('DEMO PLAN');
+    expect(cover).toMatch(/<a:ln w="\d+"><a:solidFill><a:srgbClr val="160D22"\/>/);
+    expect(cover).toContain('1E1230');
+    expect(lav).toContain('B48CF0');
+    expect(lav).toContain('Demo plan');
+  });
+
+  it('falls back to drawn shapes when no marble texture is available', async () => {
+    const read = await slideXml(buildDeckPptx(PptxGenJS, violetDeck()));
+    const cover = await read(1);
+    expect(cover).not.toContain('<p:pic>');
+    expect(cover).toContain('2B1A45');
+  });
+});
+
+function pad2(n) {
+  return String(n).padStart(2, '0');
+}

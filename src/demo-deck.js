@@ -72,6 +72,7 @@ export const DECK_STYLES = [
   { key: 'classic', label: '經典深藍' },
   { key: 'nomad', label: '數位游牧' },
   { key: 'gallery', label: '藝廊品牌' },
+  { key: 'violet', label: '紫色潮流' },
 ];
 
 export function normStyle(v) {
