@@ -4,7 +4,7 @@
  */
 import { escapeHTML } from './utils.js';
 import { fontCss, ptToCqw, sectionNumbers, slideNumbers } from './demo-deck.js';
-import { MARBLE_URL } from './demo-deck-texture.js';
+import { MARBLE_URL, ringSvg } from './demo-deck-texture.js';
 
 const CN_NUM = ['一', '二', '三', '四', '五', '六'];
 const pad = (n) => String(n).padStart(2, '0');
@@ -149,7 +149,16 @@ function violetDeco(slide, { brand, part, hasPhoto }) {
   return `${frame}<div class="dk-vt-panel ${slide.type}" aria-hidden="true">${marble}<b class="dk-vt-word">${word}</b></div>`;
 }
 
-/** 固定頁首版型（藝廊品牌、紫色潮流）：封面／章節／結尾也用內容頁同一個頁首，標題位置與字級整份一致 */
+/** 黑色俐落：內容頁頂部黑色頁首帶＋右上小光環；封面／章節／結尾全黑＋右側大光環、膠囊日期 */
+function noirDeco(slide, { brand, meta, part, dark }) {
+  const brandTag = `<span class="dk-nr-brand" aria-hidden="true">${escapeHTML(brand || 'DEMO')}</span>`;
+  if (!dark) return `<div class="dk-nr-band" aria-hidden="true"></div><div class="dk-nr-ring sm">${ringSvg()}</div>${brandTag}`;
+  const pill = slide.type !== 'closing' ? '' : `<span class="dk-nr-pill" aria-hidden="true">${escapeHTML(meta || 'DEMO')}</span>`;
+  const big = slide.type === 'section' ? `<b class="dk-nr-big" aria-hidden="true">${pad(part || 1)}</b>` : '';
+  return `<div class="dk-nr-ring ${slide.type}">${ringSvg()}</div>${big}${pill}${brandTag}`;
+}
+
+/** 固定頁首版型（藝廊品牌、紫色潮流、黑色俐落）：封面／章節／結尾也用內容頁同一個頁首，標題位置與字級整份一致 */
 function fixedDarkInner(c) {
   const { slide } = c;
   const ph = { cover: 'DEMO', section: '第一部分', closing: '下一步' }[slide.type];
@@ -179,9 +188,10 @@ export function renderSlideHtml(
   const nomad = deckStyle === 'nomad';
   const gallery = deckStyle === 'gallery';
   const violet = deckStyle === 'violet';
-  const fixed = gallery || violet;
+  const noir = deckStyle === 'noir';
+  const fixed = gallery || violet || noir;
   const dark = slide.type === 'cover' || slide.type === 'section' || slide.type === 'closing';
-  const foot = `<span class="dk-page">${gallery ? pad(index + 1) : `${nomad ? 'N° ' : ''}${pad(index + 1)} / ${pad(total)}`}</span>`;
+  const foot = `<span class="dk-page">${gallery || noir ? pad(index + 1) : `${nomad ? 'N° ' : ''}${pad(index + 1)} / ${pad(total)}`}</span>`;
   const bgImgs = images(c, resolveImage, true);
   const fgImgs = images(c, resolveImage, false);
   const label = escapeHTML(tag || 'Digital Nomad');
@@ -189,12 +199,14 @@ export function renderSlideHtml(
     ? galleryDeco(slide, { brand, meta, part, hasPhoto: !!bgImgs })
     : violet
       ? violetDeco(slide, { brand, part, hasPhoto: !!bgImgs })
+      : noir
+      ? noirDeco(slide, { brand, meta, part, dark })
       : !nomad
       ? ''
       : dark
         ? `<span class="dk-pill">${label}</span>`
         : `<div class="dk-deco-stamp" aria-hidden="true"><small>ADMITTED</small><b>DEMO</b><small>NOMAD NOTES</small></div>`;
-  const theme = nomad ? ' t-nomad' : gallery ? ' t-gallery' : violet ? ` t-violet${!dark && index % 2 ? ' vt-lav' : ''}` : '';
+  const theme = nomad ? ' t-nomad' : gallery ? ' t-gallery' : violet ? ` t-violet${!dark && index % 2 ? ' vt-lav' : ''}` : noir ? ' t-noir' : '';
   const wrap = (cls, inner) =>
     `<div class="dk-slide ${cls}${theme}${(nomad || fixed) && bgImgs ? ' has-photo' : ''}"${style}>${bgImgs}${deco}${inner}${fgImgs}${foot}</div>`;
   const nav = nomad ? '<div class="dk-nav" aria-hidden="true"><span>規劃</span><span>作品</span><span>自由</span></div>' : '';

@@ -38,3 +38,28 @@ export async function marbleJpeg() {
 }
 
 export const MARBLE_RATIO = MARBLE_H / MARBLE_W;
+
+/**
+ * 「黑色俐落」的線條光環：一圈旋轉的細橢圓（單位方框 0–1）。
+ * HTML 畫成 SVG、PPTX 畫成同一組橢圓圖形，兩邊長得一樣。
+ */
+export function ringEllipses(n = 56) {
+  return Array.from({ length: n }, (_, i) => {
+    const a = (i / n) * Math.PI;
+    return {
+      cx: 0.5 + 0.06 * Math.cos(2 * a),
+      cy: 0.5 + 0.05 * Math.sin(3 * a),
+      rx: 0.38 + 0.05 * Math.sin(2 * a + 1),
+      ry: 0.1 + 0.16 * Math.sin(1.5 * a) ** 2,
+      rot: (a * 180) / Math.PI,
+    };
+  });
+}
+
+export function ringSvg(color = '#fff', n = 56) {
+  const f = (v) => +(v * 100).toFixed(2);
+  const shapes = ringEllipses(n)
+    .map((e) => `<ellipse cx="${f(e.cx)}" cy="${f(e.cy)}" rx="${f(e.rx)}" ry="${f(e.ry)}" transform="rotate(${e.rot.toFixed(1)} ${f(e.cx)} ${f(e.cy)})"/>`)
+    .join('');
+  return `<svg viewBox="0 0 100 100" fill="none" stroke="${color}" stroke-width=".18" stroke-opacity=".6" aria-hidden="true">${shapes}</svg>`;
+}
