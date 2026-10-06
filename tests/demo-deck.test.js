@@ -376,6 +376,25 @@ describe('gallery brand style', () => {
     expect(photo[0]).not.toContain('dk-gl-panel');
   });
 
+  it('uses one fixed header on every slide (cover, section, content, closing)', async () => {
+    const deck = galleryDeck();
+    const html = renderDeckSlides(deck);
+    html.forEach((h) => {
+      expect(h).toContain('<header class="dk-head"><div class="dk-kicker">');
+      expect(h).not.toContain('dk-center');
+    });
+    const pptx = buildDeckPptx(PptxGenJS, deck);
+    const JSZip = (await import('jszip')).default;
+    const zip = await JSZip.loadAsync(await pptx.write({ outputType: 'nodebuffer' }));
+    for (let i = 1; i <= deck.slides.length; i += 1) {
+      const xml = await zip.file(`ppt/slides/slide${i}.xml`).async('string');
+      const title = (xml.match(/<p:sp>[\s\S]*?<\/p:sp>/g) || []).find((sp) => sp.includes('<a:off x="685800" y="914400"/>'));
+      expect(title, `slide ${i}`).toBeTruthy();
+      expect(title).toContain('sz="2600"');
+      expect(title).not.toContain('normAutofit');
+    }
+  });
+
   it('exports the gallery look to pptx', async () => {
     const pptx = buildDeckPptx(PptxGenJS, galleryDeck(true), { images: new Map([['img_photo1', PNG_1PX]]) });
     const JSZip = (await import('jszip')).default;

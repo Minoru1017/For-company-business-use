@@ -224,8 +224,8 @@ function galleryHead(pptx, s, slide, num) {
   }
   if (slide.kicker) oval(pptx, s, kx, 0.68, slide.kicker, 12);
   txt(s, slide.kicker, { x: kx, y: 0.68, w: CW - 1.4, h: 0.3, fontSize: 12, bold: true, color: P.ink, charSpacing: 2 }, 'kicker');
-  txt(s, slide.title, { x: M, y: 1.05, w: CW, h: 0.75, fontSize: 30, bold: true, color: P.ink, valign: 'middle' }, 'title');
-  txt(s, slide.subtitle, { x: M, y: 1.82, w: CW, h: 0.36, fontSize: 14, color: P.sub }, 'subtitle');
+  txt(s, slide.title, { x: M, y: 1.0, w: CW, h: 0.88, fontSize: 26, bold: true, color: P.ink, valign: 'top', lineSpacingMultiple: 1.1, fit: 'none' }, 'title');
+  txt(s, slide.subtitle, { x: M, y: 1.92, w: CW, h: 0.3, fontSize: 13, color: P.sub, fit: 'none' }, 'subtitle');
   s.addShape(pptx.ShapeType.line, { x: M, y: 2.3, w: CW, h: 0, line: { color: P.line, width: 1 } });
 }
 
@@ -387,15 +387,15 @@ function nomadPaper(pptx, s) {
 }
 
 /* ---- 藝廊品牌：駝色封面＋棋盤格／照片框、章節巨型編號、品牌手冊頁尾 ---- */
-const GL_PANEL = { x: W - 0.95 - 4.0, y: 1.45, w: 4.0, h: 4.4 };
+const GL_PANEL = { x: W - 0.95 - 4.0, y: 2.6, w: 4.0, h: 3.9 };
 
 function galleryFrame(pptx, s, i, brand, meta) {
   txt(s, 'DEMO REPORT', { x: W - 0.4 - 1.5, y: H / 2 - 0.13, w: 3, h: 0.26, fontSize: 8, color: P.ink, align: 'center', charSpacing: 5, rotate: 90, transparency: 40 });
   const fy = 6.92;
-  txt(s, brand || 'DEMO', { x: M, y: fy, w: 3, h: 0.4, fontFace: P.numFont, fontSize: 18, color: P.ink, valign: 'bottom' });
-  txt(s, '→ Call Coach\nDemo Guidelines', { x: M + 3.4, y: fy, w: 3, h: 0.4, fontSize: 8, color: P.sub, valign: 'bottom' });
-  txt(s, `→ ${meta || '有邀約開發'}`, { x: M + 6.8, y: fy, w: 3.4, h: 0.4, fontSize: 8, color: P.sub, valign: 'bottom' });
-  txt(s, pad(i + 1), { x: W - M - 1.2, y: fy, w: 1.2, h: 0.4, fontFace: P.numFont, fontSize: 18, color: P.ink, align: 'right', valign: 'bottom' });
+  txt(s, brand || 'DEMO', { x: M, y: fy, w: 3, h: 0.33, fontFace: P.numFont, fontSize: 18, color: P.ink, valign: 'bottom' });
+  txt(s, '→ Call Coach\nDemo Guidelines', { x: M + 3.4, y: fy, w: 3, h: 0.33, fontSize: 8, color: P.sub, valign: 'bottom' });
+  txt(s, `→ ${meta || '有邀約開發'}`, { x: M + 6.8, y: fy, w: 3.4, h: 0.33, fontSize: 8, color: P.sub, valign: 'bottom' });
+  txt(s, pad(i + 1), { x: W - M - 1.2, y: fy, w: 1.2, h: 0.33, fontFace: P.numFont, fontSize: 18, color: P.ink, align: 'right', valign: 'bottom' });
 }
 
 function galleryMark(pptx, s, lines, x, y, align = 'left') {
@@ -415,55 +415,33 @@ function checkerboard(pptx, s, o) {
 }
 
 function galleryDark(pptx, s, slide, part, hasPhoto) {
-  const lx = 0.95;
-  const tw = slide.type === 'closing' ? 7.9 : 6.4;
+  galleryHead(pptx, s, slide, 0);
+  const top = 2.6;
   if (slide.type === 'cover') {
-    galleryMark(pptx, s, ['DEMO', 'REPORT'], lx, 0.6);
-    ['規劃', '作品', '自由'].forEach((label, k) => txt(s, label, { x: W - 0.95 - 3 + k * 1.1, y: 0.62, w: 0.8, h: 0.3, fontSize: 11, bold: true, color: P.ink, align: 'right' }));
+    ['規劃', '作品', '自由'].forEach((label, k) => txt(s, label, { x: W - 0.95 - 3 + k * 1.1, y: 0.68, w: 0.8, h: 0.3, fontSize: 10, bold: true, color: P.ink, align: 'right' }));
     if (hasPhoto) rect(pptx, s, { x: GL_PANEL.x + 0.18, y: GL_PANEL.y + 0.18, w: GL_PANEL.w, h: GL_PANEL.h, fill: { color: '000000', transparency: 78 } });
     else checkerboard(pptx, s, GL_PANEL);
+    txt(s, slide.meta, { x: M, y: top, w: 6.6, h: 0.35, fontSize: 12, bold: true, color: P.ink }, 'meta');
+    galleryMark(pptx, s, ['DEMO', 'REPORT'], M, 5.6);
+    return;
   }
-  if (slide.type === 'section' && !hasPhoto) {
-    txt(s, pad(part || 1), { x: W - 1.2 - 5.5, y: 2.3, w: 5.5, h: 3.4, fontFace: P.numFont, fontSize: 210, color: P.ink, align: 'right', valign: 'bottom', fit: 'none' });
+  if (slide.type === 'section') {
+    if (!hasPhoto) txt(s, pad(part || 1), { x: W - 1.2 - 5.5, y: 2.9, w: 5.5, h: 3.6, fontFace: P.numFont, fontSize: 210, color: P.ink, align: 'right', valign: 'bottom', fit: 'none' });
+    return;
   }
-  if (slide.type === 'closing') {
-    galleryMark(pptx, s, ['THANKS FOR', 'WATCHING.'], W - 0.95 - 2.8, 5.3, 'right');
-  }
-  let y = slide.type === 'closing' ? 0.95 : 2.2;
-  if (slide.kicker) oval(pptx, s, lx + 0.2, y, slide.kicker, 13);
-  txt(s, slide.kicker, { x: lx + 0.2, y, w: tw, h: 0.32, fontSize: 13, bold: true, color: P.ink, charSpacing: 4 }, 'kicker');
-  y += 0.45;
-  const titleH = slide.type === 'closing' ? 0.85 : 1.25;
-  if (slide.type === 'closing') {
-    s.addText(
-      [
-        { text: '“ ', options: { color: P.accent } },
-        { text: slide.title || '', options: styled({ color: P.ink }, 'title') },
-      ],
-      { x: lx, y, w: tw, h: titleH, fontFace: F.font, fontSize: 30, bold: true, valign: 'middle', margin: 0, fit: 'shrink' }
-    );
-  } else {
-    txt(s, slide.title, { x: lx, y, w: tw, h: titleH, fontSize: slide.type === 'cover' ? 40 : 36, bold: true, color: P.ink, valign: 'middle' }, 'title');
-  }
-  y += titleH + 0.12;
-  if (slide.type !== 'closing') {
-    rect(pptx, s, { x: lx, y, w: 0.8, h: 0.07, fill: { color: P.ink } });
-    y += 0.22;
-  }
-  txt(s, slide.subtitle, { x: lx, y, w: tw, h: 0.42, fontSize: 17, bold: true, color: P.sub }, 'subtitle');
-  y += 0.55;
-  if (slide.type === 'cover') txt(s, slide.meta, { x: lx, y, w: tw, h: 0.35, fontSize: 12, bold: true, color: P.ink }, 'meta');
-  if (slide.type !== 'closing') return;
+  const tw = 7.9;
+  let y = top;
+  galleryMark(pptx, s, ['THANKS FOR', 'WATCHING.'], W - 0.95 - 2.8, 5.3, 'right');
   if (slide.confirm) {
-    rect(pptx, s, { x: lx, y, w: tw, h: 1.0, fill: { color: P.ink } }, 'confirm');
-    rect(pptx, s, { x: lx, y, w: 0.08, h: 1.0, fill: { color: P.accent } });
-    txt(s, slide.confirm, { x: lx + 0.3, y, w: tw - 0.55, h: 1.0, fontSize: 15, bold: true, color: P.onNavyAccent, valign: 'middle' }, 'confirm');
+    rect(pptx, s, { x: M, y, w: tw, h: 1.0, fill: { color: P.ink } }, 'confirm');
+    rect(pptx, s, { x: M, y, w: 0.08, h: 1.0, fill: { color: P.accent } });
+    txt(s, slide.confirm, { x: M + 0.3, y, w: tw - 0.55, h: 1.0, fontSize: 13, bold: true, color: P.onNavyAccent, valign: 'middle' }, 'confirm');
     y += 1.2;
   }
   slide.steps.forEach((step, k) => {
-    txt(s, `${k + 1}°`, { x: lx, y, w: 0.6, h: 0.5, fontFace: P.numFont, fontSize: 14, color: P.sub, valign: 'middle' });
-    txt(s, step, { x: lx + 0.65, y, w: tw - 0.65, h: 0.5, fontSize: 15, bold: true, color: P.ink, valign: 'middle' }, `steps.${k}`);
-    s.addShape(pptx.ShapeType.line, { x: lx, y: y + 0.52, w: tw, h: 0, line: { color: P.ink, width: 0.75, transparency: 55 } });
+    txt(s, `${k + 1}°`, { x: M, y, w: 0.6, h: 0.5, fontFace: P.numFont, fontSize: 13, color: P.sub, valign: 'middle' });
+    txt(s, step, { x: M + 0.65, y, w: tw - 0.65, h: 0.5, fontSize: 13, bold: true, color: P.ink, valign: 'middle' }, `steps.${k}`);
+    s.addShape(pptx.ShapeType.line, { x: M, y: y + 0.52, w: tw, h: 0, line: { color: P.ink, width: 0.75, transparency: 55 } });
     y += 0.6;
   });
 }
