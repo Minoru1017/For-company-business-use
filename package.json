@@ -11,10 +11,12 @@
     "test:watch": "vitest"
   },
   "devDependencies": {
+    "fake-indexeddb": "^6.2.5",
     "vite": "^6.2.0",
     "vitest": "^3.0.8"
   },
   "dependencies": {
+    "jszip": "^3.10.2",
     "pptxgenjs": "^4.0.1"
   }
 }

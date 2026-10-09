@@ -1,4 +1,5 @@
 import { runAnalysis } from './analyze.js';
+import { initBackupUI } from './backup-ui.js';
 import { drawChart } from './chart.js';
 import {
   buildTranscript,
@@ -858,6 +859,11 @@ function init() {
     initWorkspaceToc();
   } catch (e) {
     console.error('workspace toc init failed', e);
+  }
+  try {
+    initBackupUI({ showToast });
+  } catch (e) {
+    console.error('backup init failed', e);
   }
   try {
     reflectionJournalCtrl = initReflectionJournal({
