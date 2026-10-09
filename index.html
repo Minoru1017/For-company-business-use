@@ -58,6 +58,7 @@
         <span class="mode-card-cta">做簡報 →</span>
       </button>
     </div>
+    <div id="backupHome" class="backup-strip" hidden></div>
     <div id="coachPhilosophyHome"></div>
     <p class="hint mode-chooser-hint">首次使用 DEMO：<strong>公司電腦</strong>請下載 <a href="https://github.com/Minoru1017/For-company-business-use/releases/latest/download/CallCoachAssistant-Setup.exe" target="_blank" rel="noopener noreferrer">CallCoachAssistant-Setup.exe</a> 安裝精靈（不需 .cmd）；安裝完成後從開始選單啟動助手。</p>
   </div>
@@ -99,6 +100,7 @@
       </div>
       <div class="app-sidebar-foot">
         <button type="button" class="app-sidebar-clear app-sidebar-trajectory" id="sidebarTrajectory">複盤學習軌跡</button>
+        <button type="button" class="app-sidebar-clear app-sidebar-backup" id="sidebarBackup">備份／還原</button>
         <button type="button" class="app-sidebar-clear" id="sidebarClear">清空紀錄</button>
         <span class="app-sidebar-ver mono">VER 11.9 · LOCAL</span>
       </div>
@@ -390,6 +392,41 @@
     </div>
     <div id="rjtStats" class="rjt-stats"></div>
     <div id="rjtTimeline" class="rjt-timeline"></div>
+  </div>
+</div>
+
+<div id="backupModal" class="dev-notes-modal backup-modal" hidden role="dialog" aria-modal="true" aria-labelledby="backupTitle">
+  <div class="dev-notes-dialog backup-dialog">
+    <div class="backup-head">
+      <div>
+        <p class="backup-kicker">DATA BACKUP</p>
+        <h2 id="backupTitle">資料備份／還原</h2>
+      </div>
+      <button type="button" id="backupClose" aria-label="關閉備份視窗">關閉</button>
+    </div>
+    <p class="hint">所有紀錄（複盤、症狀紀錄、通話錄音、陪練、簡報…）只存在<b>這台電腦的這個瀏覽器</b>。清除瀏覽器資料、換電腦或換瀏覽器都會遺失，請定期下載備份檔。</p>
+    <p class="backup-status" id="backupStatus"></p>
+
+    <section class="backup-sec">
+      <h3>下載備份</h3>
+      <label class="backup-opt"><input type="checkbox" id="backupAudio" checked> 包含錄音（症狀紀錄通話、主管早會；檔案會比較大）</label>
+      <label class="backup-opt"><input type="checkbox" id="backupSecrets"> 包含 API Key 與 Token（只在搬到自己的新電腦時勾選，備份檔要妥善保管）</label>
+      <div class="btns">
+        <button type="button" class="primary" id="backupDownload">下載備份檔</button>
+      </div>
+    </section>
+
+    <section class="backup-sec">
+      <h3>從備份還原</h3>
+      <p class="hint">還原會用備份檔<b>取代</b>這台電腦目前的 Call Coach 資料。備份檔沒有包含的錄音、以及這台電腦的 API Key／Token 會保留。</p>
+      <div class="btns">
+        <button type="button" id="backupPick">選擇備份檔（.zip）</button>
+        <input type="file" id="backupFile" accept=".zip,application/zip" hidden>
+      </div>
+      <div id="backupPreview" class="backup-preview" hidden></div>
+    </section>
+
+    <p class="backup-progress" id="backupProgress" role="status" aria-live="polite"></p>
   </div>
 </div>
 
