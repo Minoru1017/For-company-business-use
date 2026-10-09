@@ -73,6 +73,7 @@ export const DECK_STYLES = [
   { key: 'nomad', label: '數位游牧' },
   { key: 'gallery', label: '藝廊品牌' },
   { key: 'violet', label: '紫色潮流' },
+  { key: 'noir', label: '黑色俐落' },
 ];
 
 export function normStyle(v) {
