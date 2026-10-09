@@ -34,11 +34,17 @@ function customerLayer(text) {
   return hit ? hit.n : 0;
 }
 
-/** 依關鍵字與「業務剛問了哪一層」決定一句客戶原話放哪個欄位 */
-function classifyLine(text, askedLayer) {
+/**
+ * 依關鍵字與「業務剛問了哪一層」決定一句客戶原話放哪個欄位。
+ * 業務還沒開始挖掘前（開場寒暄），只收擔心／時間／背景，避免客套話被當成故事。
+ */
+function classifyLine(text, askedLayer, digging) {
   if (CONCERN_RE.test(text)) return 'concerns';
+  const layer = askedLayer ? RULES.layers.find((L) => L.n === askedLayer) : null;
+  if (layer && (layer.customerRe || layer.re).test(text)) return LAYER_FIELD[askedLayer];
   if (AVAIL_RE.test(text) && !GOAL_RE.test(text)) return 'availability';
   if (askedLayer) return LAYER_FIELD[askedLayer];
+  if (!digging) return BACKGROUND_RE.test(text) ? 'background' : '';
   if (GOAL_RE.test(text)) return 'goals';
   if (BACKGROUND_RE.test(text)) return 'background';
   if (STORY_RE.test(text)) return 'story';
@@ -59,6 +65,7 @@ export function deckInputFromCall(segs, result = null, { source = '' } = {}) {
   const rawLines = [];
   let askedLayer = 0;
   let sinceAsk = 0;
+  let digging = false;
   const seen = new Set();
 
   (segs || []).forEach((s) => {
@@ -69,6 +76,7 @@ export function deckInputFromCall(segs, result = null, { source = '' } = {}) {
       if (n) {
         askedLayer = n;
         sinceAsk = 0;
+        digging = true;
       }
       return;
     }
@@ -77,7 +85,7 @@ export function deckInputFromCall(segs, result = null, { source = '' } = {}) {
     sinceAsk += 1;
     const layerCtx = sinceAsk <= 2 ? askedLayer : 0;
     if (rawLines.length < RAW_MAX_LINES) rawLines.push(`[${fmt(Number(s.start) || 0)}] ${text}`);
-    const field = classifyLine(text, layerCtx);
+    const field = classifyLine(text, layerCtx, digging);
     if (field && buckets[field].length < FIELD_LIMITS[field]) buckets[field].push(quote(s));
   });
 

@@ -837,7 +837,7 @@ function handleModeChange(mode) {
 /** 模式之間互相帶資料時用（已在工作區內，不再經過首頁的上班日檢查） */
 function switchMode(mode) {
   setMode(mode, { onChange: handleModeChange });
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  window.scrollTo({ top: 0, behavior: 'auto' });
 }
 
 function sendAnalysisToDeck() {

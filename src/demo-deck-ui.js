@@ -722,6 +722,7 @@ export function initDemoDeck(container, { getApiKey, setApiKey, getModel, onGemi
         if (typeof input[k] === 'string') rec.input[k] = input[k];
       });
       rec.source = 'call';
+      state.decks = state.decks.filter((d) => d.deck || hasCustomerInput(d.input));
       state.decks.unshift(rec);
       persistNow();
       select(rec.id);

@@ -153,9 +153,11 @@ describe('deck-from-call：電訪分析 → DEMO 簡報客戶資料', () => {
   const segs = enrichSegments(
     [
       ['S', '您好，我是 AI 學院的顧問，現在方便聊嗎？'],
-      ['C', '可以啊'],
+      ['C', '可以啊，我之前有在網站上留資料'],
       ['S', '你現在工作大概是什麼狀況？'],
       ['C', '我現在是自由業，平常接案做設計，也兼職跑外送'],
+      ['S', '如果一直這樣，對你影響最大的是什麼？'],
+      ['C', '影響最大是時間，每週花十幾個小時在重複的事'],
       ['S', '為什麼這件事現在對你這麼重要？'],
       ['C', '因為這個想法我想了五年，一直沒有開始'],
       ['S', '如果真的做到了，你最希望變成什麼樣子？'],
@@ -173,6 +175,10 @@ describe('deck-from-call：電訪分析 → DEMO 簡報客戶資料', () => {
     expect(input.goals).toContain('音樂 cover');
     expect(input.concerns).toContain('學不會');
     expect(input.availability).toContain('Windows');
+    expect(input.story).toContain('影響最大是時間');
+    expect(input.availability).not.toContain('影響最大');
+    expect(input.story).not.toContain('留資料');
+    expect(input.raw).toContain('[00:20] 可以啊');
     expect(input.raw).toContain('call-1006.srt');
     expect(input.raw).toContain('[01:00] 我現在是自由業');
     expect(input.raw).not.toContain('顧問');
