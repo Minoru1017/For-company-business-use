@@ -14,7 +14,9 @@ import {
   mergeAIResults,
   pickPreferredModel,
 } from './gemini.js';
-import { initDrill } from './drill.js';
+import { initDrill, refreshDrillFocus, setDrillFocus } from './drill.js';
+import { focusForSymptom, recentSymptomAggregate } from './drill-focus.js';
+import { deckInputFromCall, filledDeckFields } from './deck-from-call.js';
 import {
   buildNextCallChecklist,
   buildSummaryMessage,
@@ -46,9 +48,9 @@ import {
 } from './local-transcribe.js';
 import { initDemoPlayer, refreshDemoPlayerFromBridge, seekDemoTo, updateDemoPlayerSegments } from './demo-player.js';
 import { mountDevAudioUpload } from './dev-audio-upload.js';
-import { goToModeHome, initModeChooser, resolveMode } from './mode.js';
+import { goToModeHome, initModeChooser, resolveMode, setMode } from './mode.js';
 import { initSymptomLog } from './symptom-log.js';
-import { findCallBySourceName } from './symptom-store.js';
+import { findCallBySourceName, listCallsBetween } from './symptom-store.js';
 import { initMeetingNotes } from './meeting-notes-ui.js';
 import { initDemoDeck } from './demo-deck-ui.js';
 import { appendDirectivesToPrompt } from './coach-directives.js';
@@ -471,6 +473,7 @@ async function runDevNotesAI() {
 }
 
 function bindExports() {
+  $('toDemoDeck').onclick = sendAnalysisToDeck;
   $('copyReport').onclick = () => copyWithFeedback($('copyReport'), reportText, '完整報告已複製到剪貼簿');
   $('copySummary').onclick = () => copyWithFeedback($('copySummary'), summaryText(), '摘要已複製，直接貼到 LINE／Slack');
   $('copyChecklist').onclick = () =>
@@ -821,6 +824,40 @@ function bindAI() {
   $('aiCancel').onclick = () => aiAbort?.abort();
 }
 
+function handleModeChange(mode) {
+  updateHeroPhilosophyBar(mode);
+  if (mode === 'demo') window.__refreshBridge?.();
+  if (mode === 'log') symptomLog?.activate();
+  if (mode === 'brief') meetingNotes?.activate();
+  if (mode === 'deck') demoDeck?.activate();
+  if (mode === 'drill') refreshDrillFocus();
+  refreshReflectionGateUI();
+}
+
+/** 模式之間互相帶資料時用（已在工作區內，不再經過首頁的上班日檢查） */
+function switchMode(mode) {
+  setMode(mode, { onChange: handleModeChange });
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function sendAnalysisToDeck() {
+  if (!lastResult || !segs.length) return showToast('請先完成分析');
+  if (!demoDeck?.createFromInput) return showToast('DEMO 簡報模組無法使用');
+  const input = deckInputFromCall(segs, lastResult, { source: sourceName });
+  if (!input.raw) return showToast('逐字稿裡沒有找到客戶說的話——先確認說話者標記（C＝客戶）');
+  demoDeck.createFromInput(input);
+  switchMode('deck');
+  const n = filledDeckFields(input).length;
+  showToast(n ? `已帶入 ${n} 個欄位的客戶原話，檢查後再產生簡報` : '已帶入客戶原話到「開發紀錄」，可直接用 AI 產生');
+}
+
+function practiceSymptom(symptomKey) {
+  const focus = focusForSymptom(symptomKey);
+  if (!focus || !setDrillFocus(focus.key)) return;
+  switchMode('drill');
+  showToast(`陪練重點已設定：${focus.label}`);
+}
+
 function init() {
   mountHomePhilosophy();
   dayTypeHomeCtrl = initDayTypeHome({
@@ -836,14 +873,7 @@ function init() {
       dayTypeHomeCtrl?.refresh?.();
       return false;
     },
-    onModeChange: (mode) => {
-      updateHeroPhilosophyBar(mode);
-      if (mode === 'demo') window.__refreshBridge?.();
-      if (mode === 'log') symptomLog?.activate();
-      if (mode === 'brief') meetingNotes?.activate();
-      if (mode === 'deck') demoDeck?.activate();
-      refreshReflectionGateUI();
-    },
+    onModeChange: handleModeChange,
   });
   updateHeroPhilosophyBar(resolveMode());
 
@@ -952,6 +982,7 @@ function init() {
         $('labelCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
     },
+    onPracticeSymptom: practiceSymptom,
   });
   // 從網址直接進入 #log 時 initModeChooser 已先觸發 onModeChange，此時 symptomLog 尚未建立
   if (resolveMode() === 'log') symptomLog.activate();
@@ -993,6 +1024,7 @@ function init() {
     setApiKey,
     getModel,
     onGeminiUsed,
+    loadRecentSymptoms: () => recentSymptomAggregate(listCallsBetween),
   });
 }
 
