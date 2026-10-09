@@ -715,6 +715,20 @@ export function initDemoDeck(container, { getApiKey, setApiKey, getModel, onGemi
       renderViewer();
     },
     openEditor,
+    /** 從其他模式帶入客戶資料，開一份新簡報（不自動產生，讓業務先檢查欄位） */
+    createFromInput(input = {}) {
+      const rec = newDeckRecord();
+      Object.keys(rec.input).forEach((k) => {
+        if (typeof input[k] === 'string') rec.input[k] = input[k];
+      });
+      rec.source = 'call';
+      state.decks = state.decks.filter((d) => d.deck || hasCustomerInput(d.input));
+      state.decks.unshift(rec);
+      persistNow();
+      select(rec.id);
+      els.status.textContent = '已從電訪分析帶入客戶原話。先檢查、刪掉不準的句子，再按「用範本產生」或「AI 產生簡報」。';
+      return rec.id;
+    },
     syncApiKey(v) {
       els.apiKey.value = v || '';
     },

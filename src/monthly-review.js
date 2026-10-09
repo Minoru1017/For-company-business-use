@@ -1,6 +1,7 @@
 /**
  * 開發症狀紀錄 · 每月總結（主管复盘四问）
  */
+import { summarizeDrills } from './drill-log.js';
 
 export const MONTHLY_REVIEW_FIELDS = [
   {
@@ -72,14 +73,40 @@ export function buildMonthlyStatsHint(stats) {
   if (stats.daysWithNotes > 0) parts.push(`${stats.daysWithNotes} 天有改善筆記`);
   if (stats.daysWithDiagnosis > 0) parts.push(`${stats.daysWithDiagnosis} 天做過 AI 共同病症診斷`);
   if (stats.topSymptoms?.length) parts.push(`常見病症：${stats.topSymptoms.join('、')}`);
+  const d = stats.drills;
+  if (d?.count) {
+    let line = `陪練 ${d.count} 次（${d.days} 天）、平均 ${d.avgScore} 分`;
+    if (d.prevAvgScore != null) line += `，比上月${formatDelta(d.avgScore - d.prevAvgScore)}`;
+    else if (d.trend != null) line += `，月中後段比前段${formatDelta(d.trend)}`;
+    parts.push(line);
+  }
   if (!parts.length) return '這個月尚無批次分析紀錄——數字會在你分析錄音後自動出現，但仍請用自己的話回答四問。';
   return `數據提示（僅輔助）：${parts.join('；')}。`;
 }
 
-export async function computeMonthlyStats({ year, month, summarizeRange, listDays, listCallsBetween }) {
-  const from = `${reviewMonthKey(year, month)}-01`;
+export function formatDelta(n) {
+  const v = Math.round(Number(n) * 10) / 10;
+  if (!Number.isFinite(v) || v === 0) return '持平';
+  return v > 0 ? `進步 ${v} 分` : `退步 ${Math.abs(v)} 分`;
+}
+
+export function monthRange(year, month) {
   const lastDay = new Date(year, month, 0).getDate();
-  const to = `${reviewMonthKey(year, month)}-${String(lastDay).padStart(2, '0')}`;
+  return { from: `${reviewMonthKey(year, month)}-01`, to: `${reviewMonthKey(year, month)}-${String(lastDay).padStart(2, '0')}` };
+}
+
+/** 當月陪練彙總，並帶上個月平均分做比較 */
+export function monthlyDrillStats(drillLog, year, month) {
+  const cur = monthRange(year, month);
+  const stats = summarizeDrills(drillLog, cur.from, cur.to);
+  const prevDate = new Date(year, month - 2, 1);
+  const prev = monthRange(prevDate.getFullYear(), prevDate.getMonth() + 1);
+  const prevStats = summarizeDrills(drillLog, prev.from, prev.to);
+  return { ...stats, prevCount: prevStats.count, prevAvgScore: prevStats.avgScore };
+}
+
+export async function computeMonthlyStats({ year, month, summarizeRange, listDays, listCallsBetween, drillLog = [] }) {
+  const { from, to } = monthRange(year, month);
   const [summary, days, calls] = await Promise.all([
     summarizeRange(from, to),
     listDays(from, to),
@@ -120,5 +147,6 @@ export async function computeMonthlyStats({ year, month, summarizeRange, listDay
     topSymptoms,
     invites,
     over,
+    drills: monthlyDrillStats(drillLog, year, month),
   };
 }

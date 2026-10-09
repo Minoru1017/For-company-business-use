@@ -1011,6 +1011,21 @@ button.primary:hover { background:linear-gradient(180deg,#ffffff,#e6e0d1);
 .drill-coach .card { margin-bottom:0; }
 .drill-coach ul.report li { cursor:default; }
 .drill-debrief-actions { margin-top:14px; }
+
+/* 陪練重點（來自症狀紀錄） */
+.drill-focus-card { margin-bottom:14px; border-left:3px solid var(--accent); }
+.drill-focus-card p { margin:0 0 6px; }
+.drill-focus-card .row { margin-top:8px; }
+.drill-focus-kicker { font-family:var(--mono); font-size:.66rem; letter-spacing:.14em; color:var(--muted); }
+.drill-focus-title { font-size:.95rem; line-height:1.6; }
+.drill-focus-title small { color:var(--muted); font-size:.78rem; }
+.drill-focus-foot { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:center; gap:8px 16px; margin-top:10px; padding-top:10px; border-top:1px dashed var(--border); }
+.drill-focus-foot select { margin-left:6px; padding:4px 8px; background:transparent; color:var(--text); border:1px solid var(--border); border-radius:4px; font:inherit; }
+.drill-focus-foot select option { color:#111; }
+.drill-focus-stats { margin:0; }
+.drill-focus-result { display:flex; flex-wrap:wrap; align-items:center; gap:6px 10px; border-left:3px solid var(--bad); }
+.drill-focus-result.ok { border-left-color:var(--ok); }
+.drill-focus-result .hint { margin:0; }
 @media (max-width:760px) {
   .drill-setup-grid { grid-template-columns:1fr; }
   .drill-msg { max-width:100%; }
@@ -1573,6 +1588,14 @@ body.mm-max-open { overflow:hidden; }
 .slog-sym-group { font-family:var(--mono); font-size:.62rem; letter-spacing:.16em; color:var(--muted); padding:2px 6px; border:1px solid var(--border); border-radius:3px; }
 .slog-sym-count { font-family:var(--mono); font-size:.72rem; color:var(--warn); }
 .slog-sym-streak { font-family:var(--mono); font-size:.66rem; color:var(--bad); border:1px solid var(--bad); border-radius:3px; padding:1px 6px; }
+.slog-sym-practice { margin-left:auto; padding:3px 10px; font-size:.72rem; border-radius:4px; }
+.slog-monthly-drill { margin:10px 0 4px; }
+.slog-monthly-drill-head { display:flex; align-items:baseline; gap:10px; margin-bottom:8px; font-size:.86rem; }
+.slog-monthly-drill-head .hint { margin:0; }
+.slog-monthly-drill .slog-metrics { margin-bottom:8px; }
+.slog-drill-spark { display:block; width:100%; max-width:420px; height:56px; }
+.slog-drill-spark polyline { stroke:var(--accent); stroke-width:1.6; vector-effect:non-scaling-stroke; }
+.slog-drill-spark circle { fill:var(--accent); }
 .slog-sym-bar { height:4px; background:rgba(255,255,255,.08); border-radius:2px; margin:8px 0 6px; overflow:hidden; }
 .slog-sym-bar div { height:100%; background:var(--accent); }
 .slog-sym .hint { margin-top:0; }

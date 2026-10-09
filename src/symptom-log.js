@@ -9,6 +9,7 @@ import {
   MONTHLY_REVIEW_FIELDS,
   buildMonthlyStatsHint,
   computeMonthlyStats,
+  formatDelta,
   getMonthlyReviewFromSettings,
   monthlyReviewFilled,
   patchMonthlyReviews,
@@ -30,6 +31,8 @@ import {
   targetSequenceWarnings,
 } from './monthly-plan.js';
 import { isAiAnalysisUnlocked, summarizeDayJournalForPrompt, unlockStatusMessage } from './reflection-journal.js';
+import { focusForSymptom } from './drill-focus.js';
+import { loadDrillLog } from './drill-log.js';
 import { runAnalysis } from './analyze.js';
 import { AUDIO_ACCEPT, describeSize, transcribeAudioWithGemini, validateAudioFile, guessAudioMime } from './audio-transcribe.js';
 import { loadWorkerSettings, transcribeViaWorker } from './browser-worker-transcribe.js';
@@ -154,7 +157,7 @@ function plainSegs(segs) {
  * @param {(segs:Array, name:string)=>void} [opts.onOpenCall]  在完整分析中開啟某通
  * @returns {{ activate():void, syncApiKey(v:string):void }}
  */
-export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGeminiUsed, showToast, onOpenCall }) {
+export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGeminiUsed, showToast, onOpenCall, onPracticeSymptom }) {
   if (!container) return { activate() {}, syncApiKey() {} };
 
   const today = dateKey(new Date());
@@ -231,6 +234,7 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
         <summary><h2>每月總結</h2><span class="slog-count" id="slMonthlyReviewBadge">待填</span></summary>
         <p class="hint">對照當月日曆與 AI 診斷，<b>自己先寫</b>（主管复盘四问）。數據只輔助，不能代替你的思考。</p>
         <p class="hint slog-monthly-stats" id="slMonthlyStatsHint"></p>
+        <div class="slog-monthly-drill" id="slMonthlyDrill" hidden></div>
         <div id="slMonthlyReviewFields" class="slog-monthly-fields"></div>
         <p class="hint" id="slMonthlySaved"></p>
       </details>
@@ -705,13 +709,53 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
           summarizeRange,
           listDays,
           listCallsBetween,
+          drillLog: loadDrillLog(),
         });
         const tops = stats.topSymptoms.map((k) => SYMPTOM_DEFS[k]?.label || k);
         statsEl.textContent = buildMonthlyStatsHint({ ...stats, topSymptoms: tops });
+        renderMonthlyDrill(stats.drills);
       } catch {
         statsEl.textContent = '';
+        renderMonthlyDrill(null);
       }
     }
+  }
+
+  function renderMonthlyDrill(d) {
+    const el = q('#slMonthlyDrill');
+    if (!el) return;
+    el.hidden = !d?.count;
+    if (!d?.count) {
+      el.innerHTML = '';
+      return;
+    }
+    const chip = (label, value, hint = '') =>
+      `<div class="slog-chip"><span class="slog-chip-v">${value}</span><span class="slog-chip-l">${label}</span>${hint ? `<span class="slog-chip-h">${hint}</span>` : ''}</div>`;
+    const vsPrev = d.prevAvgScore != null ? formatDelta(d.avgScore - d.prevAvgScore) : '上月沒有紀錄';
+    const trend = d.trend != null ? formatDelta(d.trend) : '練滿 4 次後顯示';
+    el.innerHTML = `
+      <div class="slog-monthly-drill-head"><b>陪練練習量</b><span class="hint">每次陪練結束自動記錄</span></div>
+      <div class="slog-metrics">
+        ${chip('陪練次數', `${d.count} 次`, `${d.days} 天有練 · 破冰 ${d.icebreak}／完整 ${d.full}`)}
+        ${chip('平均分數', `${d.avgScore}`, `最高 ${d.bestScore}`)}
+        ${chip('比上月', vsPrev, d.prevAvgScore != null ? `上月平均 ${d.prevAvgScore}（${d.prevCount} 次）` : '')}
+        ${chip('月內趨勢', trend, '後半次數 vs 前半次數')}
+        ${d.focusCount ? chip('重點達成', `${d.focusMet}/${d.focusCount}`, '來自症狀紀錄的弱點') : ''}
+      </div>
+      ${drillSparkline(d.daily)}`;
+  }
+
+  function drillSparkline(daily) {
+    if (!daily || daily.length < 2) return '';
+    const W = 320;
+    const H = 56;
+    const step = W / (daily.length - 1);
+    const y = (v) => Math.round((H - 6 - (v / 100) * (H - 12)) * 10) / 10;
+    const pts = daily.map((p, i) => `${Math.round(i * step * 10) / 10},${y(p.avg)}`).join(' ');
+    const dots = daily
+      .map((p, i) => `<circle cx="${Math.round(i * step * 10) / 10}" cy="${y(p.avg)}" r="2.5"><title>${p.date.slice(5)} · ${p.count} 次 · 平均 ${p.avg}</title></circle>`)
+      .join('');
+    return `<svg class="slog-drill-spark" viewBox="-4 0 ${W + 8} ${H}" preserveAspectRatio="none" aria-label="每日陪練平均分"><polyline points="${pts}" fill="none"/>${dots}</svg>`;
   }
 
   async function refreshStorage() {
@@ -1481,6 +1525,11 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
     renderAggregate();
   }
 
+  q('#slSymptoms').addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-practice]');
+    if (btn) onPracticeSymptom?.(btn.dataset.practice);
+  });
+
   function currentAggregate() {
     const pool = state.callFilter === 'all' ? state.calls : callsForFilter();
     return aggregateSymptoms(pool);
@@ -1526,12 +1575,17 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
           const ev = s.evidence
             .map((e) => `<span class="ev">[${formatDuration(e.start)}] ${escapeHTML(e.text)}<em>${escapeHTML(e.call)}</em></span>`)
             .join('');
+          const focus = onPracticeSymptom ? focusForSymptom(s.key) : null;
+          const practice = focus
+            ? `<button type="button" class="slog-sym-practice" data-practice="${escapeHTML(s.key)}" title="${escapeHTML(focus.goal)}">練「${escapeHTML(focus.label)}」→</button>`
+            : '';
           return `<div class="slog-sym ${common ? 'common' : ''}">
             <div class="slog-sym-head">
               <span class="slog-sym-group">${escapeHTML(s.group)}</span>
               <strong>${escapeHTML(s.label)}</strong>
               <span class="slog-sym-count">${s.count}/${agg.total} 通</span>
               ${streak >= 2 ? `<span class="slog-sym-streak">連續第 ${streak} 天</span>` : ''}
+              ${practice}
             </div>
             <div class="slog-sym-bar"><div style="width:${Math.round(s.ratio * 100)}%"></div></div>
             <div class="hint">${escapeHTML(s.hint)}</div>

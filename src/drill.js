@@ -24,12 +24,16 @@ import {
   timeoutTurn,
   DRILL_TRACKS,
 } from './drill-engine.js';
+import { DRILL_FOCUSES, evaluateFocus, getFocus, pickDrillFocus, RECENT_SYMPTOM_DAYS } from './drill-focus.js';
+import { appendDrillLog, drillLogEntry, loadDrillLog, summarizeDrills } from './drill-log.js';
 import { DRILL_PERSONAS, getPersona, randomPersona } from './drill-personas.js';
+import { dateKey, shiftDateKey } from './symptom-engine.js';
 import { callGemini, DEFAULT_MODEL } from './gemini.js';
 import { PURPOSE_TYPES } from './purpose-types.js';
 import { $, escapeHTML, renderReportList } from './utils.js';
 
 const PREFS_KEY = 'callCoachDrillPrefs';
+const DEFAULT_PREFS = { personaKey: 'random', limitSec: 30, difficulty: 'normal', engine: 'script', track: 'icebreak', tts: false, mic: false, focus: '' };
 const END_LABELS = {
   manual: '你結束了通話',
   hangup: '客戶掛電話了',
@@ -49,12 +53,16 @@ let busy = false;
 let recognizer = null;
 let aiWarned = false;
 let quizAnswer = { tier: null, fit: null };
+let recentPick = undefined;
+let recentLoading = false;
 
 function loadPrefs() {
   try {
-    return { personaKey: 'random', limitSec: 30, difficulty: 'normal', engine: 'script', track: 'icebreak', tts: false, mic: false, ...JSON.parse(localStorage.getItem(PREFS_KEY) || '{}') };
+    const p = { ...DEFAULT_PREFS, ...JSON.parse(localStorage.getItem(PREFS_KEY) || '{}') };
+    if (!getFocus(p.focus)) p.focus = '';
+    return p;
   } catch {
-    return { personaKey: 'random', limitSec: 30, difficulty: 'normal', engine: 'script', track: 'icebreak', tts: false, mic: false };
+    return { ...DEFAULT_PREFS };
   }
 }
 
@@ -107,6 +115,7 @@ function renderSetup() {
     .join('');
 
   panel().innerHTML = `
+  <div class="card drill-focus-card" id="drillFocusCard"></div>
   <div class="card drill-setup">
     <div class="drill-setup-grid">
       <div class="drill-track-block">
@@ -172,6 +181,16 @@ function renderSetup() {
   bindOpt('drillDiff', 'difficulty');
   bindOpt('drillEngine', 'engine');
   bindOpt('drillTrack', 'track');
+  root.querySelectorAll('input[name="drillTrack"]').forEach((r) => {
+    r.addEventListener('change', () => {
+      const f = getFocus(prefs.focus);
+      if (f && f.track !== prefs.track) {
+        prefs.focus = '';
+        savePrefs();
+        renderFocusCard();
+      }
+    });
+  });
   const syncTrackUi = () => {
     const ice = prefs.track === 'icebreak';
     root.querySelector('.drill-diff-h')?.classList.toggle('muted', ice);
@@ -196,6 +215,95 @@ function renderSetup() {
     if (v) deps.setApiKey?.(v);
   };
   $('drillStart').onclick = startDrill;
+  renderFocusCard();
+  if (recentPick === undefined) loadRecentPick();
+}
+
+async function loadRecentPick() {
+  recentPick = null;
+  recentLoading = true;
+  renderFocusCard();
+  try {
+    const agg = await deps.loadRecentSymptoms?.();
+    recentPick = pickDrillFocus(agg);
+  } catch (e) {
+    console.warn('recent symptoms unavailable', e);
+  }
+  recentLoading = false;
+  renderFocusCard();
+}
+
+function practiceLine() {
+  const today = dateKey();
+  const week = summarizeDrills(loadDrillLog(), shiftDateKey(today, -6), today);
+  if (!week.count) return '最近 7 天還沒有陪練紀錄——每練完一次，分數會記在這裡並帶進每月總結。';
+  return `最近 7 天陪練 <b>${week.count}</b> 次（${week.days} 天）· 平均 <b>${week.avgScore}</b> 分${week.focusCount ? ` · 重點達成 ${week.focusMet}/${week.focusCount}` : ''}`;
+}
+
+function renderFocusCard() {
+  const el = $('drillFocusCard');
+  if (!el) return;
+  const active = getFocus(prefs.focus);
+  const pick = recentPick;
+  let body;
+  if (active) {
+    const fromPick = pick?.focus.key === active.key;
+    body = `<p class="drill-focus-kicker">本次重點${fromPick ? ' · 來自症狀紀錄' : ''}</p>
+      <p class="drill-focus-title"><b>${escapeHTML(active.label)}</b>——${escapeHTML(active.goal)}</p>
+      <p class="hint">${escapeHTML(active.tip)}</p>
+      <div class="row"><button type="button" id="drillFocusClear">取消重點</button></div>`;
+  } else if (pick) {
+    const top = pick.symptoms[0];
+    const others = pick.symptoms.slice(1, 3).map((s) => `${escapeHTML(s.label)} ${s.count} 通`).join('、');
+    body = `<p class="drill-focus-kicker">最近 ${RECENT_SYMPTOM_DAYS} 天症狀紀錄 · 已分析 ${pick.total} 通</p>
+      <p class="drill-focus-title">最常見弱點：<b>${escapeHTML(top.label)}</b>（${top.count}/${pick.total} 通）${others ? `<small>，還有 ${others}</small>` : ''}</p>
+      <p class="hint">建議這次只練「${escapeHTML(pick.focus.label)}」：${escapeHTML(pick.focus.goal)}</p>
+      <div class="row"><button type="button" class="primary" id="drillFocusUse" data-focus="${pick.focus.key}">用這個弱點練 →</button></div>`;
+  } else {
+    body = `<p class="drill-focus-kicker">陪練重點</p>
+      <p class="hint">${
+        recentLoading
+          ? '正在讀取症狀紀錄…'
+          : `症狀紀錄最近 ${RECENT_SYMPTOM_DAYS} 天還沒有分析過的通話——批次分析後，這裡會自動挑出你最常見的弱點來練。`
+      }</p>`;
+  }
+  const options = Object.values(DRILL_FOCUSES)
+    .map((f) => `<option value="${f.key}" ${f.key === prefs.focus ? 'selected' : ''}>${escapeHTML(f.label)}</option>`)
+    .join('');
+  el.innerHTML = `${body}
+    <div class="drill-focus-foot">
+      <label class="hint">或自己選重點 <select id="drillFocusSel"><option value="">不設重點</option>${options}</select></label>
+      <span class="hint drill-focus-stats">${practiceLine()}</span>
+    </div>`;
+  const use = $('drillFocusUse');
+  if (use) use.onclick = () => applyFocus(use.dataset.focus);
+  const clear = $('drillFocusClear');
+  if (clear) clear.onclick = () => applyFocus('');
+  $('drillFocusSel').onchange = (e) => applyFocus(e.target.value);
+}
+
+function applyFocus(key) {
+  const f = getFocus(key);
+  prefs.focus = f ? f.key : '';
+  if (f) prefs.track = f.track;
+  savePrefs();
+  if (!session || session.ended) renderSetup();
+}
+
+/** 從其他模式（症狀紀錄）指定陪練重點；通話中不打斷 */
+export function setDrillFocus(key) {
+  const f = getFocus(key);
+  if (!f) return null;
+  if (session && !session.ended) {
+    prefs.focus = f.key;
+    prefs.track = f.track;
+    savePrefs();
+    return f;
+  }
+  session = null;
+  recentPick = undefined;
+  applyFocus(f.key);
+  return f;
 }
 
 /* ------------------------------------------------------------------ */
@@ -220,6 +328,8 @@ function startDrill() {
     limitSec: prefs.limitSec,
     engine: prefs.engine,
   });
+  const focus = getFocus(prefs.focus);
+  session.focus = focus && focus.track === session.track ? focus.key : '';
   quizAnswer = { tier: null, fit: null };
   aiWarned = false;
   renderLive();
@@ -568,6 +678,20 @@ function renderDebrief(quiz) {
   const trackLabel = DRILL_TRACKS[session.track]?.label || '完整通話';
   const scoreColor = stats.score >= 80 ? 'var(--ok)' : stats.score >= 60 ? 'var(--warn)' : 'var(--bad)';
   const avg = stats.salesLines ? `${(stats.avgReactionMs / 1000).toFixed(1)}s` : '—';
+  const focusRes = evaluateFocus(session.focus, stats, quiz);
+  if (!session.logged) {
+    session.logged = true;
+    appendDrillLog(drillLogEntry({ session, stats, focus: focusRes }));
+  }
+  const today = dateKey();
+  const month = summarizeDrills(loadDrillLog(), `${today.slice(0, 7)}-01`, today);
+  const focusHtml = focusRes
+    ? `<div class="card drill-focus-result ${focusRes.met ? 'ok' : 'bad'}">
+        <span class="drill-flag ${focusRes.met ? 'good' : 'bad'}">${focusRes.met ? '重點達成' : '重點還沒做到'}</span>
+        <b>本次重點 · ${escapeHTML(focusRes.label)}</b>
+        <span class="hint">${escapeHTML(focusRes.goal)}——${escapeHTML(focusRes.detail)}</span>
+      </div>`
+    : '';
   const timeline = session.turns
     .map((t) => {
       if (t.who === 'S') {
@@ -594,7 +718,8 @@ function renderDebrief(quiz) {
       <div class="stat"><div class="num">${stats.objectionsHandled}／${stats.objectionsThrown}</div><div class="lbl">突襲接住</div></div>
       <div class="stat"><div class="num">${stats.generalLayers}＋${stats.tierLayers}</div><div class="lbl">一般層＋分級層</div></div>
     </div>
-    <p class="hint drill-track-badge">模式：${escapeHTML(trackLabel)}</p>
+    <p class="hint drill-track-badge">模式：${escapeHTML(trackLabel)} · 本月第 ${month.count} 次陪練，平均 ${month.avgScore ?? '—'} 分（已記入每月總結）</p>
+    ${focusHtml}
     <div class="card drill-reveal">
       <h3 class="drill-h">劇本揭曉：${escapeHTML(p.name)}</h3>
       <p><b>隱藏分級：</b>${TIER_LABELS[p.tier]}（${escapeHTML(PURPOSE_TYPES.find((t) => t.key === p.tier)?.aiPurpose || '')}）</p>
@@ -645,6 +770,13 @@ function renderDebrief(quiz) {
 }
 
 /* ------------------------------------------------------------------ */
+
+/** 回到陪練模式時重讀症狀紀錄（期間可能分析了新的通話） */
+export function refreshDrillFocus() {
+  if (session && !session.ended) return;
+  if (!$('drillFocusCard')) return;
+  loadRecentPick();
+}
 
 export function initDrill(options = {}) {
   deps = options;
