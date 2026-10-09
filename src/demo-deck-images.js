@@ -16,7 +16,7 @@ function req(r) {
   });
 }
 
-function openDb() {
+export function openDb() {
   if (dbPromise) return dbPromise;
   if (typeof indexedDB === 'undefined') return Promise.reject(new Error('此瀏覽器不支援圖片儲存'));
   dbPromise = new Promise((resolve, reject) => {
