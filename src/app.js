@@ -14,7 +14,6 @@ import {
   mergeAIResults,
   pickPreferredModel,
 } from './gemini.js';
-import { initDrill, refreshDrillFocus, setDrillFocus } from './drill.js';
 import { focusForSymptom, recentSymptomAggregate } from './drill-focus.js';
 import { deckInputFromCall, filledDeckFields } from './deck-from-call.js';
 import {
@@ -49,10 +48,7 @@ import {
 import { initDemoPlayer, refreshDemoPlayerFromBridge, seekDemoTo, updateDemoPlayerSegments } from './demo-player.js';
 import { mountDevAudioUpload } from './dev-audio-upload.js';
 import { goToModeHome, initModeChooser, resolveMode, setMode } from './mode.js';
-import { initSymptomLog } from './symptom-log.js';
 import { findCallBySourceName, listCallsBetween } from './symptom-store.js';
-import { initMeetingNotes } from './meeting-notes-ui.js';
-import { initDemoDeck } from './demo-deck-ui.js';
 import { appendDirectivesToPrompt } from './coach-directives.js';
 import { bindLabelCollapseHandlers, createLabelController } from './labels.js';
 import { applyBuiltinSpeakerLabels, enrichSegments, parse, parseVibeJson } from './parser.js';
@@ -824,13 +820,90 @@ function bindAI() {
   $('aiCancel').onclick = () => aiAbort?.abort();
 }
 
+/**
+ * 症狀紀錄／主管早會／DEMO 簡報／陪練第一次進入時才下載（首頁與電訪模式不用等它們）。
+ * modeDeps 在 init() 建好 API Key 等共用函式後才設定，之前切模式只記下來，init 結束再補載。
+ */
+let modeDeps = null;
+const modeLoads = {};
+
+const MODE_LOADERS = {
+  log: async (d) => {
+    const { initSymptomLog } = await import('./symptom-log.js');
+    symptomLog = initSymptomLog($('symptomLogPanel'), {
+      ...d,
+      onOpenCall: (parsed, filename) => {
+        if (loadParsedSegments(parsed, filename, '症狀紀錄')) {
+          $('analyze').click();
+          $('labelCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }
+      },
+      onPracticeSymptom: practiceSymptom,
+    });
+    return symptomLog;
+  },
+  brief: async (d) => {
+    const { initMeetingNotes } = await import('./meeting-notes-ui.js');
+    meetingNotes = initMeetingNotes($('meetingPanel'), {
+      ...d,
+      onDirectivesChanged: () => {
+        mountHomePhilosophy();
+        updateHeroPhilosophyBar(resolveMode());
+      },
+    });
+    return meetingNotes;
+  },
+  deck: async (d) => {
+    const { initDemoDeck } = await import('./demo-deck-ui.js');
+    demoDeck = initDemoDeck($('deckPanel'), d);
+    return demoDeck;
+  },
+  drill: async (d) => {
+    const drill = await import('./drill.js');
+    drill.initDrill({
+      ...d,
+      // 陪練逐字稿已含說話者標籤，直接跑分析並跳到結果
+      onTranscriptReady: (text, filename) => {
+        if (loadTranscriptText(text, filename)) $('analyze').click();
+      },
+      loadRecentSymptoms: () => recentSymptomAggregate(listCallsBetween),
+    });
+    return { activate: () => drill.refreshDrillFocus(), setDrillFocus: drill.setDrillFocus };
+  },
+};
+
+/** @returns {Promise<object|null>} 該模式的控制器；載入失敗回傳 null（已提示使用者） */
+function ensureMode(mode) {
+  const load = MODE_LOADERS[mode];
+  if (!load || !modeDeps) return Promise.resolve(null);
+  if (!modeLoads[mode]) {
+    modeLoads[mode] = load(modeDeps)
+      .then((ctrl) => {
+        ctrl?.syncApiKey?.(modeDeps.getApiKey());
+        return ctrl;
+      })
+      .catch((e) => {
+        delete modeLoads[mode];
+        console.error(`${mode} mode load failed`, e);
+        showToast('這個模式載入失敗，請檢查網路後重新整理頁面');
+        return null;
+      });
+  }
+  return modeLoads[mode];
+}
+
+function activateMode(mode) {
+  const first = !modeLoads[mode];
+  ensureMode(mode).then((ctrl) => {
+    // drill 初次載入時 initDrill 已讀過症狀紀錄，不必再重讀
+    if (ctrl && !(first && mode === 'drill')) ctrl.activate?.();
+  });
+}
+
 function handleModeChange(mode) {
   updateHeroPhilosophyBar(mode);
   if (mode === 'demo') window.__refreshBridge?.();
-  if (mode === 'log') symptomLog?.activate();
-  if (mode === 'brief') meetingNotes?.activate();
-  if (mode === 'deck') demoDeck?.activate();
-  if (mode === 'drill') refreshDrillFocus();
+  activateMode(mode);
   refreshReflectionGateUI();
 }
 
@@ -840,20 +913,23 @@ function switchMode(mode) {
   window.scrollTo({ top: 0, behavior: 'auto' });
 }
 
-function sendAnalysisToDeck() {
+async function sendAnalysisToDeck() {
   if (!lastResult || !segs.length) return showToast('請先完成分析');
-  if (!demoDeck?.createFromInput) return showToast('DEMO 簡報模組無法使用');
   const input = deckInputFromCall(segs, lastResult, { source: sourceName });
   if (!input.raw) return showToast('逐字稿裡沒有找到客戶說的話——先確認說話者標記（C＝客戶）');
-  demoDeck.createFromInput(input);
+  const deck = await ensureMode('deck');
+  if (!deck?.createFromInput) return;
+  deck.createFromInput(input);
   switchMode('deck');
   const n = filledDeckFields(input).length;
   showToast(n ? `已帶入 ${n} 個欄位的客戶原話，檢查後再產生簡報` : '已帶入客戶原話到「開發紀錄」，可直接用 AI 產生');
 }
 
-function practiceSymptom(symptomKey) {
+async function practiceSymptom(symptomKey) {
   const focus = focusForSymptom(symptomKey);
-  if (!focus || !setDrillFocus(focus.key)) return;
+  if (!focus) return;
+  const drill = await ensureMode('drill');
+  if (!drill?.setDrillFocus(focus.key)) return;
   switchMode('drill');
   showToast(`陪練重點已設定：${focus.label}`);
 }
@@ -969,62 +1045,14 @@ function init() {
     showToast,
   });
 
-  // 開發症狀紀錄：日曆／漏斗／當天錄音批次分析；「完整分析」把某通逐字稿送進標記→分析流程
-  symptomLog = initSymptomLog($('symptomLogPanel'), {
-    getApiKey,
-    setApiKey,
-    getModel,
-    onGeminiUsed,
-    showToast,
-    onOpenCall: (parsed, filename) => {
-      if (loadParsedSegments(parsed, filename, '症狀紀錄')) {
-        $('analyze').click();
-        $('labelCard').scrollIntoView({ behavior: 'smooth', block: 'start' });
-      }
-    },
-    onPracticeSymptom: practiceSymptom,
-  });
-  // 從網址直接進入 #log 時 initModeChooser 已先觸發 onModeChange，此時 symptomLog 尚未建立
-  if (resolveMode() === 'log') symptomLog.activate();
-
-  // 主管早會：即時語音轉文字 → 重點 → 確認後套用為專案方向（首頁／頁首顯示，AI prompt 對齊）
-  try {
-    meetingNotes = initMeetingNotes($('meetingPanel'), {
-      getApiKey,
-      setApiKey,
-      getModel,
-      onGeminiUsed,
-      showToast,
-      onDirectivesChanged: () => {
-        mountHomePhilosophy();
-        updateHeroPhilosophyBar(resolveMode());
-      },
-    });
-    if (resolveMode() === 'brief') meetingNotes.activate();
-  } catch (e) {
-    console.error('meeting notes init failed', e);
-  }
-
-  // 有邀約開發 → DEMO 簡報：依客戶資料產生投其所好的簡報，可全螢幕簡報或下載 PPTX
-  try {
-    demoDeck = initDemoDeck($('deckPanel'), { getApiKey, setApiKey, getModel, onGeminiUsed, showToast });
-    demoDeck.syncApiKey(getApiKey());
-    if (resolveMode() === 'deck') demoDeck.activate();
-  } catch (e) {
-    console.error('demo deck init failed', e);
-  }
-
-  initDrill({
-    // 陪練逐字稿已含說話者標籤，直接跑分析並跳到結果
-    onTranscriptReady: (text, filename) => {
-      if (loadTranscriptText(text, filename)) $('analyze').click();
-    },
-    showToast,
-    getApiKey,
-    setApiKey,
-    getModel,
-    onGeminiUsed,
-    loadRecentSymptoms: () => recentSymptomAggregate(listCallsBetween),
+  // 症狀紀錄、主管早會、DEMO 簡報、陪練：進入該模式時才載入（見 MODE_LOADERS）
+  modeDeps = { getApiKey, setApiKey, getModel, onGeminiUsed, showToast };
+  // 從網址直接進入時 initModeChooser 已先觸發 onModeChange，當時 modeDeps 還沒建好
+  if (MODE_LOADERS[resolveMode()]) activateMode(resolveMode());
+  // 瀏覽器上一頁／下一頁只會改 hash，不經過 onModeChange
+  window.addEventListener('hashchange', () => {
+    const mode = resolveMode();
+    if (MODE_LOADERS[mode] && !modeLoads[mode]) activateMode(mode);
   });
 }
 

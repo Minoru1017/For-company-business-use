@@ -1,0 +1,29 @@
+/* ---- 列印／存成 PDF：只留報告本體，白底黑字 ---- */
+@media print {
+  html, body { background:#fff !important; color:#111 !important; }
+  body::before, body::after, .hero::after, .report-shell::before, .report-shell::after, .hero .display::before, .hero .display::after { display:none !important; }
+  .app-sidebar, .app-topbar, .app-scrim, .ws-toc, .ws-head, .mode-bar, #modeChooser, #devSection, #demoSection, #drillSection, #logSection, #briefSection, #labelCard, #historySection,
+  #exportSection, .footer, #toast, #quotaModal, .rnav, .rpager, .rfoot, .ai-progress, .quota-box,
+  #aiOut ~ .hint, .sample-actions { display:none !important; }
+  #mainApp, #result { display:block !important; }
+  .app-shell { display:block !important; }
+  .app-main { max-width:none !important; padding:0 !important; }
+  .wrap { max-width:none; padding:0; }
+  .sec { margin-bottom:18px; break-inside:avoid; }
+  .sec-head .num, .sec-head h2 { background:#eee !important; color:#111 !important; box-shadow:none !important; clip-path:none !important; }
+  .card, .report-shell, .stats, .stat, .step, .layer, .rule-card, .purpose-card, .purpose-playbook, .export-group {
+    background:#fff !important; border:1px solid #bbb !important; color:#111 !important; box-shadow:none !important; }
+  .rpane { display:block !important; animation:none !important; margin-bottom:12px; }
+  .rpane-title { color:#111 !important; }
+  .rpane ul.report li, .report li { color:#111 !important; background:#fff !important; border-bottom:1px solid #ddd !important; }
+  .rpane .q { color:#7a4a00 !important; }
+  .rpane .ev, .ev { color:#555 !important; }
+  .hint, .stat .lbl { color:#444 !important; }
+  .stat .num, .sec-head h2, h2, h4, h5 { color:#111 !important; }
+  .chart-box { max-height:260px; }
+  /* Gemini 區塊：只印結果，不印 Key 與按鈕 */
+  #apiKey, #aiModel, #verifyModel, #aiBtn, #aiCancel, #rememberKey, #aiConsent, #aiStatus,
+  #result .sec:has(#aiOut[hidden]) { display:none !important; }
+  #result .sec .row { display:none !important; }
+  a { color:inherit !important; text-decoration:none; }
+}

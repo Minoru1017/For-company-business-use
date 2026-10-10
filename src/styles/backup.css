@@ -1,0 +1,28 @@
+/* ---- 資料備份／還原 ---- */
+.backup-strip { display:flex; align-items:center; justify-content:space-between; gap:var(--s3); margin:var(--s4) 0 0; padding:10px 14px;
+  border:1px solid var(--border); border-radius:10px; background:var(--panel); color:var(--muted); font-size:.8rem; }
+.backup-strip[hidden] { display:none; }
+.backup-strip.due { border-color:rgba(245,197,24,.45); background:rgba(245,197,24,.06); color:var(--text); }
+.backup-strip.due .backup-strip-text::before { content:"⚠ "; color:var(--warn); }
+.backup-strip button { flex-shrink:0; padding:6px 14px; font-size:.78rem; }
+.app-sidebar-backup { position:relative; }
+.app-sidebar-backup:hover { color:var(--text); background:rgba(255,255,255,.05); }
+.app-sidebar-backup.due::after { content:""; position:absolute; top:4px; right:0; width:6px; height:6px; border-radius:50%; background:var(--warn); }
+.backup-dialog { width:min(600px,100%); }
+.backup-head { display:flex; align-items:flex-start; justify-content:space-between; gap:var(--s3); margin-bottom:var(--s2); }
+.backup-kicker { margin:0 0 2px; color:var(--muted); font-family:var(--mono); font-size:.62rem; letter-spacing:.2em; }
+.backup-status { margin:var(--s3) 0 0; color:var(--text); font-family:var(--mono); font-size:.74rem; }
+.backup-sec { margin-top:var(--s4); padding-top:var(--s4); border-top:1px solid var(--border); }
+.backup-sec h3 { margin:0 0 var(--s2); font-family:var(--disp); font-size:.92rem; }
+.backup-opt { display:flex; align-items:flex-start; gap:8px; margin:6px 0; font-size:.82rem; line-height:1.5; cursor:pointer; }
+.backup-opt input { margin-top:4px; }
+.backup-preview { margin-top:var(--s3); padding:12px 14px; border:1px solid var(--border); border-radius:8px; background:var(--panel2); }
+.backup-preview[hidden] { display:none; }
+.backup-preview-head { display:flex; flex-wrap:wrap; justify-content:space-between; gap:4px 12px; margin:0 0 4px; font-size:.82rem; }
+.backup-preview-head span { color:var(--muted); font-family:var(--mono); font-size:.72rem; }
+.backup-preview-list { margin:var(--s2) 0; padding:0; list-style:none; font-size:.8rem; }
+.backup-preview-list li { display:flex; justify-content:space-between; gap:12px; padding:4px 0; border-bottom:1px dashed var(--border); }
+.backup-preview-list b { font-family:var(--mono); }
+.backup-warn { margin:var(--s2) 0 0; color:var(--warn); font-size:.78rem; line-height:1.5; }
+.backup-dialog button.danger { border-color:var(--bad); background:var(--bad); color:#fff; font-weight:700; }
+.backup-progress { min-height:1.2em; margin:var(--s3) 0 0; color:var(--muted); font-size:.78rem; }
