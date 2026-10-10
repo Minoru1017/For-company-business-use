@@ -19,10 +19,13 @@ import { escapeHTML } from './utils.js';
 const STORAGE_ENGINE = 'callCoachDevAudioEngine';
 const WORKER_ACCEPT = `${AUDIO_ACCEPT},.mp4,video/mp4`;
 
+export function normalizeEngine(v) {
+  return v === 'worker' ? 'worker' : 'gemini';
+}
+
 function loadEngine() {
   try {
-    const v = localStorage.getItem(STORAGE_ENGINE);
-    return v === 'worker' ? 'worker' : 'gemini';
+    return normalizeEngine(localStorage.getItem(STORAGE_ENGINE));
   } catch {
     return 'gemini';
   }
@@ -36,9 +39,39 @@ function saveEngine(engine) {
   }
 }
 
-function formatElapsed(ms) {
+export function formatElapsed(ms) {
   const s = Math.floor(ms / 1000);
   return s >= 60 ? `${Math.floor(s / 60)} 分 ${String(s % 60).padStart(2, '0')} 秒` : `${s} 秒`;
+}
+
+/** 「開始轉錄」不能按的原因（給按鈕 title）；可以按時回傳空字串。轉錄中另有狀態列，不給 title */
+export function startBlockReason({ busy = false, hasFile = false, apiKey = '', keyProblem = '', consent = false } = {}) {
+  if (busy) return 'busy';
+  if (!hasFile) return '請先選擇錄音檔';
+  if (!apiKey) return '請貼上 Gemini API Key';
+  if (keyProblem) return keyProblem;
+  if (!consent) return '請勾選知情同意';
+  return '';
+}
+
+export function transcriptFileName(audioName) {
+  return `${String(audioName || 'audio').replace(/\.[a-z0-9]+$/i, '')}.srt`;
+}
+
+/** Gemini 轉錄完成後的狀態列與 toast 文字 */
+export function transcribeDoneMessages({ lines, truncated }) {
+  if (truncated) {
+    return {
+      status: `轉錄完成：${lines} 句，已載入並標好業務／客戶；錄音較長，輸出被截斷，僅取得前段——建議切成 30～60 分鐘再上傳`,
+      kind: 'err',
+      toast: '轉錄完成（輸出被截斷，僅前段）',
+    };
+  }
+  return {
+    status: `轉錄完成：${lines} 句，已載入並標好業務／客戶`,
+    kind: 'ok',
+    toast: `轉錄完成 — ${lines} 句，請確認標記後開始分析`,
+  };
 }
 
 /**
@@ -135,17 +168,16 @@ export function mountDevAudioUpload(
 
   const refreshStart = () => {
     if (!startBtn) return;
-    const key = keyEl?.value?.trim();
-    const problem = keyProblem();
-    const blocked = busy || !picked || !key || !!problem || !consentEl?.checked;
-    startBtn.disabled = blocked;
+    const reason = startBlockReason({
+      busy,
+      hasFile: !!picked,
+      apiKey: keyEl?.value?.trim() || '',
+      keyProblem: keyProblem(),
+      consent: !!consentEl?.checked,
+    });
+    startBtn.disabled = !!reason;
     startBtn.removeAttribute('title');
-    if (blocked && !busy) {
-      if (!picked) startBtn.title = '請先選擇錄音檔';
-      else if (!key) startBtn.title = '請貼上 Gemini API Key';
-      else if (problem) startBtn.title = problem;
-      else if (!consentEl?.checked) startBtn.title = '請勾選知情同意';
-    }
+    if (reason && reason !== 'busy') startBtn.title = reason;
     if (pickBtn) pickBtn.disabled = busy;
   };
 
@@ -236,12 +268,11 @@ export function mountDevAudioUpload(
         onModelSwitch: (next, prev) => showToast?.(`${prev} 忙碌，改試 ${next}…`),
       });
       onGeminiUsed?.(result.usedTokens);
-      const base = picked.name.replace(/\.[a-z0-9]+$/i, '');
-      const ok = onSegmentsReady?.(result.segs, `${base}.srt`, `Gemini 轉錄（${result.modelUsed}）`);
+      const ok = onSegmentsReady?.(result.segs, transcriptFileName(picked.name), `Gemini 轉錄（${result.modelUsed}）`);
       if (ok === false) throw new Error('逐字稿載入失敗');
-      const note = result.truncated ? '；錄音較長，輸出被截斷，僅取得前段——建議切成 30～60 分鐘再上傳' : '';
-      setStatus(`轉錄完成：${result.segs.length} 句，已載入並標好業務／客戶${note}`, result.truncated ? 'err' : 'ok');
-      showToast?.(result.truncated ? '轉錄完成（輸出被截斷，僅前段）' : `轉錄完成 — ${result.segs.length} 句，請確認標記後開始分析`);
+      const done = transcribeDoneMessages({ lines: result.segs.length, truncated: result.truncated });
+      setStatus(done.status, done.kind);
+      showToast?.(done.toast);
     } catch (e) {
       const msg = e?.name === 'AbortError' ? '已取消' : e?.message || '轉錄失敗';
       setStatus(msg, 'err');

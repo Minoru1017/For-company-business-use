@@ -17,13 +17,26 @@ import {
   loadDecks,
   moveSlide,
   newDeckRecord,
-  normalizeSlide,
   parseDeckResponse,
   saveCourseNotes,
   saveDecks,
   setByPath,
   templateDeck,
 } from './demo-deck.js';
+import {
+  addDeckFromInput,
+  appendRawNote,
+  cleanEditedText,
+  clampSlideIndex,
+  deckLabel,
+  deckListMeta,
+  deckOpenMeta,
+  deleteSlidePrompt,
+  duplicateSlide,
+  editorKeyAction,
+  presentKeyAction,
+  slideIndexAfter,
+} from './demo-deck-actions.js';
 import { renderDeckSlides } from './demo-deck-slides.js';
 import { formatBarHtml, mountDeckFormatBar } from './demo-deck-format-ui.js';
 import { deleteDeckImages, loadAllDeckImages } from './demo-deck-images.js';
@@ -178,17 +191,13 @@ export function initDemoDeck(container, { getApiKey, setApiKey, getModel, onGemi
     state.saveT = setTimeout(persistNow, 400);
   }
 
-  function recLabel(rec) {
-    return rec.input.name.trim() || rec.deck?.customer || '未命名客戶';
-  }
-
   function renderList() {
     els.list.innerHTML = state.decks
       .map((rec) => {
         const on = rec.id === state.currentId;
-        const meta = [rec.input.demoAt.trim(), rec.deck ? `${rec.deck.slides.length} 頁${rec.source === 'template' ? '・範本' : ''}` : '尚未產生'].filter(Boolean).join(' · ');
+        const meta = deckListMeta(rec);
         return `<li><button type="button" class="dk-deck-item${on ? ' active' : ''}" data-deck="${escapeHTML(rec.id)}">
-          <b>${escapeHTML(recLabel(rec))}</b><small>${escapeHTML(meta)}</small></button>
+          <b>${escapeHTML(deckLabel(rec))}</b><small>${escapeHTML(meta)}</small></button>
           <button type="button" class="dk-deck-del" data-del-deck="${escapeHTML(rec.id)}" title="刪除這份簡報" aria-label="刪除">×</button></li>`;
       })
       .join('');
@@ -250,9 +259,8 @@ export function initDemoDeck(container, { getApiKey, setApiKey, getModel, onGemi
     const rec = current();
     els.openCard.hidden = !rec?.deck;
     if (!rec?.deck) return;
-    const style = DECK_STYLES.find((x) => x.key === rec.deck.theme?.style)?.label || DECK_STYLES[0].label;
     els.openTitle.textContent = rec.deck.title;
-    els.openMeta.textContent = `${rec.deck.slides.length} 頁 · ${style}${rec.source === 'template' ? ' · 範本' : ''}`;
+    els.openMeta.textContent = deckOpenMeta(rec);
   }
 
   function renderTabs() {
@@ -261,7 +269,7 @@ export function initDemoDeck(container, { getApiKey, setApiKey, getModel, onGemi
       .map((id) => {
         const rec = state.decks.find((d) => d.id === id);
         const on = id === state.currentId;
-        return `<span class="dk-win-tab${on ? ' active' : ''}"><button type="button" role="tab" class="dk-win-tab-label" aria-selected="${on}" tabindex="${on ? 0 : -1}" data-tab="${escapeHTML(id)}" title="${escapeHTML(rec.deck.title)}">${escapeHTML(recLabel(rec))}</button><button type="button" class="dk-win-tab-x" data-tab-close="${escapeHTML(id)}" title="關閉分頁" aria-label="關閉分頁">×</button></span>`;
+        return `<span class="dk-win-tab${on ? ' active' : ''}"><button type="button" role="tab" class="dk-win-tab-label" aria-selected="${on}" tabindex="${on ? 0 : -1}" data-tab="${escapeHTML(id)}" title="${escapeHTML(rec.deck.title)}">${escapeHTML(deckLabel(rec))}</button><button type="button" class="dk-win-tab-x" data-tab-close="${escapeHTML(id)}" title="關閉分頁" aria-label="關閉分頁">×</button></span>`;
       })
       .join('');
   }
@@ -357,8 +365,7 @@ export function initDemoDeck(container, { getApiKey, setApiKey, getModel, onGemi
   function goto(i) {
     const rec = current();
     if (!rec?.deck) return;
-    const n = rec.deck.slides.length;
-    const next = Math.min(Math.max(0, i), n - 1);
+    const next = clampSlideIndex(i, rec.deck.slides.length);
     if (next !== state.idx) fmtBar?.clear();
     state.idx = next;
     els.thumbs.querySelectorAll('.dk-thumb').forEach((b) => b.classList.toggle('active', Number(b.dataset.slide) === state.idx));
@@ -468,14 +475,12 @@ export function initDemoDeck(container, { getApiKey, setApiKey, getModel, onGemi
   function onPresentKey(e) {
     const rec = current();
     if (!state.present || !rec?.deck) return;
-    const k = e.key;
-    if (k === 'ArrowRight' || k === 'PageDown' || k === ' ' || k === 'Enter') goto(state.idx + 1);
-    else if (k === 'ArrowLeft' || k === 'PageUp' || k === 'Backspace') goto(state.idx - 1);
-    else if (k === 'Home') goto(0);
-    else if (k === 'End') goto(rec.deck.slides.length - 1);
-    else if (k === 'n' || k === 'N') state.present.notes.hidden = !state.present.notes.hidden;
-    else if (k === 'Escape') closePresent();
-    else return;
+    const action = presentKeyAction(e.key);
+    if (!action) return;
+    const to = slideIndexAfter(action, state.idx, rec.deck.slides.length);
+    if (to != null) goto(to);
+    else if (action === 'notes') state.present.notes.hidden = !state.present.notes.hidden;
+    else if (action === 'exit') closePresent();
     e.preventDefault();
     e.stopPropagation();
   }
@@ -555,7 +560,7 @@ export function initDemoDeck(container, { getApiKey, setApiKey, getModel, onGemi
     const del = e.target.closest('[data-del-deck]');
     if (del) {
       const rec = state.decks.find((d) => d.id === del.dataset.delDeck);
-      if (!rec || !window.confirm(`刪除「${recLabel(rec)}」的簡報？`)) return;
+      if (!rec || !window.confirm(`刪除「${deckLabel(rec)}」的簡報？`)) return;
       state.decks = state.decks.filter((d) => d.id !== rec.id);
       persistNow();
       gcImages();
@@ -582,7 +587,7 @@ export function initDemoDeck(container, { getApiKey, setApiKey, getModel, onGemi
     const rec = current();
     els.importSel.value = '';
     if (!it || !rec) return;
-    rec.input.raw = [rec.input.raw.trim(), it.text].filter(Boolean).join('\n\n');
+    rec.input.raw = appendRawNote(rec.input.raw, it.text);
     persist();
     renderInput();
     toast(`已帶入：${it.label}`);
@@ -609,7 +614,7 @@ export function initDemoDeck(container, { getApiKey, setApiKey, getModel, onGemi
     const el = e.target.closest('[data-path]');
     const rec = current();
     if (!el || !rec?.deck) return;
-    const value = el.innerText.replace(/\n{3,}/g, '\n\n').trim();
+    const value = cleanEditedText(el.innerText);
     if (setByPath(rec.deck, el.dataset.path, value)) {
       if (el.dataset.path === `slides.${state.idx}.title` && state.idx === 0) {
         rec.deck.title = value || rec.deck.title;
@@ -636,12 +641,12 @@ export function initDemoDeck(container, { getApiKey, setApiKey, getModel, onGemi
   });
 
   els.viewer.addEventListener('keydown', (e) => {
-    if (isTyping(e.target) || e.ctrlKey || e.metaKey || e.altKey) return;
-    if (e.key === 'ArrowRight' || e.key === 'PageDown') goto(state.idx + 1);
-    else if (e.key === 'ArrowLeft' || e.key === 'PageUp') goto(state.idx - 1);
-    else if (e.key === 'f' || e.key === 'F') setMaximized(!editor.max);
-    else if (e.key === 'Escape') closeEditor();
-    else return;
+    const action = editorKeyAction(e.key, { typing: isTyping(e.target), modifier: e.ctrlKey || e.metaKey || e.altKey });
+    if (!action) return;
+    if (action === 'next') goto(state.idx + 1);
+    else if (action === 'prev') goto(state.idx - 1);
+    else if (action === 'maximize') setMaximized(!editor.max);
+    else closeEditor();
     e.preventDefault();
   });
 
@@ -679,12 +684,11 @@ export function initDemoDeck(container, { getApiKey, setApiKey, getModel, onGemi
     if (act === 'pptx') return downloadPptx(b);
     const slides = rec.deck.slides;
     if (act === 'up' || act === 'down') state.idx = moveSlide(rec.deck, state.idx, act === 'up' ? -1 : 1);
-    else if (act === 'dup') {
-      slides.splice(state.idx + 1, 0, normalizeSlide({ ...JSON.parse(JSON.stringify(slides[state.idx])), id: '' }));
-      state.idx += 1;
-    } else if (act === 'del') {
-      if (slides.length <= 1) return toast('至少要留一頁');
-      if (!window.confirm(`刪除第 ${state.idx + 1} 頁「${slides[state.idx].title || SLIDE_TYPE_LABELS[slides[state.idx].type]}」？`)) return;
+    else if (act === 'dup') state.idx = duplicateSlide(rec.deck, state.idx);
+    else if (act === 'del') {
+      const ask = deleteSlidePrompt(rec.deck, state.idx);
+      if (ask.blocked) return toast(ask.blocked);
+      if (!window.confirm(ask.confirm)) return;
       slides.splice(state.idx, 1);
     }
     persist();
@@ -717,13 +721,8 @@ export function initDemoDeck(container, { getApiKey, setApiKey, getModel, onGemi
     openEditor,
     /** 從其他模式帶入客戶資料，開一份新簡報（不自動產生，讓業務先檢查欄位） */
     createFromInput(input = {}) {
-      const rec = newDeckRecord();
-      Object.keys(rec.input).forEach((k) => {
-        if (typeof input[k] === 'string') rec.input[k] = input[k];
-      });
-      rec.source = 'call';
-      state.decks = state.decks.filter((d) => d.deck || hasCustomerInput(d.input));
-      state.decks.unshift(rec);
+      const { rec, decks } = addDeckFromInput(state.decks, input);
+      state.decks = decks;
       persistNow();
       select(rec.id);
       els.status.textContent = '已從電訪分析帶入客戶原話。先檢查、刪掉不準的句子，再按「用範本產生」或「AI 產生簡報」。';
