@@ -5,7 +5,14 @@
  * 訓練目標：不慌（限時接話）、不亂套話（套話／恐嚇／太早推）、不講不出話（卡住）。
  * 每個判定都對應手冊規則（rules.js / purpose-types.js），結束後可直接送進正式分析。
  */
-import { DRILL_COMMON, DRILL_OPENING, DRILL_SITUATION_AFTER_CONNECT, DRILL_SITUATION_MID } from './drill-personas.js';
+import {
+  DRILL_COMMON,
+  DRILL_OPENING,
+  DRILL_SITUATION_AFTER_CONNECT,
+  DRILL_SITUATION_MID,
+  commonQuestionHint,
+  objectionQueue,
+} from './drill-personas.js';
 import { sharesDiscoveryTerms } from './manual-check.js';
 import { PURPOSE_TYPES, TYPE_DISCOVERY_LAYERS, detectWrongProbes } from './purpose-types.js';
 import { RULES } from './rules.js';
@@ -84,6 +91,8 @@ export function newSession({ persona, difficulty = 'normal', limitSec = 30, engi
     objectionIdx: 0,
     objectionsThrown: 0,
     objectionsHandled: 0,
+    objectionQueue: objectionQueue(persona),
+    missedObjections: [],
     pendingObjection: null,
     nextObjectionAt: diff.every,
     salesTurns: 0,
@@ -329,6 +338,7 @@ export function respond(state, text, reactionMs = 0) {
       }
     } else {
       c.flags.push('missedObjection');
+      state.missedObjections.push(pending);
       bumpMood(state, -10);
       replies.push({ text: DRILL_COMMON.objectionMissed, kind: 'pushback', reword: true });
       if (['pushback', 'ack', 'vague', 'tooLong'].includes(main.kind)) skipMain = true;
@@ -381,8 +391,8 @@ export function respond(state, text, reactionMs = 0) {
     c.kind !== 'noConnect' &&
     !['pushback', 'notYet', 'repeat'].includes(main.kind)
   ) {
-    const p = state.persona;
-    const objection = p.objections[state.objectionIdx % p.objections.length];
+    const queue = state.objectionQueue;
+    const objection = queue[state.objectionIdx % queue.length];
     state.objectionIdx += 1;
     state.objectionsThrown += 1;
     state.pendingObjection = objection;
@@ -613,6 +623,10 @@ export function buildCoaching(state, stats, quiz) {
     if (r >= 0.7) good.push(`突襲處理 <b>${stats.objectionsHandled}/${stats.objectionsThrown}</b>——客戶丟難題時有接住（承認→反問）`);
     else bad.push(`突襲處理只有 <b>${stats.objectionsHandled}/${stats.objectionsThrown}</b>——客戶丟難題時不要直接解釋，先接住：<span class="q">「這個問題很合理。」</span>再反問一句：<span class="q">「你會這樣問，是之前有遇過＿＿嗎？」</span>`);
   }
+  [...new Set(state.missedObjections || [])].forEach((text) => {
+    const hint = commonQuestionHint(text);
+    if (hint) bad.push(`客戶問<b>「${text}」</b>沒接住——${hint}`);
+  });
   if (stats.salesLines >= 4) {
     const pct = Math.round(stats.followUpRate * 100);
     if (stats.followUpRate >= 0.5) good.push(`接話率 ${pct}%——多數問題有引用客戶上一句的關鍵字，不是背題庫`);
