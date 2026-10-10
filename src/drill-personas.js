@@ -242,6 +242,45 @@ export const DRILL_SITUATION_MID = [
   '等等，我換個安靜點的地方……好了，你剛說？',
 ];
 
+/**
+ * 每個客戶都可能問的常見問題，和劇本自己的突襲交替出現。
+ * hint 是陪練結束後「沒接住」時給的建議接法（＿＿留給業務自己填，不替公司編事實）。
+ */
+export const DRILL_COMMON_QUESTIONS = [
+  {
+    text: '阿你們主要在做什麼的？',
+    hint: '一句話講完，不背簡介：<span class="q">「我們是做＿＿的，幫像你這樣的＿＿把 AI 用在自己的工作上。」</span>接著馬上反問：<span class="q">「你當初留資料，是想先解決哪一塊？」</span>',
+  },
+  {
+    text: '跟其他AI課程有什麼不一樣？',
+    hint: '不批評別家，先問清楚他比較的是什麼：<span class="q">「你有看過哪幾家？哪裡讓你覺得還不夠？」</span>聽完再對準他講的那一點說差異',
+  },
+  {
+    text: '那你們的優勢是什麼？',
+    hint: '優勢要接回客戶自己說過的需求，不是列賣點：<span class="q">「你剛提到＿＿，這正好是我們最花力氣做的——＿＿。」</span>講完問一句：<span class="q">「這樣有對到你要的嗎？」</span>',
+  },
+  {
+    text: '我聽不太懂你講的，可以試聽課程嗎？',
+    hint: '先把責任攬回來：<span class="q">「是我講得太複雜了。」</span>用一句白話重講重點，再問：<span class="q">「你最想先看到的是哪一段？」</span>試聽／體驗當成下一步去約，不要直接丟連結就結束',
+  },
+];
+
+/** 突襲出場順序：劇本的突襲和常見問題交替，兩邊都問過一輪再重來 */
+export function objectionQueue(persona) {
+  const own = persona?.objections || [];
+  const common = DRILL_COMMON_QUESTIONS.map((q) => q.text);
+  const out = [];
+  for (let i = 0; i < Math.max(own.length, common.length); i++) {
+    if (i < own.length) out.push(own[i]);
+    if (i < common.length) out.push(common[i]);
+  }
+  return out;
+}
+
+export function commonQuestionHint(text) {
+  return DRILL_COMMON_QUESTIONS.find((q) => q.text === text)?.hint || '';
+}
+
 /** 客戶共用的口頭反應（各劇本沒特別寫時使用） */
 export const DRILL_COMMON = {
   ack: ['嗯嗯。', '喔好。', '好，然後呢？', '呃……你繼續。'],
