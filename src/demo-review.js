@@ -85,6 +85,7 @@ function normalizeVideo(v) {
   if (!name) return null;
   return {
     name,
+    bridgeName: clip(v.bridgeName, 200),
     size: Math.max(0, Number(v.size) || 0),
     addedAt: ts(v.addedAt),
     sentAt: ts(v.sentAt),
@@ -221,28 +222,52 @@ export function videoFromFile(file, now = Date.now()) {
   return normalizeVideo({ name: file?.name, size: file?.size, addedAt: now });
 }
 
-/** 逐字稿來源名稱對應到哪一筆複盤（有多筆時取最近更新的） */
-export function matchReviewByVideo(list, source) {
+const PENDING_KEY = 'call_coach_pending_review';
+
+/** 剛從哪一筆複盤送出錄影（同名檔如 demo.mp4 有好幾筆時，轉錄結果優先回填這一筆）；只留在這個分頁 */
+export function setPendingReview(id) {
+  try {
+    if (id) sessionStorage.setItem(PENDING_KEY, id);
+    else sessionStorage.removeItem(PENDING_KEY);
+  } catch {
+    /* sessionStorage unavailable */
+  }
+}
+
+export function getPendingReview() {
+  try {
+    return sessionStorage.getItem(PENDING_KEY) || '';
+  } catch {
+    return '';
+  }
+}
+
+/**
+ * 逐字稿來源名稱對應到哪一筆複盤。比對原檔名與助手實際存下的檔名；
+ * 有多筆符合時：指定的 preferId → 最近送出錄影的 → 最近更新的。
+ */
+export function matchReviewByVideo(list, source, preferId = '') {
   const key = videoKey(source);
   if (!key) return null;
+  const hits = (list || []).filter((r) => r.video && (videoKey(r.video.name) === key || (r.video.bridgeName && videoKey(r.video.bridgeName) === key)));
   return (
-    (list || [])
-      .filter((r) => r.video && videoKey(r.video.name) === key)
-      .sort((a, b) => b.updatedAt - a.updatedAt)[0] || null
+    hits.find((r) => preferId && r.id === preferId) ||
+    hits.sort((a, b) => (b.video.sentAt || 0) - (a.video.sentAt || 0) || b.updatedAt - a.updatedAt)[0] ||
+    null
   );
 }
 
 /** 影片轉成逐字稿了：只在複盤還沒記過時補上時間，回傳新清單；沒有對應複盤回傳 null */
-export function linkTranscript(list, source, now = Date.now()) {
-  const hit = matchReviewByVideo(list, source);
+export function linkTranscript(list, source, now = Date.now(), preferId = '') {
+  const hit = matchReviewByVideo(list, source, preferId);
   if (!hit) return null;
   if (hit.video.transcribedAt) return { review: hit, list, changed: false };
   return { ...upsertReview(list, { ...hit, video: { ...hit.video, transcribedAt: now } }, now), changed: true };
 }
 
 /** 逐字稿分析完了：把結果摘要與「最近分析」的 id 掛回對應複盤 */
-export function linkAnalysis(list, source, { historyId, summary } = {}, now = Date.now()) {
-  const hit = matchReviewByVideo(list, source);
+export function linkAnalysis(list, source, { historyId, summary } = {}, now = Date.now(), preferId = '') {
+  const hit = matchReviewByVideo(list, source, preferId);
   if (!hit || !historyId) return null;
   return upsertReview(
     list,
@@ -265,7 +290,7 @@ function persistLink(result) {
 /** 以下兩個直接讀寫 localStorage，給 app.js 在轉錄／分析完成時呼叫 */
 export function linkTranscriptToReview(source) {
   try {
-    const r = linkTranscript(loadReviews(), source);
+    const r = linkTranscript(loadReviews(), source, Date.now(), getPendingReview());
     return r?.changed ? persistLink(r) : null;
   } catch {
     return null;
@@ -274,7 +299,9 @@ export function linkTranscriptToReview(source) {
 
 export function linkAnalysisToReview(source, info) {
   try {
-    return persistLink(linkAnalysis(loadReviews(), source, info));
+    const review = persistLink(linkAnalysis(loadReviews(), source, info, Date.now(), getPendingReview()));
+    if (review && review.id === getPendingReview()) setPendingReview('');
+    return review;
   } catch {
     return null;
   }
