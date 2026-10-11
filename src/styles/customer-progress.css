@@ -1,0 +1,26 @@
+/* 首頁：每位客戶的進度條 */
+.cp-home { margin:var(--s4) 0 0; display:flex; flex-direction:column; gap:10px; }
+.cp-home[hidden] { display:none; }
+.cp-head h3 { margin:0; font-family:var(--disp); font-size:1.05rem; }
+.cp-head h3 small { margin-left:6px; font-family:var(--sans); font-size:.74rem; font-weight:400; color:var(--muted); }
+.cp-head h3 em { font-style:normal; color:var(--warn); }
+.cp-list { list-style:none; margin:0; padding:0; display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:10px; }
+.cp-item { width:100%; display:flex; flex-direction:column; gap:7px; padding:12px 14px; text-align:left; border:1px solid var(--border); border-radius:8px; background:rgba(37,47,61,.4); color:var(--text); font-family:var(--sans); letter-spacing:0; box-shadow:none; cursor:pointer; transition:border-color .15s, transform .15s; }
+.cp-item:hover, .cp-item:focus-visible { border-color:var(--accent); transform:translateY(-1px); box-shadow:none; outline:none; }
+.cp-item.complete { border-color:rgba(76,175,120,.5); }
+.cp-top { display:flex; flex-wrap:wrap; align-items:center; gap:4px 8px; }
+.cp-name { font-size:.92rem; }
+.cp-pct { margin-left:auto; font-family:var(--mono); font-size:.82rem; color:var(--accent); }
+.cp-item.complete .cp-pct { color:var(--ok); }
+.cp-badge { padding:1px 7px; border-radius:10px; border:1px solid var(--border); font-size:.68rem; color:var(--muted); }
+.cp-badge.ok { color:var(--ok); border-color:var(--ok); }
+.cp-badge.warn { color:var(--warn); border-color:var(--warn); }
+.cp-bar { display:grid; grid-template-columns:repeat(5,1fr); gap:3px; }
+.cp-bar i { height:7px; border-radius:2px; background:rgba(255,255,255,.1); }
+.cp-bar i.on { background:var(--accent); }
+.cp-item.complete .cp-bar i.on { background:var(--ok); }
+.cp-stages { display:grid; grid-template-columns:repeat(5,1fr); gap:3px; font-size:.64rem; color:var(--muted); text-align:center; }
+.cp-stages .on { color:var(--text); }
+.cp-next { font-size:.76rem; color:var(--muted); line-height:1.45; }
+.cp-next.ok { color:var(--ok); }
+.cp-more { align-self:flex-start; padding:4px 12px; font-size:.78rem; }

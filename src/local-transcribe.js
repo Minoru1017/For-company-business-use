@@ -958,7 +958,7 @@ async function uploadMp4(file, showToast, refreshStatus) {
   if (!file.name.toLowerCase().endsWith('.mp4')) {
     setUploadUI({ state: 'err', message: '請選擇 .mp4 錄影檔' });
     showToast('請選擇 MP4 檔案');
-    return;
+    return false;
   }
 
   const sizeMb = file.size / (1024 * 1024);
@@ -970,7 +970,7 @@ async function uploadMp4(file, showToast, refreshStatus) {
     );
     if (!manual) {
       showToast('建議手動複製到 input 資料夾');
-      return;
+      return false;
     }
   }
 
@@ -983,6 +983,7 @@ async function uploadMp4(file, showToast, refreshStatus) {
   });
   showToast(`開始複製 ${file.name}…（大檔請耐心等候）`);
 
+  let ok = false;
   try {
     const r = await uploadMp4XHR(file, ({ loaded, total, pct, sec, speed }) => {
       const stalled = pct < 1 && sec > 30;
@@ -1000,6 +1001,7 @@ async function uploadMp4(file, showToast, refreshStatus) {
     setUploadUI({ state: 'ok', message: `✓ 已放入本機 input：${r.filename}（${fmtSize(file.size)}）` });
     showToast(`已放入本機 input：${r.filename} — 可按「開始本機轉錄」`);
     setTimeout(() => setUploadUI({ state: 'idle' }), 5000);
+    ok = true;
   } catch (err) {
     const msg = err?.message || '上傳失敗';
     setUploadUI({ state: 'err', message: `✗ ${msg}` });
@@ -1009,6 +1011,20 @@ async function uploadMp4(file, showToast, refreshStatus) {
     uploadXhr = null;
     await refreshStatus();
   }
+  return ok;
+}
+
+/**
+ * 從 DEMO 複盤把錄影送進本機轉錄助手的 input 資料夾（之後在 DEMO 轉錄面板按「開始轉錄」）。
+ * @returns {Promise<{ok:boolean, reason?:'offline'|'busy'|'failed'}>}
+ */
+export async function sendMp4ToBridge(file, showToast) {
+  if (uploadBusy || transcribeBusy) return { ok: false, reason: 'busy' };
+  if (!(await checkLocalBridge())) return { ok: false, reason: 'offline' };
+  const ok = await uploadMp4(file, showToast, async () => {
+    await window.__refreshBridge?.();
+  });
+  return ok ? { ok: true } : { ok: false, reason: 'failed' };
 }
 
 function notifyButtonLabel() {

@@ -44,6 +44,7 @@ import {
   initLocalTranscribe,
   openBridgeFolder,
   saveReportToBridge,
+  sendMp4ToBridge,
 } from './local-transcribe.js';
 import { initDemoPlayer, refreshDemoPlayerFromBridge, seekDemoTo, updateDemoPlayerSegments } from './demo-player.js';
 import { mountDevAudioUpload } from './dev-audio-upload.js';
@@ -67,6 +68,8 @@ import {
 import { initReflectionJournal } from './reflection-journal-ui.js';
 import { mountHomePhilosophy, updateHeroPhilosophyBar } from './coach-philosophy-ui.js';
 import { initDayTypeHome } from './learning-library-ui.js';
+import { mountCustomerProgress } from './customer-progress-ui.js';
+import { REVIEWS_CHANGED_EVENT, linkAnalysisToReview, linkTranscriptToReview } from './demo-review.js';
 import { SAMPLE_TRANSCRIPT_NAME, SAMPLE_TRANSCRIPT_SRT } from './sample-transcript.js';
 import { autoGuess } from './speaker.js';
 import { animateStats, bindUI, renderAnalysisUI, showQuotaModal, showToast } from './ui.js';
@@ -85,6 +88,7 @@ let symptomLog = null;
 let meetingNotes = null;
 let demoDeck = null;
 let recentSidebar = null;
+let customerProgress = null;
 
 const keyStorage = {
   get remember() {
@@ -198,6 +202,7 @@ function finishLoad(filename, src) {
     /* storage unavailable */
   }
   recentSidebar?.refresh();
+  if (resolveMode() === 'demo') linkTranscriptToReview(sourceName);
   return true;
 }
 
@@ -286,6 +291,7 @@ function bindLabels() {
       mode: resolveMode(),
     });
     currentHistoryId = entry.id;
+    if (resolveMode() === 'demo') linkAnalysisToReview(sourceName, { historyId: entry.id, summary: entry.summary });
     renderHistory();
     refreshExportBar();
     showToast('分析完成');
@@ -529,7 +535,10 @@ function renderHistory() {
 function bindHistory() {
   recentSidebar = initRecentSidebar({
     onOpen: (id) => loadFromHistory(id),
-    onGoHome: () => goToModeHome(),
+    onGoHome: () => {
+      goToModeHome();
+      customerProgress?.refresh();
+    },
     onNewUpload: () => scrollToNewUpload(),
     getCurrentId: () => currentHistoryId,
     onAfterDelete: (id) => {
@@ -925,6 +934,34 @@ async function sendAnalysisToDeck() {
   showToast(n ? `已帶入 ${n} 個欄位的客戶原話，檢查後再產生簡報` : '已帶入客戶原話到「開發紀錄」，可直接用 AI 產生');
 }
 
+/** DEMO 複盤的錄影：切到 DEMO 轉錄，放進本機助手的 input 資料夾 */
+async function sendReviewVideo(file) {
+  switchMode('demo');
+  const res = await sendMp4ToBridge(file, showToast);
+  if (res.reason === 'offline') showToast('轉錄助手還沒啟動——啟動後回到 DEMO 簡報的複盤，再按「送到 DEMO 轉錄分析」');
+  else if (res.reason === 'busy') showToast('轉錄助手正在處理另一個檔案，請稍後再送');
+  else if (res.ok) $('demoSection')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  return res;
+}
+
+function openReviewAnalysis(historyId) {
+  switchMode('demo');
+  loadFromHistory(historyId);
+}
+
+/** 首頁客戶進度：回到那位客戶的簡報／複盤 */
+async function openCustomerFromHome(item) {
+  if (dayTypeHomeCtrl && !dayTypeHomeCtrl.canEnterWorkModes?.()) {
+    showToast('非上班日請先完成 AI 趨勢＋銷售技巧影片心得，或改選「上班日」');
+    document.getElementById('learningOffDayPanel')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    return;
+  }
+  const deck = await ensureMode('deck');
+  if (!deck?.openCustomer) return;
+  switchMode('deck');
+  if (!deck.openCustomer(item)) showToast('找不到這位客戶的簡報或複盤（可能已被刪除）');
+}
+
 async function practiceSymptom(symptomKey) {
   const focus = focusForSymptom(symptomKey);
   if (!focus) return;
@@ -952,6 +989,11 @@ function init() {
     onModeChange: handleModeChange,
   });
   updateHeroPhilosophyBar(resolveMode());
+  try {
+    customerProgress = mountCustomerProgress($('customerProgressHome'), { onOpen: openCustomerFromHome });
+  } catch (e) {
+    console.error('customer progress init failed', e);
+  }
 
   bindUI();
   bindUpload();
@@ -1046,14 +1088,25 @@ function init() {
   });
 
   // 症狀紀錄、主管早會、DEMO 簡報、陪練：進入該模式時才載入（見 MODE_LOADERS）
-  modeDeps = { getApiKey, setApiKey, getModel, onGeminiUsed, showToast };
+  modeDeps = {
+    getApiKey,
+    setApiKey,
+    getModel,
+    onGeminiUsed,
+    showToast,
+    onSendVideo: sendReviewVideo,
+    hasAnalysis: (id) => !!getHistory(id),
+    onOpenAnalysis: openReviewAnalysis,
+  };
   // 從網址直接進入時 initModeChooser 已先觸發 onModeChange，當時 modeDeps 還沒建好
   if (MODE_LOADERS[resolveMode()]) activateMode(resolveMode());
   // 瀏覽器上一頁／下一頁只會改 hash，不經過 onModeChange
   window.addEventListener('hashchange', () => {
     const mode = resolveMode();
     if (MODE_LOADERS[mode] && !modeLoads[mode]) activateMode(mode);
+    if (!mode) customerProgress?.refresh();
   });
+  window.addEventListener(REVIEWS_CHANGED_EVENT, () => customerProgress?.refresh());
 }
 
 init();
