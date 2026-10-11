@@ -1,0 +1,122 @@
+/* =====================================================================
+   色調層級（最後載入）：用「明度與飽和度的階梯」而不是更多顏色來分資訊層級。
+
+   層級規則
+   1. 內容三階：--ink（數字、標題、主要動作）> --text-2（欄位標籤、次要說明）> --muted（註解、metadata）
+   2. 表面三階：--bg 頁面 < --panel 白卡 < --panel2 內嵌磚；--deep 墨色只給「結果 KPI」與主要按鈕
+   3. 品牌黃只做「優先訊號」：主要按鈕文字、今天／選取標記、結果 KPI 的數字；不做大面積底色
+   4. 狀態色（ok／warn／bad）降飽和、只用在小型訊號（點、chip、左側細線），正文不上色
+   5. 裝飾用 --accent 從朱紅改為深番紅，紅色只保留給 --bad
+   ===================================================================== */
+:root {
+  --bg:#ebe8e1; --panel:#fcfbf8; --panel2:#f3f0e9; --border:#e3ded3;
+  --hairline:rgba(23,21,15,.08); --hairline-2:rgba(23,21,15,.14);
+  --ink:#17150f; --text:#17150f; --text-2:#55524a; --muted:#85817a;
+  --deep:#1b1a16; --deep-2:#2a2823; --on-deep:#f3f0e9; --on-deep-muted:#a8a498;
+  --brand:#efc12f; --brand-soft:#f7edcc; --brand-ink:#17150f;
+  --accent:#b9901c;
+  --ok:#2f7d5b; --warn:#9a6b12; --bad:#bb3a24;
+  --tint-ok:#eef3ef; --line-ok:#cfdcd2; --tint-warn:#f5f0e3; --line-warn:#e3d6b7; --tint-alert:#f6efe6; --line-alert:#e7d4bf; --tint-bad:#f6ecea; --line-bad:#e6c5bf;
+  --tab-paper:var(--ink);
+  --soft-shadow:0 1px 0 rgba(255,255,255,.9) inset, 0 1px 2px rgba(40,34,20,.04), 0 14px 34px -24px rgba(40,34,20,.32);
+}
+
+/* ---- 表面與邊線：白卡只留髮絲線＋柔影 ---- */
+.card, section.sec, .ws-head, .home-top, .home-hero, .app-sidebar, .mode-card, .cp-home { border-color:var(--hairline); }
+.slog-cell, .slog-week-row, .slog-step, .slog-chip, .slog-sym, .slog-item, .slog-self-item, .slog-plan-condition, .slog-plan-progress,
+.stat, .step, .layer, .rule-card, .dev-audio-engine, .drill-opt, .drill-persona, .mm-ev, .history-item, .export-group { border-color:var(--hairline); }
+.slog-cell:hover, .slog-week-row:hover, .slog-drop.over, .slog-drop:hover { border-color:var(--hairline-2); }
+
+/* ---- 文字三階 ---- */
+.hint, .mono-hint, .slog-count, .slog-chip-h, .slog-step-r, .slog-week-date, .slog-cell-inv, .slog-legend, .slog-storage,
+.ws-kicker, .sec-head .tag, .mode-card-tag, .app-nav-sub, .rjt-kicker, .coach-hero-mode { color:var(--muted); }
+.slog-funnel-grid label, .slog-note-grid label, .slog-settings label, .slog-sheet-field, .slog-plan-adjust-grid label, .slog-plan-analysis label,
+.slog-step-l, .slog-chip-l, .stat .lbl, .slog-filter-label, .slog-plan-progress-metric b, .slog-plan-cp span, .slog-plan-target small,
+.dev-audio-engine small, .slog-legend-i, .slog-info > summary { color:var(--text-2); }
+.slog-step-n, .slog-chip-v, .stat .num, .slog-plan-progress-metric, .slog-week-k, .slog-cell-d, h2, h3 { color:var(--ink); }
+.slog-step-r { color:var(--text-2); }
+.slog-sym-count, .slog-cell-n, .slog-week-calls { color:var(--text-2); }
+
+/* ---- 資料視覺：主要量用墨色，軌道用髮絲灰 ---- */
+.slog-step-bar, .slog-storage-bar, .slog-sym-bar, .bridge-progress, .wait-bar, .cp-bar i { background:var(--hairline); }
+.slog-step-bar i, .slog-storage-bar i, .slog-sym-bar div, .bridge-progress div { background:var(--ink); }
+.slog-step-ic, .slog-week-k .ic, .slog-storage .ic, .slog-ice-stats > .ic { color:var(--muted); }
+.slog-drill-spark polyline { stroke:var(--ink); }
+.slog-drill-spark circle { fill:var(--ink); }
+
+/* ---- 結果 KPI（漏斗最後一步：同意時間）：唯一的墨色卡，黃色數字 ---- */
+.slog-step:last-child { background:var(--deep); border-color:var(--deep); }
+.slog-step:last-child .slog-step-n { color:var(--brand); }
+.slog-step:last-child .slog-step-l { color:var(--on-deep); }
+.slog-step:last-child .slog-step-r { color:var(--on-deep-muted); }
+.slog-step:last-child .slog-step-ic { color:var(--on-deep-muted); }
+.slog-step:last-child .slog-step-bar { background:rgba(255,255,255,.14); }
+.slog-step:last-child .slog-step-bar i { background:var(--brand); }
+
+/* ---- 日曆：選取＝墨色；今天＝黃色短底線；邀約成效＝底部細色條，不整格上色 ---- */
+.slog-cell { background:#fff; }
+.slog-cell.today .slog-cell-d { color:var(--ink); font-weight:800; box-shadow:inset 0 -3px 0 var(--brand); }
+.slog-cell.selected, .slog-cell.invite-good.selected, .slog-cell.invite-zero.selected { background:var(--deep); border-color:var(--deep); color:var(--on-deep); box-shadow:none; }
+.slog-cell.selected .slog-cell-d, .slog-cell.selected .slog-cell-n, .slog-cell.selected .slog-cell-inv,
+.slog-cell.invite-good.selected .slog-cell-d, .slog-cell.invite-good.selected .slog-cell-inv, .slog-cell.invite-good.selected .slog-cell-n,
+.slog-cell.invite-zero.selected .slog-cell-d, .slog-cell.invite-zero.selected .slog-cell-n { color:var(--on-deep); }
+.slog-cell.selected.today .slog-cell-d { color:var(--brand); box-shadow:none; }
+.slog-cell.invite-good, .slog-cell.invite-zero { background:#fff; border-color:var(--hairline); }
+.slog-cell.invite-good { box-shadow:inset 0 -3px 0 var(--ok); }
+.slog-cell.invite-zero { box-shadow:inset 0 -3px 0 var(--bad); }
+.slog-cell.invite-good .slog-cell-d, .slog-cell.invite-good .slog-cell-inv { color:var(--ink); }
+.slog-cell.invite-zero .slog-cell-d { color:var(--ink); }
+.slog-cell.invite-good:hover, .slog-cell.invite-zero:hover { border-color:var(--hairline-2); }
+.slog-cell.start, .slog-cell-start { border-color:var(--hairline-2); color:var(--muted); }
+.slog-swatch.good { background:transparent; border-color:transparent; box-shadow:inset 0 -3px 0 var(--ok); }
+.slog-swatch.zero { background:transparent; border-color:transparent; box-shadow:inset 0 -3px 0 var(--bad); }
+.slog-week-row.selected { border-color:var(--ink); box-shadow:inset 0 0 0 1px var(--ink); }
+
+/* ---- 選取狀態：白底＋墨色外框，不用黃底 ---- */
+.dev-audio-engine.active, .bridge-file.on, .drill-opt.on, .drill-persona.on, .drill-choices button.on, .slog-self-item.on {
+  background:#fff; border-color:var(--ink); box-shadow:inset 0 0 0 1px var(--ink);
+}
+.slog-filter.on { border-color:var(--ink); color:var(--ink); background:#fff; box-shadow:inset 0 0 0 1px var(--ink); }
+.slog-follow-opt.on { border-color:var(--ink); color:var(--ink); box-shadow:inset 0 0 0 1px var(--ink); }
+.app-sidebar-item.current, .cp-due, .backup-strip { background:var(--panel2); }
+.brief-theme, .coach-directives { background:var(--panel2); border-left-color:var(--brand); }
+
+/* ---- 提示／同意／警示：中性底＋左側細線，正文不上色 ---- */
+.bridge-consent, .bridge-python-warn, .bridge-upload-status.busy, .bridge-transcribe-status.busy, .bridge-update-pending {
+  background:var(--panel2); border:1px solid transparent; border-left:3px solid var(--warn); border-radius:0 var(--r-field) var(--r-field) 0; color:var(--text-2);
+}
+.bridge-consent strong { color:var(--ink); }
+.slog-plan-warnings p { background:var(--panel2); color:var(--text-2); border-left-color:var(--warn); }
+.slog-plan-ready { background:var(--panel2); color:var(--text-2); }
+.slog-plan-ready.ok { background:var(--panel2); border-color:var(--ok); color:var(--text-2); }
+.slog-plan-ready.ok::before { content:"✓ "; color:var(--ok); font-weight:700; }
+.slog-info-body, .slog-monthly-stats { background:var(--panel2); border-left-color:var(--hairline-2); color:var(--text-2); }
+.slog-invite-zero { background:var(--panel2); border-color:transparent; border-left:4px solid var(--bad); }
+.bridge-upload-status.err, .bridge-wait.failed, .bridge-log-panel.err { background:var(--panel2); border:1px solid transparent; border-left:3px solid var(--bad); color:var(--ink); border-radius:0 var(--r-field) var(--r-field) 0; }
+.bridge-upload-status.ok, .bridge-recording-pending { background:var(--panel2); border:1px solid transparent; border-left:3px solid var(--ok); color:var(--ink); border-radius:0 var(--r-field) var(--r-field) 0; }
+
+/* ---- 狀態 chip：只保留細邊與色字，底色透明 ---- */
+.slog-tag { background:transparent; border-color:var(--hairline-2); color:var(--text-2); }
+.slog-tag.ok, .slog-tag.warn, .slog-tag.bad { background:transparent; }
+.slog-sym-streak { background:transparent; }
+
+/* ---- 作戰儀表板：裝飾線改墨色；序號用淡墨 ---- */
+.slog-plan::before { background:var(--ink); }
+.slog-plan-kicker { color:var(--muted); }
+.slog-plan-subhead > span { color:var(--hairline-2); -webkit-text-stroke:1px var(--text-2); }
+.slog-plan-state.met { border-color:var(--ok); color:var(--ok); }
+.slog-plan-state.behind { border-color:var(--bad); color:var(--bad); }
+.slog-plan-progress-metric.met { border-color:var(--line-ok); }
+.slog-plan-progress-metric.behind { border-color:var(--line-bad); }
+.slog-plan-target-row.met, .slog-plan-target-row.behind { background:transparent; }
+.slog-plan-target.met input { border-color:var(--line-ok); }
+.slog-plan-target.behind input { border-color:var(--line-bad); }
+
+/* ---- 心智圖根節點：去掉紅底 ---- */
+.mm-root { border-color:var(--ink); background:var(--panel2); }
+.mm-tab.active::before { background:var(--ink); }
+.slog-sym.common { border-color:var(--ink); box-shadow:inset 0 0 0 1px var(--ink); }
+
+/* ---- 主要按鈕保持墨底黃字；次要按鈕白底髮絲線 ---- */
+button, .btn { border-color:var(--hairline-2); }
+button.primary, .btn.primary { border-color:var(--deep); background:var(--deep); }

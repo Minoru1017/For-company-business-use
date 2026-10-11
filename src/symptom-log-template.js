@@ -15,12 +15,12 @@ export function symptomLogTemplate() {
   return `
   <div class="slog">
     <div class="slog-top">
-      <div class="card slog-cal">
+      <div class="card slog-cal blk blk-tr">
+        <button type="button" class="btn slog-today" id="slToday">今天</button>
         <div class="slog-cal-head">
           <button type="button" class="btn slog-nav" data-nav="-1" aria-label="上個月">‹</button>
           <strong id="slMonthLabel"></strong>
           <button type="button" class="btn slog-nav" data-nav="1" aria-label="下個月">›</button>
-          <button type="button" class="btn slog-today" id="slToday">今天</button>
         </div>
         <div class="slog-weekdays">${WEEKDAYS.map((w) => `<span>${w}</span>`).join('')}</div>
         <div class="slog-grid" id="slGrid"></div>
@@ -108,8 +108,9 @@ export function symptomLogTemplate() {
     </details>
 
     <div class="slog-day" id="slDay" hidden>
-      <div class="card slog-funnel">
-        <h2><span id="slDayTitle"></span>${info('<b>留存率</b>＝超過 N 分通 ÷ 接通（破冰留客）。<b>邀約率</b>＝進邀約（客戶同意時間）÷ 超過 N 分通。Demo 與承攬會帶入本月作戰儀表板。', '公式')}</h2>
+      <div class="card slog-funnel blk blk-tl">
+        <h2 class="blk-pill" id="slDayTitle"></h2>
+        <div class="slog-funnel-head"><span class="slog-count">當日漏斗</span>${info('<b>留存率</b>＝超過 N 分通 ÷ 接通（破冰留客）。<b>邀約率</b>＝進邀約（客戶同意時間）÷ 超過 N 分通。Demo 與承攬會帶入本月作戰儀表板。', '公式')}</div>
         <div class="slog-funnel-grid">
           <label><span class="slog-funnel-label">撥出</span><input type="number" min="0" inputmode="numeric" data-day="dialed" placeholder="0"></label>
           <label><span class="slog-funnel-label">接通</span><input type="number" min="0" inputmode="numeric" data-day="connected" placeholder="0"></label>
