@@ -208,10 +208,12 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
     if (!el) return;
     const est = await storageEstimate();
     if (!est || !est.quota) {
-      el.textContent = '';
+      el.innerHTML = '';
       return;
     }
-    el.textContent = `本機已用 ${describeSize(est.usage)}／可用約 ${describeSize(est.quota)}（錄音存在這台電腦的瀏覽器；清除網站資料會一併刪除）`;
+    const pct = Math.min(100, Math.round((est.usage / est.quota) * 100));
+    el.title = '錄音存在這台電腦的瀏覽器；清除網站資料會一併刪除';
+    el.innerHTML = `<svg class="ic" aria-hidden="true"><use href="#i-db"/></svg><span class="slog-storage-bar"><i style="width:${Math.max(pct, 1)}%"></i></span><span class="slog-storage-n">${describeSize(est.usage)} / ${describeSize(est.quota)}</span>`;
   }
 
   async function refreshWeek() {
@@ -248,7 +250,18 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
       rows.push(
         `<button type="button" class="slog-week-row ${k === state.selected ? 'selected' : ''} ${empty ? 'empty' : ''}" data-date="${k}">
           <span class="slog-week-date">${fmtDateLabel(k)}</span>
-          <span class="slog-week-funnel">${f && (f.dialed || f.connected || f.over) ? `撥 ${f.dialed} · 通 ${f.connected} · >${f.shortMin}分 ${f.over} · 約 ${f.invites}` : '—'}</span>
+          <span class="slog-week-funnel">${
+            f && (f.dialed || f.connected || f.over)
+              ? [
+                  ['i-call-out', f.dialed, '撥出'],
+                  ['i-call-ok', f.connected, '接通'],
+                  ['i-clock', f.over, `>${f.shortMin} 分`],
+                  ['i-cal-check', f.invites, '同意時間'],
+                ]
+                  .map(([ic, n, t]) => `<span class="slog-week-k" title="${t}"><svg class="ic" aria-hidden="true"><use href="#${ic}"/></svg>${n}</span>`)
+                  .join('')
+              : '—'
+          }</span>
           <span class="slog-week-calls">${s?.calls ? `${s.calls} 通${s.analyzed ? `・${s.analyzed} 已析` : ''}` : ''}</span>
           <span class="slog-week-sym">${escapeHTML(top)}</span>
         </button>`
@@ -342,14 +355,18 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
     const el = q('#slFunnelBar');
     if (!el) return;
     const f = funnelFromCalls(state.day || {}, state.calls, state.settings);
-    const step = (label, n, rate, rateLabel) =>
-      `<div class="slog-step"><span class="slog-step-n">${n}</span><span class="slog-step-l">${label}</span>${rate != null ? `<span class="slog-step-r">${rateLabel} ${fmtPct(rate)}</span>` : ''}</div>`;
+    const step = (icon, label, n, rate, rateLabel) =>
+      `<div class="slog-step"><svg class="ic slog-step-ic" aria-hidden="true"><use href="#${icon}"/></svg><span class="slog-step-n">${n}</span><span class="slog-step-l">${label}</span>${
+        rate != null
+          ? `<span class="slog-step-bar" title="${rateLabel} ${fmtPct(rate)}"><i style="width:${Math.round(Math.min(1, Math.max(0, rate)) * 100)}%"></i></span><span class="slog-step-r">${rateLabel} ${fmtPct(rate)}</span>`
+          : ''
+      }</div>`;
     el.innerHTML =
-      step('撥出', f.dialed, null) +
-      step('接通', f.connected, f.connectRate, '接通率') +
-      step(`>${f.shortMin} 分`, f.over, f.retentionRate ?? f.overRate, '留存率') +
-      step(`長 Call ≥${f.longMin} 分`, f.long, f.longRate, `>${f.shortMin} 分中`) +
-      step('同意時間', f.invites, f.inviteRate, '邀約率');
+      step('i-call-out', '撥出', f.dialed, null) +
+      step('i-call-ok', '接通', f.connected, f.connectRate, '接通率') +
+      step('i-clock', `>${f.shortMin} 分`, f.over, f.retentionRate ?? f.overRate, '留存率') +
+      step('i-clock-long', `長 Call ≥${f.longMin} 分`, f.long, f.longRate, '占 >N 分') +
+      step('i-cal-check', '同意時間', f.invites, f.inviteRate, '邀約率');
     renderIceStats(f);
   }
 
@@ -365,10 +382,17 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
     const noRetN = state.calls.filter((c) => classifyCallDuration(c.durationSec, state.settings) === 'no-retention').length;
     const okN = state.calls.filter((c) => classifyCallDuration(c.durationSec, state.settings) === 'ok').length;
     const unkN = state.calls.length - shortN - noRetN - okN;
-    el.innerHTML = `<p class="hint slog-ice-line">本機錄音：<b>${shortN}</b> 通短通（&lt;3 分）· <b>${noRetN}</b> 通未留存（&lt;${state.settings.shortMin} 分）· <b>${okN}</b> 通已留存${unkN ? ` · ${unkN} 通時長未知（匯入後可自動讀取）` : ''}。破冰複盤請先篩「短通」批次分析。</p>`;
-    if (f?.connected) {
-      el.innerHTML += `<p class="hint">當日留存率 ${fmtPct(f.retentionRate ?? f.overRate)}（${f.over}/${f.connected} 接通聊滿 &gt;${f.shortMin} 分）</p>`;
+    if (!state.calls.length) {
+      el.innerHTML = '';
+      return;
     }
+    const chip = (cls, n, label, title) => `<span class="slog-tag ${cls}" title="${title}"><b>${n}</b> ${label}</span>`;
+    el.innerHTML =
+      `<svg class="ic" aria-hidden="true"><use href="#i-wave"/></svg>` +
+      chip('bad', shortN, '短通', '< 3 分；破冰複盤請先篩「短通」批次分析') +
+      chip('warn', noRetN, '未留存', `< ${state.settings.shortMin} 分`) +
+      chip('ok', okN, '已留存', `≥ ${state.settings.shortMin} 分`) +
+      (unkN ? chip('', unkN, '時長未知', '匯入後可自動讀取') : '');
   }
 
   let daySaveTimer = null;
