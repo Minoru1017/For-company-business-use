@@ -6,7 +6,7 @@
 .backup-strip.due .backup-strip-text::before { content:"⚠ "; color:var(--warn); }
 .backup-strip button { flex-shrink:0; padding:6px 14px; font-size:.78rem; }
 .app-sidebar-backup { position:relative; }
-.app-sidebar-backup:hover { color:var(--text); background:rgba(255,255,255,.05); }
+.app-sidebar-backup:hover { color:var(--text); background:rgba(27,27,26,0.04); }
 .app-sidebar-backup.due::after { content:""; position:absolute; top:4px; right:0; width:6px; height:6px; border-radius:50%; background:var(--warn); }
 .backup-dialog { width:min(600px,100%); }
 .backup-head { display:flex; align-items:flex-start; justify-content:space-between; gap:var(--s3); margin-bottom:var(--s2); }

@@ -12,7 +12,7 @@
 .dr-missing.warn { color:var(--warn); }
 .dr-missing.ok { color:var(--ok); }
 .dr-stats { display:flex; flex-wrap:wrap; gap:8px; }
-.dr-chip { flex:1 1 110px; display:flex; flex-direction:column; gap:2px; padding:8px 12px; border:1px solid var(--border); border-radius:6px; background:rgba(37,47,61,.45); }
+.dr-chip { flex:1 1 110px; display:flex; flex-direction:column; gap:2px; padding:8px 12px; border:1px solid var(--border); border-radius:6px; background:#fff; }
 .dr-chip b { font-family:var(--disp); font-size:1.25rem; line-height:1.1; }
 .dr-chip span { font-size:.72rem; color:var(--muted); }
 .dr-chip.ok b { color:var(--ok); }
@@ -21,7 +21,7 @@
 .dr-filters input[type="search"] { flex:1; min-width:180px; }
 .dr-due { display:flex; align-items:center; gap:6px; font-size:.78rem; color:var(--muted); }
 .dr-list { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:6px; max-height:420px; overflow:auto; }
-.dr-item { display:flex; align-items:stretch; gap:2px; border:1px solid var(--border); border-radius:6px; background:rgba(37,47,61,.3); }
+.dr-item { display:flex; align-items:stretch; gap:2px; border:1px solid var(--border); border-radius:6px; background:#fff; }
 .dr-item.active { border-color:var(--accent); background:rgba(226,87,63,.08); }
 .dr-open { flex:1; min-width:0; display:flex; flex-wrap:wrap; align-items:center; gap:4px 8px; padding:8px 10px; text-align:left; border:none; background:transparent; box-shadow:none; font-family:var(--sans); letter-spacing:0; }
 .dr-open:hover { transform:none; box-shadow:none; }
@@ -35,7 +35,7 @@
 @media (max-width:900px) { .dr-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } }
 
 /* DEMO 錄影上傳區 */
-.dr-video { display:flex; flex-direction:column; gap:8px; padding:12px; border:1px solid var(--border); border-radius:8px; background:rgba(37,47,61,.3); }
+.dr-video { display:flex; flex-direction:column; gap:8px; padding:12px; border:1px solid var(--border); border-radius:8px; background:#fff; }
 .dr-video-head { display:flex; flex-wrap:wrap; align-items:baseline; gap:2px 10px; }
 .dr-video-head b { font-size:.88rem; }
 .dr-video-head small { font-size:.72rem; color:var(--muted); }

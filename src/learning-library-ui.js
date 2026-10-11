@@ -32,7 +32,7 @@ export function initDayTypeHome(deps = {}) {
         ${Object.values(DAY_TYPES)
           .map(
             (t) =>
-              `<button type="button" class="day-type-btn ${type === t.key ? 'active' : ''}" data-day-type="${t.key}">${t.label}</button>`
+              `<button type="button" class="day-type-btn ${type === t.key ? 'active' : ''}" data-day-type="${t.key}" title="${escapeHTML(t.hint)}">${t.label}</button>`
           )
           .join('')}
       </div>
