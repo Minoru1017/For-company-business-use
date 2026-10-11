@@ -97,13 +97,13 @@ export function symptomLogTemplate() {
       <div class="card slog-funnel">
         <h2 id="slDayTitle"></h2>
         <div class="slog-funnel-grid">
-          <label>撥出<input type="number" min="0" inputmode="numeric" data-day="dialed" placeholder="0"></label>
-          <label>接通<input type="number" min="0" inputmode="numeric" data-day="connected" placeholder="0"></label>
-          <label>超過 <span id="slShortMinLabel">5</span> 分<input type="number" min="0" inputmode="numeric" data-day="over5Manual" placeholder="自動"></label>
-          <label>長 Call（≥<span id="slLongMinLabel">15</span> 分）<input type="number" min="0" inputmode="numeric" data-day="longManual" placeholder="自動"></label>
-          <label>進邀約（客戶同意時間）<input type="number" min="0" inputmode="numeric" data-day="invites" placeholder="0" title="客戶明確同意某個諮詢／見面時間才計入，僅開口約不算"></label>
-          <label>Demo 出席<input type="number" min="0" inputmode="numeric" data-day="demos" placeholder="0" title="實際出席 Demo 才計入"></label>
-          <label>完成承攬<input type="number" min="0" inputmode="numeric" data-day="contracts" placeholder="0" title="完成承攬才計入"></label>
+          <label><span class="slog-funnel-label">撥出</span><input type="number" min="0" inputmode="numeric" data-day="dialed" placeholder="0"></label>
+          <label><span class="slog-funnel-label">接通</span><input type="number" min="0" inputmode="numeric" data-day="connected" placeholder="0"></label>
+          <label><span class="slog-funnel-label">超過 <span id="slShortMinLabel">5</span> 分</span><input type="number" min="0" inputmode="numeric" data-day="over5Manual" placeholder="自動"></label>
+          <label><span class="slog-funnel-label">長 Call（≥<span id="slLongMinLabel">15</span> 分）</span><input type="number" min="0" inputmode="numeric" data-day="longManual" placeholder="自動"></label>
+          <label><span class="slog-funnel-label">進邀約（客戶同意時間）</span><input type="number" min="0" inputmode="numeric" data-day="invites" placeholder="0" title="客戶明確同意某個諮詢／見面時間才計入，僅開口約不算"></label>
+          <label><span class="slog-funnel-label">Demo 出席</span><input type="number" min="0" inputmode="numeric" data-day="demos" placeholder="0" title="實際出席 Demo 才計入"></label>
+          <label><span class="slog-funnel-label">完成承攬</span><input type="number" min="0" inputmode="numeric" data-day="contracts" placeholder="0" title="完成承攬才計入"></label>
         </div>
         <p class="hint">留存率＝超過 N 分通 ÷ 接通（破冰留客）｜邀約率＝進邀約（客戶同意時間）÷ 超過 N 分通。Demo 與承攬會帶入本月作戰儀表板。</p>
         <div class="slog-funnel-bar" id="slFunnelBar"></div>

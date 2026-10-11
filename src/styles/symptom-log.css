@@ -128,9 +128,11 @@
 .slog-week-sym:empty { display:none; }
 .slog-funnel-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(130px,1fr)); gap:10px; margin-bottom:12px; }
 .slog-funnel-grid label, .slog-note-grid label, .slog-settings label { display:flex; flex-direction:column; gap:6px; font-size:.78rem; color:var(--muted); }
+/* 標籤文字包成單一 flex 子項，避免「超過 <span>N</span> 分」被拆成多行垂直堆疊 */
+.slog-funnel-label { display:block; line-height:1.35; }
 .slog-funnel-grid input, .slog-note-grid input, .slog-settings input, .slog-note textarea { width:100%; padding:9px 11px; border-radius:6px; border:1px solid var(--border);
   background:var(--panel2); color:var(--text); font-family:var(--sans); font-size:.9rem; }
-.slog-funnel-grid input { font-family:var(--mono); font-size:1.05rem; }
+.slog-funnel-grid input { margin-top:auto; font-family:var(--mono); font-size:1.05rem; }
 .slog-funnel-bar { display:flex; flex-wrap:wrap; gap:8px; }
 .slog-step { flex:1 1 120px; display:flex; flex-direction:column; gap:2px; padding:10px 12px; border:1px solid var(--border); border-radius:6px; background:#fff; }
 .slog-step-n { font-family:var(--acid); font-size:1.5rem; line-height:1; color:var(--text); }
