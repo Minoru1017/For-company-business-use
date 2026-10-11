@@ -33,14 +33,14 @@ body::after  { background:radial-gradient(circle at 40% 40%, rgba(132,147,168,.1
 
 /* ---- 玻璃面板改霧藍 ---- */
 .card, .report-shell, #drop, #labelList, .quota-box, .stats {
-  background:rgba(33,42,54,.6);
-  border:1px solid rgba(232,228,220,.09);
+  background:#fff;
+  border:1px solid rgba(27,27,26,0.072);
 }
-.stat { background:rgba(37,47,61,.75); }
+.stat { background:#fff; }
 .step, .layer, .rule-card, .purpose-card, .purpose-playbook, .bridge-mode-panel,
 .bridge-log-panel, .bridge-wait-progress, .demo-offline, .field, .bridge-token, .bridge-file,
 .bridge-advanced, .bridge-team, .bridge-team-text {
-  background:rgba(37,47,61,.62); border-color:var(--border);
+  background:#fff; border-color:var(--border);
 }
 .bridge-log, .bridge-path, .demo-guide-tree { background:#141a22; }
 
@@ -162,8 +162,8 @@ button.primary:hover { background:linear-gradient(180deg,#ffffff,#e6e0d1);
 .footer .mono { color:#5b6573; }
 .barcode { background:repeating-linear-gradient(90deg,#5b6573 0 2px,transparent 2px 5px,#5b6573 5px 6px,transparent 6px 10px); }
 .faq li .idx { color:var(--tab-kraft); }
-.faq li:hover { background:rgba(232,228,220,.03); }
+.faq li:hover { background:rgba(27,27,26,0.024); }
 .sec-head .num { color:var(--ink); }
 
 /* Toast */
-#toast { border-radius:4px; background:rgba(33,42,54,.9); border-color:rgba(232,228,220,.16); }
+#toast { border-radius:4px; background:#fff; border-color:rgba(27,27,26,0.128); }

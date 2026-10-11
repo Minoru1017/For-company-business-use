@@ -17,7 +17,7 @@ function keyMomentPlugin(moments) {
         ctx.save();
         ctx.fillStyle = m.color;
         ctx.fillRect(x1, chartArea.top, x2 - x1, chartArea.bottom - chartArea.top);
-        ctx.strokeStyle = 'rgba(255, 210, 80, 0.55)';
+        ctx.strokeStyle = 'rgba(226, 87, 63, 0.7)';
         ctx.lineWidth = 1;
         ctx.strokeRect(x1, chartArea.top, x2 - x1, chartArea.bottom - chartArea.top);
         ctx.restore();
@@ -58,7 +58,7 @@ export function renderKeyMomentsLegend(moments) {
 
 export function drawChart(segs, moments = []) {
   const vals = segs.map((s) => s.chars);
-  const colors = segs.map((s) => (s.spk === 'S' ? 'rgba(237,237,237,.9)' : 'rgba(255,90,60,.9)'));
+  const colors = segs.map((s) => (s.spk === 'S' ? 'rgba(27,27,26,.92)' : 'rgba(247,197,49,.95)'));
   const borders = momentBarHighlight(segs, moments);
   if (chart) chart.destroy();
   chart = new Chart($('chart'), {
@@ -67,7 +67,7 @@ export function drawChart(segs, moments = []) {
       labels: segs.map((s) => fmt(s.start)),
       datasets: [
         {
-          label: '每句字數（白=業務 紅=客戶）',
+          label: '每句字數（黑=業務 黃=客戶）',
           data: vals,
           backgroundColor: colors,
           borderColor: borders,
@@ -89,7 +89,7 @@ export function drawChart(segs, moments = []) {
         }
       },
       plugins: {
-        legend: { labels: { color: '#8a8a8a', font: { family: 'JetBrains Mono' } } },
+        legend: { labels: { color: '#8b8880', font: { family: 'Plus Jakarta Sans' } } },
         tooltip: {
           callbacks: {
             afterBody: (items) => {
@@ -104,8 +104,8 @@ export function drawChart(segs, moments = []) {
         },
       },
       scales: {
-        x: { ticks: { color: '#5a5a5a', maxTicksLimit: 18, font: { family: 'JetBrains Mono', size: 10 } }, grid: { color: 'rgba(255,255,255,.05)' } },
-        y: { ticks: { color: '#5a5a5a', font: { family: 'JetBrains Mono', size: 10 } }, grid: { color: 'rgba(255,255,255,.05)' } },
+        x: { ticks: { color: '#8b8880', maxTicksLimit: 18, font: { family: 'JetBrains Mono', size: 10 } }, grid: { color: 'rgba(27,27,26,.06)' } },
+        y: { ticks: { color: '#8b8880', font: { family: 'JetBrains Mono', size: 10 } }, grid: { color: 'rgba(27,27,26,.06)' } },
       },
     },
   });

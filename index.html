@@ -6,62 +6,95 @@
   <meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self' https://cdn.jsdelivr.net; style-src 'self' https://fonts.googleapis.com 'unsafe-inline'; font-src https://fonts.gstatic.com; connect-src 'self' http://127.0.0.1:8765 https://generativelanguage.googleapis.com https: http:; img-src 'self' data:; media-src 'self' blob:; base-uri 'self'; object-src 'none';">
   <title>CALL COACH｜顧問式銷售電訪分析</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=JetBrains+Mono:wght@400;600&family=Noto+Sans+TC:wght@400;500;700;900&family=Noto+Serif+TC:wght@600;700&family=Archivo+Black&family=Oswald:wght@500;700&family=Doto:wght@600;800&family=Caveat:wght@600;700&family=Manrope:wght@700;800&display=swap" rel="stylesheet">
+  <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;600;700&family=JetBrains+Mono:wght@400;600&family=Noto+Sans+TC:wght@400;500;700;900&family=Noto+Serif+TC:wght@600;700&family=Archivo+Black&family=Oswald:wght@500;700&family=Doto:wght@600;800&family=Caveat:wght@600;700&family=Manrope:wght@700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/src/styles.css">
 </head>
 <body>
+<svg xmlns="http://www.w3.org/2000/svg" width="0" height="0" style="position:absolute" aria-hidden="true" focusable="false">
+  <defs>
+    <symbol id="i-dev" viewBox="0 0 24 24"><path d="M5 4h4l2 5-2.5 1.5a11 11 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2z"/></symbol>
+    <symbol id="i-demo" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="3.5"/><path d="M10.2 9.4v5.2l4.4-2.6z"/></symbol>
+    <symbol id="i-drill" viewBox="0 0 24 24"><circle cx="12" cy="12" r="8.5"/><circle cx="12" cy="12" r="4.5"/><circle cx="12" cy="12" r="1"/></symbol>
+    <symbol id="i-log" viewBox="0 0 24 24"><path d="M3 12h4l2.4-6 4.2 12 2.4-6H21"/></symbol>
+    <symbol id="i-brief" viewBox="0 0 24 24"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5.5 11a6.5 6.5 0 0 0 13 0M12 17.5V21"/></symbol>
+    <symbol id="i-deck" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="12" rx="2.5"/><path d="M8 20h8M12 16v4"/></symbol>
+    <symbol id="i-home" viewBox="0 0 24 24"><path d="M4 11.2 12 4l8 7.2V19a1 1 0 0 1-1 1h-4.5v-5.5h-5V20H5a1 1 0 0 1-1-1z"/></symbol>
+    <symbol id="i-search" viewBox="0 0 24 24"><circle cx="11" cy="11" r="6.5"/><path d="m16 16 4 4"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><path d="M12 5v14M5 12h14"/></symbol>
+    <symbol id="i-backup" viewBox="0 0 24 24"><path d="M12 4v11M7.5 10.5 12 15l4.5-4.5M5 20h14"/></symbol>
+    <symbol id="i-trend" viewBox="0 0 24 24"><path d="m4 17 5-6 4 3 7-8"/><path d="M15 6h5v5"/></symbol>
+    <symbol id="i-arrow" viewBox="0 0 24 24"><path d="M7 17 17 7M9 7h8v8"/></symbol>
+  </defs>
+</svg>
 <div class="side-label l">ARCHIVE LOG ● 私/人/稿/件 ● CONSULTATIVE SELLING</div>
 <div class="side-label r">FILE_01 // LOCAL PROCESSING ● 禁止上雲</div>
 
 <section class="mode-chooser" id="modeChooser">
   <div class="mode-chooser-inner">
-    <p class="mode-chooser-kicker">CALL COACH</p>
-    <h2 class="mode-chooser-title">選擇工作流程</h2>
-    <p class="mode-chooser-lead">同一套工具，圍繞<b>做 → 聽自己 → 找問題 → 再做</b>——不是用 AI 代替你想。</p>
-    <div id="dayTypeToggle" class="day-type-toggle card"></div>
-    <div id="learningOffDayPanel" class="learning-off-wrap" hidden></div>
-    <section id="followUpHome" class="cp-due" aria-label="今天該跟進" hidden></section>
-    <div class="mode-cards">
-      <button type="button" class="mode-card" data-mode="dev" data-code="CODE_001 // DRIFT">
-        <span class="mode-card-tag">開發 · 電訪</span>
-        <h3>電訪逐字稿</h3>
-        <p><b>找問題</b>：規則分析本機隨時可用；三通自寫複盤後，AI 只做交叉對照。</p>
-        <span class="mode-card-cta">上傳分析 →</span>
-      </button>
-      <button type="button" class="mode-card accent" data-mode="demo" data-code="CODE_002 // SIGNAL">
-        <span class="mode-card-tag">DEMO · 錄影</span>
-        <h3>錄影轉逐字稿</h3>
-        <p><b>輸入＋回放</b>：MP4 本機轉錄；要變強仍得回到自己打、自己講。</p>
-        <span class="mode-card-cta">本機轉錄 →</span>
-      </button>
-      <button type="button" class="mode-card drill" data-mode="drill" data-code="CODE_003 // SPAR">
-        <span class="mode-card-tag">開發 · 陪練</span>
-        <h3>臨場反應陪練</h3>
-        <p><b>下水練</b>：你主動問、限時接話——被反駁與被掛斷，聽再多分享也替代不了。</p>
-        <span class="mode-card-cta">開始撥號 →</span>
-      </button>
-      <button type="button" class="mode-card log" data-mode="log" data-code="CODE_004 // PULSE">
-        <span class="mode-card-tag">開發 · 症狀</span>
-        <h3>開發症狀紀錄</h3>
-        <p><b>聽自己</b>：漏斗證明有在動 → 批次分析 → 改善筆記只改一件事 → 再去做。</p>
-        <span class="mode-card-cta">開始記錄 →</span>
-      </button>
-      <button type="button" class="mode-card brief" data-mode="brief" data-code="CODE_005 // BRIEF">
-        <span class="mode-card-tag">主管 · 早會</span>
-        <h3>主管早會語音紀錄</h3>
-        <p><b>聽指示、定方向</b>：按錄音即時轉文字 → 萃取重點 → 你確認後套用成專案方向。</p>
-        <span class="mode-card-cta">開始錄音 →</span>
-      </button>
-      <button type="button" class="mode-card deck" data-mode="deck" data-code="CODE_006 // DECK">
-        <span class="mode-card-tag">邀約 · DEMO</span>
-        <h3>DEMO 簡報</h3>
-        <p><b>投其所好</b>：有邀約的開發紀錄 → 只講他喜歡、想知道的事 → 可直接簡報或下載 PPTX。</p>
-        <span class="mode-card-cta">做簡報 →</span>
-      </button>
+    <header class="home-top">
+      <div class="home-brand"><span class="home-brand-mark" aria-hidden="true">C</span><span class="home-brand-name">CALL COACH</span></div>
+      <div id="dayTypeToggle" class="day-type-toggle"></div>
+    </header>
+    <div class="home-grid">
+      <div class="home-main">
+        <div class="home-hero">
+          <p class="mode-chooser-kicker">CALL COACH</p>
+          <h2 class="mode-chooser-title">選擇工作流程</h2>
+          <p class="mode-chooser-lead">同一套工具，圍繞<b>做 → 聽自己 → 找問題 → 再做</b>——不是用 AI 代替你想。</p>
+        </div>
+        <div id="learningOffDayPanel" class="learning-off-wrap" hidden></div>
+        <div class="mode-cards">
+          <button type="button" class="mode-card" data-mode="dev" data-code="CODE_001 // DRIFT">
+            <span class="mode-card-icon"><svg class="ic" aria-hidden="true"><use href="#i-dev"/></svg></span>
+            <span class="mode-card-tag">開發 · 電訪</span>
+            <h3>電訪逐字稿</h3>
+            <p><b>找問題</b>：規則分析本機隨時可用；三通自寫複盤後，AI 只做交叉對照。</p>
+            <span class="mode-card-cta">上傳分析 →</span>
+          </button>
+          <button type="button" class="mode-card accent" data-mode="demo" data-code="CODE_002 // SIGNAL">
+            <span class="mode-card-icon"><svg class="ic" aria-hidden="true"><use href="#i-demo"/></svg></span>
+            <span class="mode-card-tag">DEMO · 錄影</span>
+            <h3>錄影轉逐字稿</h3>
+            <p><b>輸入＋回放</b>：MP4 本機轉錄；要變強仍得回到自己打、自己講。</p>
+            <span class="mode-card-cta">本機轉錄 →</span>
+          </button>
+          <button type="button" class="mode-card drill" data-mode="drill" data-code="CODE_003 // SPAR">
+            <span class="mode-card-icon"><svg class="ic" aria-hidden="true"><use href="#i-drill"/></svg></span>
+            <span class="mode-card-tag">開發 · 陪練</span>
+            <h3>臨場反應陪練</h3>
+            <p><b>下水練</b>：你主動問、限時接話——被反駁與被掛斷，聽再多分享也替代不了。</p>
+            <span class="mode-card-cta">開始撥號 →</span>
+          </button>
+          <button type="button" class="mode-card log" data-mode="log" data-code="CODE_004 // PULSE">
+            <span class="mode-card-icon"><svg class="ic" aria-hidden="true"><use href="#i-log"/></svg></span>
+            <span class="mode-card-tag">開發 · 症狀</span>
+            <h3>開發症狀紀錄</h3>
+            <p><b>聽自己</b>：漏斗證明有在動 → 批次分析 → 改善筆記只改一件事 → 再去做。</p>
+            <span class="mode-card-cta">開始記錄 →</span>
+          </button>
+          <button type="button" class="mode-card brief" data-mode="brief" data-code="CODE_005 // BRIEF">
+            <span class="mode-card-icon"><svg class="ic" aria-hidden="true"><use href="#i-brief"/></svg></span>
+            <span class="mode-card-tag">主管 · 早會</span>
+            <h3>主管早會語音紀錄</h3>
+            <p><b>聽指示、定方向</b>：按錄音即時轉文字 → 萃取重點 → 你確認後套用成專案方向。</p>
+            <span class="mode-card-cta">開始錄音 →</span>
+          </button>
+          <button type="button" class="mode-card deck" data-mode="deck" data-code="CODE_006 // DECK">
+            <span class="mode-card-icon"><svg class="ic" aria-hidden="true"><use href="#i-deck"/></svg></span>
+            <span class="mode-card-tag">邀約 · DEMO</span>
+            <h3>DEMO 簡報</h3>
+            <p><b>投其所好</b>：有邀約的開發紀錄 → 只講他喜歡、想知道的事 → 可直接簡報或下載 PPTX。</p>
+            <span class="mode-card-cta">做簡報 →</span>
+          </button>
+        </div>
+        <div id="coachPhilosophyHome"></div>
+      </div>
+      <aside class="home-side">
+        <section id="followUpHome" class="cp-due" aria-label="今天該跟進" hidden></section>
+        <section id="customerProgressHome" class="cp-home" aria-label="客戶進度" hidden></section>
+        <div id="backupHome" class="backup-strip" hidden></div>
+      </aside>
     </div>
-    <section id="customerProgressHome" class="cp-home" aria-label="客戶進度" hidden></section>
-    <div id="backupHome" class="backup-strip" hidden></div>
-    <div id="coachPhilosophyHome"></div>
     <p class="hint mode-chooser-hint">首次使用 DEMO：<strong>公司電腦</strong>請下載 <a href="https://github.com/Minoru1017/For-company-business-use/releases/latest/download/CallCoachAssistant-Setup.exe" target="_blank" rel="noopener noreferrer">CallCoachAssistant-Setup.exe</a> 安裝精靈（不需 .cmd）；安裝完成後從開始選單啟動助手。</p>
   </div>
 </section>
@@ -77,23 +110,23 @@
     <aside class="app-sidebar" id="appSidebar" aria-label="工作區導覽">
       <div class="app-sidebar-head">
         <button type="button" class="app-sidebar-brand" id="sidebarHome" title="回到模式選擇">
-          <span class="app-sidebar-brand-mark" aria-hidden="true">▲</span><span class="app-sidebar-brand-text">CALL COACH</span>
+          <span class="app-sidebar-brand-mark" aria-hidden="true">C</span><span class="app-sidebar-brand-text">CALL COACH</span>
         </button>
         <button type="button" class="app-sidebar-toggle" id="sidebarCollapse" aria-label="收合側欄" title="收合側欄">‹</button>
       </div>
       <nav class="app-nav mode-bar" id="modeBar" hidden aria-label="工作模式">
         <p class="app-sidebar-section">工作模式</p>
-        <button type="button" class="mode-pill app-nav-item" data-mode="dev" title="電訪逐字稿"><span class="app-nav-code">01</span><span class="app-nav-text"><span class="app-nav-label">電訪逐字稿</span><span class="app-nav-sub">找問題</span></span></button>
-        <button type="button" class="mode-pill app-nav-item" data-mode="demo" title="DEMO 轉錄"><span class="app-nav-code">02</span><span class="app-nav-text"><span class="app-nav-label">DEMO 轉錄</span><span class="app-nav-sub">輸入＋回放</span></span></button>
-        <button type="button" class="mode-pill app-nav-item" data-mode="drill" title="臨場反應陪練"><span class="app-nav-code">03</span><span class="app-nav-text"><span class="app-nav-label">臨場陪練</span><span class="app-nav-sub">下水練</span></span></button>
-        <button type="button" class="mode-pill app-nav-item" data-mode="log" title="開發症狀紀錄"><span class="app-nav-code">04</span><span class="app-nav-text"><span class="app-nav-label">症狀紀錄</span><span class="app-nav-sub">聽自己</span></span></button>
-        <button type="button" class="mode-pill app-nav-item" data-mode="brief" title="主管早會 · 語音紀錄"><span class="app-nav-code">05</span><span class="app-nav-text"><span class="app-nav-label">主管早會</span><span class="app-nav-sub">定方向</span></span></button>
-        <button type="button" class="mode-pill app-nav-item" data-mode="deck" title="有邀約開發轉 DEMO 簡報"><span class="app-nav-code">06</span><span class="app-nav-text"><span class="app-nav-label">DEMO 簡報</span><span class="app-nav-sub">投其所好</span></span></button>
+        <button type="button" class="mode-pill app-nav-item" data-mode="dev" title="電訪逐字稿"><span class="app-nav-icon"><svg class="ic" aria-hidden="true"><use href="#i-dev"/></svg></span><span class="app-nav-text"><span class="app-nav-label">電訪逐字稿</span><span class="app-nav-sub">找問題</span></span></button>
+        <button type="button" class="mode-pill app-nav-item" data-mode="demo" title="DEMO 轉錄"><span class="app-nav-icon"><svg class="ic" aria-hidden="true"><use href="#i-demo"/></svg></span><span class="app-nav-text"><span class="app-nav-label">DEMO 轉錄</span><span class="app-nav-sub">輸入＋回放</span></span></button>
+        <button type="button" class="mode-pill app-nav-item" data-mode="drill" title="臨場反應陪練"><span class="app-nav-icon"><svg class="ic" aria-hidden="true"><use href="#i-drill"/></svg></span><span class="app-nav-text"><span class="app-nav-label">臨場陪練</span><span class="app-nav-sub">下水練</span></span></button>
+        <button type="button" class="mode-pill app-nav-item" data-mode="log" title="開發症狀紀錄"><span class="app-nav-icon"><svg class="ic" aria-hidden="true"><use href="#i-log"/></svg></span><span class="app-nav-text"><span class="app-nav-label">症狀紀錄</span><span class="app-nav-sub">聽自己</span></span></button>
+        <button type="button" class="mode-pill app-nav-item" data-mode="brief" title="主管早會 · 語音紀錄"><span class="app-nav-icon"><svg class="ic" aria-hidden="true"><use href="#i-brief"/></svg></span><span class="app-nav-text"><span class="app-nav-label">主管早會</span><span class="app-nav-sub">定方向</span></span></button>
+        <button type="button" class="mode-pill app-nav-item" data-mode="deck" title="有邀約開發轉 DEMO 簡報"><span class="app-nav-icon"><svg class="ic" aria-hidden="true"><use href="#i-deck"/></svg></span><span class="app-nav-text"><span class="app-nav-label">DEMO 簡報</span><span class="app-nav-sub">投其所好</span></span></button>
       </nav>
       <div class="app-sidebar-recent">
-        <button type="button" class="app-sidebar-new" id="sidebarNew" title="新增逐字稿"><span class="app-sidebar-new-icon" aria-hidden="true">＋</span><span class="app-sidebar-new-text">新增逐字稿</span></button>
+        <button type="button" class="app-sidebar-new" id="sidebarNew" title="新增逐字稿"><span class="app-sidebar-new-icon" aria-hidden="true"><svg class="ic" aria-hidden="true"><use href="#i-plus"/></svg></span><span class="app-sidebar-new-text">新增逐字稿</span></button>
         <label class="app-sidebar-search">
-          <span class="app-sidebar-search-icon" aria-hidden="true">⌕</span>
+          <span class="app-sidebar-search-icon" aria-hidden="true"><svg class="ic" aria-hidden="true"><use href="#i-search"/></svg></span>
           <input type="search" id="sidebarSearch" placeholder="搜尋最近項目" autocomplete="off">
         </label>
         <p class="app-sidebar-section">最近項目</p>
@@ -221,7 +254,7 @@
     </section>
 
     <section class="sec">
-      <div class="sec-head"><span class="num">07</span><h2>對話節奏圖</h2><span class="tag">白=業務 ・ 紅=客戶 ・ 黃框=關鍵話點</span></div>
+      <div class="sec-head"><span class="num">07</span><h2>對話節奏圖</h2><span class="tag">黑=業務 ・ 黃=客戶 ・ 框線=關鍵話點</span></div>
       <div class="card">
         <div class="chart-box"><canvas id="chart"></canvas></div>
         <div class="key-moments-legend" id="keyMomentsLegend"></div>

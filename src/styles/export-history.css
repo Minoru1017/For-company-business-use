@@ -1,7 +1,7 @@
 /* ---- 把結果帶走：匯出列 ---- */
 .export-bar { display:flex; flex-direction:column; gap:12px; }
 .export-group { display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:12px 14px;
-  background:rgba(37,47,61,.45); border:1px solid var(--border); border-radius:6px; }
+  background:#fff; border:1px solid var(--border); border-radius:6px; }
 .export-group[hidden] { display:none; }
 .export-label { font-family:var(--mono); font-size:.62rem; letter-spacing:.2em; color:var(--muted); min-width:110px; text-transform:uppercase; }
 .export-group button { font-size:.8rem; padding:8px 16px; }
@@ -50,7 +50,7 @@
 .coach-cycle.compact .coach-cycle-item span { display:none; }
 .coach-hero-wrap { margin:0 0 12px; }
 .coach-hero-bar { display:flex; flex-wrap:wrap; gap:var(--s1) var(--s3); align-items:baseline; padding:var(--s2) var(--s3);
-  border-left:2px solid var(--muted); border-radius:0 4px 4px 0; font-size:.8rem; background:rgba(232,228,220,.03); }
+  border-left:2px solid var(--muted); border-radius:0 4px 4px 0; font-size:.8rem; background:rgba(27,27,26,0.024); }
 .coach-hero-bar.coach-pace-ok { border-left-color:var(--ok); }
 .coach-hero-bar.coach-pace-warn { border-left-color:var(--warn); }
 .coach-hero-mode { flex:0 0 auto; font-family:var(--mono); font-size:.62rem; letter-spacing:.18em; color:var(--tab-paper); text-transform:uppercase; }
@@ -71,7 +71,7 @@
 .rj-summary .rj-ok { color:var(--ok,#6bc06b); }
 .rj-archive-summary { color:var(--muted); white-space:nowrap; }
 .reflection-journal-dialog { width:min(720px,100%); }
-.rj-draft-status { margin:8px 0 12px; padding:7px 10px; border-left:3px solid var(--muted); background:rgba(0,0,0,.1); }
+.rj-draft-status { margin:8px 0 12px; padding:7px 10px; border-left:3px solid var(--muted); background:rgba(27,27,26,0.03); }
 .rj-draft-status.saving { border-color:var(--warn); color:var(--warn); }
 .rj-draft-status.saved { border-color:var(--ok); color:var(--ok); }
 .rj-draft-status.recovered { border-color:var(--accent); color:var(--accent); }
@@ -101,9 +101,9 @@
 .rjt-timeline { max-height:calc(90vh - 190px); overflow:auto; padding:16px 22px 22px; }
 .rjt-empty { padding:34px 20px; border:1px dashed var(--border); border-radius:8px; text-align:center; }
 .rjt-empty p { margin:8px 0 0; }
-.rjt-day { position:relative; margin:0 0 10px; border:1px solid var(--border); border-radius:8px; background:rgba(0,0,0,.1); overflow:hidden; }
+.rjt-day { position:relative; margin:0 0 10px; border:1px solid var(--border); border-radius:8px; background:rgba(27,27,26,0.03); overflow:hidden; }
 .rjt-day::before { content:""; position:absolute; top:0; bottom:0; left:0; width:3px; background:var(--tab-olive); }
-.rjt-day[open] { border-color:rgba(232,228,220,.22); }
+.rjt-day[open] { border-color:rgba(27,27,26,0.176); }
 .rjt-day summary { display:grid; grid-template-columns:auto 1fr auto auto; align-items:baseline; gap:10px; padding:12px 14px 12px 17px; cursor:pointer; list-style:none; }
 .rjt-day summary::-webkit-details-marker { display:none; }
 .rjt-date { font-family:var(--disp); font-size:1rem; color:var(--text); }
@@ -140,7 +140,7 @@
 }
 
 .dev-notes-out { width:100%; margin:8px 0 12px; font-family:var(--mono); font-size:.78rem; line-height:1.55;
-  background:rgba(0,0,0,.35); border:1px solid var(--border); border-radius:8px; color:var(--text); padding:12px; resize:vertical; }
+  background:rgba(27,27,26,0.07); border:1px solid var(--border); border-radius:8px; color:var(--text); padding:12px; resize:vertical; }
 
 /* ---- 最近分析 ---- */
 .history-sec details { border:1px dashed var(--border); border-radius:6px; padding:10px 14px; }
@@ -153,7 +153,7 @@
 .history-hint { margin:0 0 0 auto; }
 .history-list { list-style:none; margin:12px 0 0; padding:0; display:flex; flex-direction:column; gap:6px; }
 .history-item { display:flex; align-items:center; gap:12px; flex-wrap:wrap; padding:10px 12px;
-  background:rgba(37,47,61,.45); border:1px solid var(--border); border-radius:6px; font-size:.82rem; }
+  background:#fff; border:1px solid var(--border); border-radius:6px; font-size:.82rem; }
 .history-item.current { border-color:var(--warn); }
 .history-main { display:flex; flex-direction:column; gap:2px; flex:1; min-width:200px; }
 .history-src { color:var(--text); font-weight:600; word-break:break-all; }

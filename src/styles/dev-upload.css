@@ -90,7 +90,7 @@ button:disabled { opacity:.4; cursor:not-allowed; }
 .purpose-card-head { font-weight:700; font-family:var(--disp); margin-bottom:4px; display:flex; align-items:center; gap:6px; flex-wrap:wrap; }
 .purpose-badge { font-family:var(--mono); font-size:.6rem; padding:2px 6px; border-radius:99px; }
 .purpose-badge.dom { background:rgba(255,210,80,.2); color:var(--warn); }
-.purpose-badge.sec { background:rgba(255,255,255,.08); color:var(--muted); }
+.purpose-badge.sec { background:rgba(27,27,26,0.064); color:var(--muted); }
 .purpose-desc { color:var(--muted); font-size:.72rem; margin-bottom:6px; }
 .purpose-ev { font-size:.7rem; color:var(--text); }
 .purpose-ev.muted { color:var(--muted); }
