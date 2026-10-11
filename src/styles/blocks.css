@@ -88,6 +88,16 @@ section.sec > .sec-head, .sec:nth-of-type(n) > .sec-head { position:static; min-
 .slog-cal .slog-today { position:absolute; top:4px; right:4px; height:36px; padding:0 16px; border-radius:999px; background:var(--deep); color:var(--brand); border-color:var(--deep); font-weight:700; z-index:1; }
 .slog-cal .slog-today:hover { background:var(--deep-2); color:var(--brand); }
 
+/* ---- 日曆格：有邀約成效的日子，右上缺一小角，缺角裡坐一枚純色方塊（綠＝同意 ≥2、紅＝同意 0） ---- */
+.slog-cell.blk, .slog-cell.blk.selected, .slog-cell.blk:hover { --blk-bg:#fff; --nw:22px; --nh:22px; --nr:6px; background:transparent; border-color:transparent; box-shadow:none; }
+.slog-cell.blk.selected { --blk-bg:var(--deep); }
+.slog-cell.blk::before { box-shadow:inset 0 0 0 1px var(--hairline); }
+.slog-cell.blk:hover::before { box-shadow:inset 0 0 0 1px var(--hairline-2); }
+.slog-cell.blk.selected::before { box-shadow:none; }
+.slog-cell-chip { position:absolute; top:3px; right:3px; width:14px; height:14px; border-radius:4px; background:var(--ok); z-index:1; }
+.slog-cell-chip.zero { background:var(--bad); }
+.slog-cell.blk > .slog-cell-n { right:24px; }
+
 /* ---- 症狀紀錄：當天卡的日期膠囊扣進左上缺角 ---- */
 .slog .card.slog-funnel { --blk-bg:var(--panel2); --nw:160px; --nh:46px; --nr:14px; padding-top:54px; }
 .slog-funnel > h2 { margin:0; }
@@ -115,4 +125,7 @@ section.sec > .sec-head, .sec:nth-of-type(n) > .sec-head { position:static; min-
   section.sec > .sec-head .num { top:6px; left:6px; }
   section.sec > .sec-head, .sec:nth-of-type(n) > .sec-head { padding-left:calc(var(--nw) - 4px); }
   .slog .card.slog-funnel { --nw:150px; }
+  .slog-cell.blk, .slog-cell.blk.selected, .slog-cell.blk:hover { --nw:18px; --nh:18px; --nr:5px; }
+  .slog-cell-chip { top:3px; right:3px; width:11px; height:11px; border-radius:3px; }
+  .slog-cell.blk > .slog-cell-n { top:auto; right:5px; bottom:5px; }
 }
