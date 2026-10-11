@@ -904,14 +904,11 @@ function setUploadUI({ state, message, pct = 0, showCancel = false }) {
 }
 
 function uploadMp4XHR(file, onProgress) {
-  return new Promise(async (resolve, reject) => {
-    let token;
-    try {
-      token = await ensureApiToken();
-    } catch (err) {
-      reject(err);
-      return;
-    }
+  return ensureApiToken().then((token) => sendUploadXhr(file, onProgress, token));
+}
+
+function sendUploadXhr(file, onProgress, token) {
+  return new Promise((resolve, reject) => {
     uploadXhr = new XMLHttpRequest();
     uploadStartAt = Date.now();
     uploadXhr.open('POST', `${LOCAL_API}/api/upload`);

@@ -25,6 +25,7 @@ export function exportBaseName(sourceName, date = new Date()) {
   const stem = String(sourceName || 'call')
     .replace(/\.vibe\.json$/i, '')
     .replace(/\.[A-Za-z0-9]{1,5}$/, '')
+    // eslint-disable-next-line no-control-regex -- 檔名需濾掉控制字元
     .replace(/[\\/:*?"<>|\x00-\x1f]+/g, '_')
     .replace(/\s+/g, ' ')
     .trim()

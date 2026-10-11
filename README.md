@@ -86,6 +86,9 @@ npm install
 npm run dev      # http://localhost:5173
 npm run build    # 建置到 dist/
 npm test         # Vitest
+npm run lint     # ESLint（錯誤會擋 CI，警告僅提示）
+npm run smoke    # 建置後用瀏覽器開六個模式，確認無白屏／console 錯誤（需先 npx playwright install chromium）
+npm run check    # lint + test + smoke
 ```
 
 ## 功能
