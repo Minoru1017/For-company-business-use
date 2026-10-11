@@ -5,12 +5,15 @@
 import {
   FITS,
   OUTCOMES,
+  REVIEWS_CHANGED_EVENT,
   REVIEW_TEXT_FIELDS,
   TIER_OPTIONS,
   emptyReview,
   filterReviews,
   followUpStatus,
+  formatAnalysisSummary,
   loadReviews,
+  mergeLinkFields,
   outcomeLabel,
   removeReview,
   reviewFileName,
@@ -23,6 +26,7 @@ import {
   saveReviews,
   tierLabel,
   upsertReview,
+  videoFromFile,
 } from './demo-review.js';
 import { escapeHTML } from './utils.js';
 
@@ -44,12 +48,27 @@ function downloadText(name, text, type = 'text/csv;charset=utf-8') {
  * @param {object} opts
  * @param {(deckId:string)=>boolean} opts.hasDeck  這份簡報還在不在
  * @param {(deckId:string)=>void} opts.onOpenDeck  切到那份簡報（會再呼叫 setDeck）
+ * @param {(file:File)=>Promise<{ok:boolean,reason?:string}>} [opts.onSendVideo]  把錄影送進 DEMO 轉錄
+ * @param {(historyId:string)=>boolean} [opts.hasAnalysis]  「最近分析」裡還找不找得到這筆
+ * @param {(historyId:string)=>void} [opts.onOpenAnalysis]  開啟那筆分析
  * @param {(msg:string)=>void} [opts.showToast]
- * @returns {{ setDeck(rec:object|null):void, refresh():void }}
+ * @returns {{ setDeck(rec:object|null):void, syncDeckInfo(rec:object):void, openReview(id:string):boolean, refresh():void }}
  */
-export function mountDemoReview(container, { hasDeck = () => false, onOpenDeck = () => {}, showToast } = {}) {
+export function mountDemoReview(
+  container,
+  { hasDeck = () => false, onOpenDeck = () => {}, onSendVideo, hasAnalysis = () => false, onOpenAnalysis, showToast } = {}
+) {
   const toast = (m) => showToast?.(m);
-  const state = { reviews: loadReviews(), reviewId: null, deck: null, filter: { outcome: '', followUp: false, q: '' }, saveT: null };
+  const state = {
+    reviews: loadReviews(),
+    reviewId: null,
+    deck: null,
+    filter: { outcome: '', followUp: false, q: '' },
+    saveT: null,
+    videoFile: null,
+    videoFileFor: null,
+    sending: false,
+  };
 
   container.innerHTML = `
     <section class="card dr-form">
@@ -71,6 +90,22 @@ export function mountDemoReview(container, { hasDeck = () => false, onOpenDeck =
         ${REVIEW_TEXT_FIELDS.map(
           (f) => `<label class="dk-field wide"><span>${escapeHTML(f.label)}</span><textarea class="field" data-dr="${f.key}" rows="${f.rows}" placeholder="${escapeHTML(f.placeholder)}"></textarea></label>`
         ).join('')}
+      </div>
+      <div class="dr-video" id="drVideo">
+        <div class="dr-video-head">
+          <b>DEMO 錄影</b>
+          <small>上傳這場 DEMO 的 MP4，送進「DEMO 轉錄」做逐字稿與分析；分析完成後結果會自動回填到這筆複盤。</small>
+        </div>
+        <div class="dr-video-drop" id="drVideoDrop" tabindex="0" role="button" aria-label="選擇或拖曳 DEMO 錄影 MP4">
+          <span id="drVideoDropText">拖曳 MP4 到這裡，或點此選擇檔案</span>
+          <input type="file" id="drVideoFile" accept=".mp4,video/mp4" hidden>
+        </div>
+        <p class="dr-video-state" id="drVideoState"></p>
+        <div class="dr-video-actions">
+          <button type="button" class="btn primary slog-mini" id="drVideoSend" hidden>送到 DEMO 轉錄分析</button>
+          <button type="button" class="btn slog-mini" id="drVideoOpen" hidden>開啟分析結果</button>
+          <button type="button" class="btn slog-mini" id="drVideoClear" hidden>移除錄影</button>
+        </div>
       </div>
       <div class="dr-foot">
         <span class="dr-missing" id="drMissing"></span>
@@ -103,6 +138,13 @@ export function mountDemoReview(container, { hasDeck = () => false, onOpenDeck =
     count: q('#drCount'),
     stats: q('#drStats'),
     list: q('#drList'),
+    videoDrop: q('#drVideoDrop'),
+    videoDropText: q('#drVideoDropText'),
+    videoFile: q('#drVideoFile'),
+    videoState: q('#drVideoState'),
+    videoSend: q('#drVideoSend'),
+    videoOpen: q('#drVideoOpen'),
+    videoClear: q('#drVideoClear'),
   };
 
   const current = () => state.reviews.find((r) => r.id === state.reviewId) || null;
@@ -144,6 +186,41 @@ export function mountDemoReview(container, { hasDeck = () => false, onOpenDeck =
     els.who.textContent = r?.deckId && hasDeck(r.deckId) ? '・對應目前這份簡報' : r ? '・未綁定簡報' : state.deck ? '・對應目前這份簡報（填任何一欄就會建檔）' : '';
     els.saved.textContent = '';
     renderMissing();
+    renderVideo();
+  }
+
+  function fmtSize(n) {
+    return n >= 1024 * 1024 * 1024 ? `${(n / 1024 / 1024 / 1024).toFixed(1)} GB` : `${Math.max(1, Math.round(n / 1024 / 1024))} MB`;
+  }
+
+  function renderVideo() {
+    const r = current();
+    const v = r?.video;
+    const a = r?.analysis;
+    const inMemory = !!(v && state.videoFile && state.videoFileFor === r.id);
+    els.videoDropText.textContent = v ? `目前：${v.name}（${fmtSize(v.size)}）——點此或拖曳可更換` : '拖曳 MP4 到這裡，或點此選擇檔案';
+    els.videoDrop.classList.toggle('has-file', !!v);
+    let text = '';
+    let tone = '';
+    if (a) {
+      text = `✓ 已完成轉錄分析：${formatAnalysisSummary(a.summary)}`;
+      tone = 'ok';
+    } else if (v?.transcribedAt) {
+      text = '逐字稿已轉好。到「DEMO 轉錄」標記說話者（業務／客戶）後按「開始分析」，結果會回填到這裡。';
+      tone = 'warn';
+    } else if (v?.sentAt) {
+      text = '錄影已放進轉錄助手。到「DEMO 轉錄」面板按「開始轉錄」；轉好後會自動對上這筆複盤。';
+      tone = 'warn';
+    } else if (v) {
+      text = inMemory ? '已選擇錄影，還沒送進轉錄。' : '複盤只記住檔名；要轉錄請重新選擇這個檔案。';
+    }
+    els.videoState.textContent = text;
+    els.videoState.className = `dr-video-state ${tone}`;
+    els.videoSend.hidden = !v || !onSendVideo || !!a;
+    els.videoSend.disabled = state.sending;
+    els.videoSend.textContent = state.sending ? '送出中…' : inMemory ? (v.sentAt ? '重新送到 DEMO 轉錄' : '送到 DEMO 轉錄分析') : '重新選擇檔案並送出';
+    els.videoOpen.hidden = !(a && onOpenAnalysis && hasAnalysis(a.historyId));
+    els.videoClear.hidden = !v;
   }
 
   function renderMissing() {
@@ -184,6 +261,7 @@ export function mountDemoReview(container, { hasDeck = () => false, onOpenDeck =
                 <b>${escapeHTML(r.customer || '未命名客戶')}</b>
                 <span class="dr-badge ${escapeHTML(OUTCOMES.find((o) => o.key === r.outcome)?.tone || 'muted')}">${escapeHTML(outcomeLabel(r.outcome))}</span>
                 ${FOLLOW_LABELS[fu] ? `<span class="dr-badge ${fu === 'upcoming' ? 'muted' : 'warn'}">${FOLLOW_LABELS[fu]}</span>` : ''}
+                ${r.analysis ? '<span class="dr-badge ok">已分析錄影</span>' : r.video ? '<span class="dr-badge muted">有錄影</span>' : ''}
                 ${miss ? '<span class="dr-badge muted">待補</span>' : ''}
                 <small>${escapeHTML(meta)}</small>
                 ${r.nextStep ? `<small class="dr-next">下一步：${escapeHTML(r.nextStep)}</small>` : ''}
@@ -195,20 +273,97 @@ export function mountDemoReview(container, { hasDeck = () => false, onOpenDeck =
       : `<li class="hint">${state.reviews.length ? '沒有符合條件的檔案。' : ''}</li>`;
   }
 
-  function onField(el) {
-    const key = el.dataset.dr;
+  function patchCurrent(patch) {
     let r = current();
     if (!r) {
       r = emptyReview(deckDefaults());
       state.reviewId = r.id;
     }
-    const { review, list } = upsertReview(state.reviews, { ...r, [key]: el.value });
+    const { review, list } = upsertReview(state.reviews, { ...r, ...patch });
     state.reviews = list;
     state.reviewId = review.id;
     scheduleSave();
     renderMissing();
     renderArchive();
+    return review;
   }
+
+  function onField(el) {
+    patchCurrent({ [el.dataset.dr]: el.value });
+  }
+
+  function pickVideo(file, { send = false } = {}) {
+    if (!file) return;
+    if (!/\.mp4$/i.test(file.name)) return toast('請選擇 .mp4 的 DEMO 錄影檔');
+    const review = patchCurrent({ video: videoFromFile(file), analysis: null });
+    state.videoFile = file;
+    state.videoFileFor = review.id;
+    renderVideo();
+    if (send) sendVideo();
+  }
+
+  async function sendVideo() {
+    const r = current();
+    if (!r?.video || !onSendVideo || state.sending) return;
+    if (!state.videoFile || state.videoFileFor !== r.id) {
+      els.videoFile.dataset.send = '1';
+      els.videoFile.click();
+      return;
+    }
+    state.sending = true;
+    renderVideo();
+    flush();
+    try {
+      const res = await onSendVideo(state.videoFile);
+      if (res?.ok) {
+        patchCurrent({ video: { ...current().video, sentAt: Date.now() } });
+        flush();
+      }
+    } catch (e) {
+      toast(`送出失敗：${e?.message || e}`);
+    } finally {
+      state.sending = false;
+      renderVideo();
+    }
+  }
+
+  els.videoDrop.addEventListener('click', () => els.videoFile.click());
+  els.videoDrop.addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      els.videoFile.click();
+    }
+  });
+  els.videoDrop.addEventListener('dragover', (e) => {
+    e.preventDefault();
+    els.videoDrop.classList.add('drag');
+  });
+  els.videoDrop.addEventListener('dragleave', () => els.videoDrop.classList.remove('drag'));
+  els.videoDrop.addEventListener('drop', (e) => {
+    e.preventDefault();
+    els.videoDrop.classList.remove('drag');
+    pickVideo(e.dataTransfer?.files?.[0]);
+  });
+  els.videoFile.addEventListener('change', () => {
+    const file = els.videoFile.files?.[0];
+    const send = els.videoFile.dataset.send === '1';
+    delete els.videoFile.dataset.send;
+    els.videoFile.value = '';
+    pickVideo(file, { send });
+  });
+  els.videoSend.addEventListener('click', sendVideo);
+  els.videoOpen.addEventListener('click', () => {
+    const a = current()?.analysis;
+    if (a) onOpenAnalysis?.(a.historyId);
+  });
+  els.videoClear.addEventListener('click', () => {
+    if (!current()?.video) return;
+    if (!window.confirm('移除這筆複盤的錄影與分析連結？（不會刪除轉錄助手裡的檔案）')) return;
+    patchCurrent({ video: null, analysis: null });
+    state.videoFile = null;
+    state.videoFileFor = null;
+    renderVideo();
+  });
 
   fieldEls.forEach((el) => {
     el.addEventListener(el.tagName === 'SELECT' || el.type === 'date' ? 'change' : 'input', () => onField(el));
@@ -282,6 +437,12 @@ export function mountDemoReview(container, { hasDeck = () => false, onOpenDeck =
   });
 
   window.addEventListener('beforeunload', flush);
+  window.addEventListener(REVIEWS_CHANGED_EVENT, () => {
+    state.reviews = mergeLinkFields(state.reviews, loadReviews());
+    renderVideo();
+    renderMissing();
+    renderArchive();
+  });
 
   renderForm();
   renderArchive();
@@ -302,6 +463,16 @@ export function mountDemoReview(container, { hasDeck = () => false, onOpenDeck =
       if (!rec || state.deck?.id !== rec.id || current()) return;
       state.deck = rec;
       renderForm();
+    },
+    /** 從首頁客戶進度點進來：開啟指定複盤（有對應簡報的由簡報那邊切換） */
+    openReview(id) {
+      const r = state.reviews.find((x) => x.id === id);
+      if (!r) return false;
+      flush();
+      state.reviewId = r.id;
+      renderForm();
+      renderArchive();
+      return true;
     },
     refresh() {
       state.reviews = loadReviews();

@@ -71,7 +71,46 @@ export function emptyReview({ deckId = '', customer = '', demoAt = '' } = {}) {
     fit: '',
     nextStep: '',
     followUpDate: '',
+    video: null,
+    analysis: null,
     ...Object.fromEntries(REVIEW_TEXT_FIELDS.map((f) => [f.key, ''])),
+  };
+}
+
+const ts = (v) => (Number(v) > 0 ? Number(v) : 0);
+
+/** DEMO 錄影只記檔名與大小（影片本身不存瀏覽器） */
+function normalizeVideo(v) {
+  const name = clip(v?.name, 200);
+  if (!name) return null;
+  return {
+    name,
+    size: Math.max(0, Number(v.size) || 0),
+    addedAt: ts(v.addedAt),
+    sentAt: ts(v.sentAt),
+    transcribedAt: ts(v.transcribedAt),
+  };
+}
+
+/** 轉錄分析的結果摘要：只留數字與一個標籤，完整分析在「最近分析」裡 */
+function normalizeAnalysis(a) {
+  const historyId = clip(a?.historyId, 80);
+  if (!historyId) return null;
+  const s = a.summary && typeof a.summary === 'object' ? a.summary : {};
+  const num = (x) => (Number.isFinite(Number(x)) ? Number(x) : 0);
+  return {
+    historyId,
+    at: ts(a.at),
+    summary: {
+      totalDur: num(s.totalDur),
+      custRatio: num(s.custRatio),
+      sQuestions: num(s.sQuestions),
+      steps: num(s.steps),
+      deepest: num(s.deepest),
+      dominant: clip(s.dominant, 40),
+      badCount: num(s.badCount),
+      goodCount: num(s.goodCount),
+    },
   };
 }
 
@@ -88,6 +127,8 @@ export function normalizeReview(r = {}) {
   out.fit = FITS.includes(out.fit) ? out.fit : '';
   out.nextStep = clip(out.nextStep, 300);
   out.followUpDate = validDate(out.followUpDate);
+  out.video = normalizeVideo(r.video);
+  out.analysis = normalizeAnalysis(r.analysis);
   REVIEW_TEXT_FIELDS.forEach((f) => {
     out[f.key] = clip(out[f.key], TEXT_LIMIT);
   });
@@ -100,7 +141,7 @@ export function normalizeReview(r = {}) {
 export function reviewHasContent(r) {
   if (!r) return false;
   return (
-    !!(r.outcome || r.tier || r.fit || r.nextStep || r.followUpDate) ||
+    !!(r.outcome || r.tier || r.fit || r.nextStep || r.followUpDate || r.video || r.analysis) ||
     REVIEW_TEXT_FIELDS.some((f) => String(r[f.key] || '').trim())
   );
 }
@@ -163,6 +204,104 @@ export function removeReview(list, id) {
   return (list || []).filter((r) => r.id !== id);
 }
 
+/* ---- DEMO 錄影 ↔ 轉錄分析 ---- */
+
+export const REVIEWS_CHANGED_EVENT = 'callcoach:reviews-changed';
+
+/** 影片檔名與轉錄出來的逐字稿名稱要能對上：忽略副檔名、大小寫、空白與符號（助手可能改過檔名） */
+export function videoKey(name) {
+  return String(name || '')
+    .normalize('NFC')
+    .replace(/\.[a-z0-9]{1,5}$/i, '')
+    .toLowerCase()
+    .replace(/[^\p{L}\p{N}]+/gu, '');
+}
+
+export function videoFromFile(file, now = Date.now()) {
+  return normalizeVideo({ name: file?.name, size: file?.size, addedAt: now });
+}
+
+/** 逐字稿來源名稱對應到哪一筆複盤（有多筆時取最近更新的） */
+export function matchReviewByVideo(list, source) {
+  const key = videoKey(source);
+  if (!key) return null;
+  return (
+    (list || [])
+      .filter((r) => r.video && videoKey(r.video.name) === key)
+      .sort((a, b) => b.updatedAt - a.updatedAt)[0] || null
+  );
+}
+
+/** 影片轉成逐字稿了：只在複盤還沒記過時補上時間，回傳新清單；沒有對應複盤回傳 null */
+export function linkTranscript(list, source, now = Date.now()) {
+  const hit = matchReviewByVideo(list, source);
+  if (!hit) return null;
+  if (hit.video.transcribedAt) return { review: hit, list, changed: false };
+  return { ...upsertReview(list, { ...hit, video: { ...hit.video, transcribedAt: now } }, now), changed: true };
+}
+
+/** 逐字稿分析完了：把結果摘要與「最近分析」的 id 掛回對應複盤 */
+export function linkAnalysis(list, source, { historyId, summary } = {}, now = Date.now()) {
+  const hit = matchReviewByVideo(list, source);
+  if (!hit || !historyId) return null;
+  return upsertReview(
+    list,
+    {
+      ...hit,
+      video: { ...hit.video, transcribedAt: hit.video.transcribedAt || now },
+      analysis: { historyId, at: now, summary },
+    },
+    now
+  );
+}
+
+function persistLink(result) {
+  if (!result) return null;
+  saveReviews(result.list);
+  if (typeof window !== 'undefined') window.dispatchEvent(new Event(REVIEWS_CHANGED_EVENT));
+  return result.review;
+}
+
+/** 以下兩個直接讀寫 localStorage，給 app.js 在轉錄／分析完成時呼叫 */
+export function linkTranscriptToReview(source) {
+  try {
+    const r = linkTranscript(loadReviews(), source);
+    return r?.changed ? persistLink(r) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function linkAnalysisToReview(source, info) {
+  try {
+    return persistLink(linkAnalysis(loadReviews(), source, info));
+  } catch {
+    return null;
+  }
+}
+
+/** 其他地方（app.js）改過複盤後，把連結欄位合併進畫面上還沒存檔的清單，避免互相覆蓋 */
+export function mergeLinkFields(current, fresh) {
+  const byId = new Map((fresh || []).map((r) => [r.id, r]));
+  const merged = (current || []).map((r) => {
+    const f = byId.get(r.id);
+    return f ? { ...r, video: f.video, analysis: f.analysis, updatedAt: Math.max(r.updatedAt, f.updatedAt) } : r;
+  });
+  const known = new Set(merged.map((r) => r.id));
+  return [...merged, ...(fresh || []).filter((r) => !known.has(r.id))].sort((a, b) => b.updatedAt - a.updatedAt);
+}
+
+export function formatAnalysisSummary(s) {
+  if (!s) return '';
+  const parts = [];
+  if (s.totalDur) parts.push(`通話 ${Math.max(1, Math.round(s.totalDur / 60))} 分`);
+  parts.push(`客戶說話 ${Math.round(s.custRatio * 100)}%`);
+  parts.push(`顧問提問 ${s.sQuestions} 題`);
+  parts.push(`五層資訊到 L${s.deepest || 0}`);
+  if (s.dominant) parts.push(`客戶偏向「${s.dominant}」`);
+  return parts.join(' · ');
+}
+
 /* ---- 篩選與統計 ---- */
 
 /**
@@ -221,6 +360,8 @@ const CSV_COLUMNS = [
   ['適配', (r) => r.fit],
   ['下一步', (r) => r.nextStep],
   ['跟進日期', (r) => r.followUpDate],
+  ['DEMO 錄影', (r) => r.video?.name || ''],
+  ['錄影分析', (r) => formatAnalysisSummary(r.analysis?.summary)],
   ...REVIEW_TEXT_FIELDS.map((f) => [f.label, (r) => r[f.key]]),
   ['建檔時間', (r) => new Date(r.createdAt).toISOString().slice(0, 16).replace('T', ' ')],
 ];
@@ -247,6 +388,7 @@ export function reviewToText(r) {
   const lines = [`【DEMO 複盤】${r.customer || '未命名客戶'}${r.demoAt ? `（${r.demoAt}）` : ''}`];
   lines.push(`結果：${outcomeLabel(r.outcome)}${r.tier ? `｜分級：${tierLabel(r.tier)}` : ''}${r.fit ? `｜適配：${r.fit}` : ''}`);
   if (r.nextStep || r.followUpDate) lines.push(`下一步：${r.nextStep || '（未填）'}${r.followUpDate ? `（${r.followUpDate} 跟進）` : ''}`);
+  if (r.analysis) lines.push(`錄影分析：${formatAnalysisSummary(r.analysis.summary)}`);
   REVIEW_TEXT_FIELDS.forEach((f) => {
     if (r[f.key]) lines.push(`${f.label}：${r[f.key]}`);
   });

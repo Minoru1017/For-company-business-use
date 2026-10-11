@@ -45,7 +45,10 @@ import { escapeHTML } from './utils.js';
 
 const isTyping = (el) => !!el?.closest?.('input, textarea, select, [contenteditable]:not([contenteditable="false"])');
 
-export function initDemoDeck(container, { getApiKey, setApiKey, getModel, onGeminiUsed, showToast } = {}) {
+export function initDemoDeck(
+  container,
+  { getApiKey, setApiKey, getModel, onGeminiUsed, showToast, onSendVideo, hasAnalysis, onOpenAnalysis } = {}
+) {
   if (!container) return { activate() {}, syncApiKey() {} };
   const toast = (m) => showToast?.(m);
   const state = { decks: loadDecks(), currentId: null, idx: 0, busy: false, saveT: null, present: null, images: new Map() };
@@ -713,6 +716,9 @@ export function initDemoDeck(container, { getApiKey, setApiKey, getModel, onGemi
   review = mountDemoReview(q('#dkReview'), {
     hasDeck: (id) => state.decks.some((d) => d.id === id),
     onOpenDeck: (id) => select(id),
+    onSendVideo,
+    hasAnalysis,
+    onOpenAnalysis,
     showToast: toast,
   });
   render();
@@ -732,6 +738,15 @@ export function initDemoDeck(container, { getApiKey, setApiKey, getModel, onGemi
       renderViewer();
     },
     openEditor,
+    /** 首頁客戶進度點進來：優先開那份簡報（複盤會跟著切過去），沒有簡報就直接開複盤 */
+    openCustomer({ deckId, reviewId } = {}) {
+      if (deckId && state.decks.some((d) => d.id === deckId)) {
+        select(deckId);
+        if (reviewId) review?.openReview(reviewId);
+        return true;
+      }
+      return !!(reviewId && review?.openReview(reviewId));
+    },
     /** 從其他模式帶入客戶資料，開一份新簡報（不自動產生，讓業務先檢查欄位） */
     createFromInput(input = {}) {
       const { rec, decks } = addDeckFromInput(state.decks, input);
