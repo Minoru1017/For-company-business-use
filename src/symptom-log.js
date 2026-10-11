@@ -57,6 +57,7 @@ import { fmtPct, fmtDateLabel, startKey, probeDuration, srtToSegments, plainSegs
 import { createMonthlyPanels } from './symptom-log-monthly.js';
 import { createSheetSync } from './symptom-log-sheet.js';
 import { symptomLogTemplate } from './symptom-log-template.js';
+import { createFunnelMotion } from './motion.js';
 
 /**
  * @param {HTMLElement} container
@@ -99,6 +100,7 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
   };
 
   container.innerHTML = symptomLogTemplate();
+  const animateFunnel = createFunnelMotion();
 
   const q = (sel) => container.querySelector(sel);
   const gridEl = q('#slGrid');
@@ -186,7 +188,7 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
         if (c.key === state.selected) cls.push('selected');
         if (c.weekday === 0 || c.weekday === 6) cls.push('weekend');
         const tone = inviteTone(s);
-        if (tone) cls.push(`invite-${tone}`);
+        if (tone) cls.push(`invite-${tone}`, 'blk', 'blk-tr');
         const selfN = selfMarkNames(c.key).length;
         const dots =
           (s
@@ -195,7 +197,8 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
         const n = s?.calls ? `<span class="slog-cell-n">${s.calls}</span>` : '';
         const inv = s?.invites != null && s.invites > 0 ? `<span class="slog-cell-inv" title="客戶同意時間 ${s.invites} 通">約 ${s.invites}</span>` : '';
         const startTag = start && c.key === start ? '<span class="slog-cell-start">入職</span>' : '';
-        return `<button type="button" class="${cls.join(' ')}" data-date="${c.key}"><span class="slog-cell-d">${c.day}</span>${n}${inv}${startTag}<span class="slog-dots">${dots}</span></button>`;
+        const chip = tone ? `<span class="slog-cell-chip ${tone}" aria-hidden="true"></span>` : '';
+        return `<button type="button" class="${cls.join(' ')}" data-date="${c.key}">${chip}<span class="slog-cell-d">${c.day}</span>${n}${inv}${startTag}<span class="slog-dots">${dots}</span></button>`;
       })
       .join('');
     refreshStorage();
@@ -367,6 +370,7 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
       step('i-clock', `>${f.shortMin} 分`, f.over, f.retentionRate ?? f.overRate, '留存率') +
       step('i-clock-long', `長 Call ≥${f.longMin} 分`, f.long, f.longRate, '占 >N 分') +
       step('i-cal-check', '同意時間', f.invites, f.inviteRate, '邀約率');
+    animateFunnel(el);
     renderIceStats(f);
   }
 
