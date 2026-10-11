@@ -53,23 +53,26 @@
 .slog-step:last-child .slog-step-bar { background:rgba(255,255,255,.14); }
 .slog-step:last-child .slog-step-bar i { background:var(--brand); }
 
-/* ---- 日曆：選取＝墨色；今天＝黃色短底線；邀約成效＝底部細色條，不整格上色 ---- */
+/* ---- 日曆：選取＝墨色；今天＝黃色短底線；邀約成效＝45° 細斜紋，不整格上色 ---- */
 .slog-cell { background:#fff; }
+.slog-cell.invite-good, .slog-cell.invite-zero, .slog-swatch.good, .slog-swatch.zero {
+  --hatch-ink:color-mix(in srgb, var(--ok) 55%, #fff);
+  background:repeating-linear-gradient(-45deg, var(--hatch-ink) 0 1px, transparent 1px 6px) #fff;
+  background-clip:padding-box;
+}
+.slog-cell.invite-zero, .slog-swatch.zero { --hatch-ink:color-mix(in srgb, var(--bad) 55%, #fff); }
 .slog-cell.today .slog-cell-d { color:var(--ink); font-weight:800; box-shadow:inset 0 -3px 0 var(--brand); }
 .slog-cell.selected, .slog-cell.invite-good.selected, .slog-cell.invite-zero.selected { background:var(--deep); border-color:var(--deep); color:var(--on-deep); box-shadow:none; }
 .slog-cell.selected .slog-cell-d, .slog-cell.selected .slog-cell-n, .slog-cell.selected .slog-cell-inv,
 .slog-cell.invite-good.selected .slog-cell-d, .slog-cell.invite-good.selected .slog-cell-inv, .slog-cell.invite-good.selected .slog-cell-n,
 .slog-cell.invite-zero.selected .slog-cell-d, .slog-cell.invite-zero.selected .slog-cell-n { color:var(--on-deep); }
 .slog-cell.selected.today .slog-cell-d { color:var(--brand); box-shadow:none; }
-.slog-cell.invite-good, .slog-cell.invite-zero { background:#fff; border-color:var(--hairline); }
-.slog-cell.invite-good { box-shadow:inset 0 -3px 0 var(--ok); }
-.slog-cell.invite-zero { box-shadow:inset 0 -3px 0 var(--bad); }
+.slog-cell.invite-good, .slog-cell.invite-zero { border-color:var(--hairline); box-shadow:none; }
 .slog-cell.invite-good .slog-cell-d, .slog-cell.invite-good .slog-cell-inv { color:var(--ink); }
 .slog-cell.invite-zero .slog-cell-d { color:var(--ink); }
 .slog-cell.invite-good:hover, .slog-cell.invite-zero:hover { border-color:var(--hairline-2); }
 .slog-cell.start, .slog-cell-start { border-color:var(--hairline-2); color:var(--muted); }
-.slog-swatch.good { background:transparent; border-color:transparent; box-shadow:inset 0 -3px 0 var(--ok); }
-.slog-swatch.zero { background:transparent; border-color:transparent; box-shadow:inset 0 -3px 0 var(--bad); }
+.slog-swatch.good, .slog-swatch.zero { border-color:var(--hairline-2); box-shadow:none; }
 .slog-week-row.selected { border-color:var(--ink); box-shadow:inset 0 0 0 1px var(--ink); }
 
 /* ---- 選取狀態：白底＋墨色外框，不用黃底 ---- */
