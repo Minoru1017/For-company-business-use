@@ -30,6 +30,7 @@ import {
   upsertReview,
   videoFromFile,
 } from './demo-review.js';
+import { ensureCustomerId } from './customers.js';
 import { escapeHTML } from './utils.js';
 
 const AUTO_START_KEY = 'call_coach_review_autostart';
@@ -178,6 +179,7 @@ export function mountDemoReview(
     if (!d) return {};
     return {
       deckId: d.id,
+      customerId: d.customerId || '',
       customer: String(d.input?.name || '').trim() || d.deck?.customer || '',
       demoAt: d.input?.demoAt || '',
     };
@@ -388,6 +390,12 @@ export function mountDemoReview(
   });
 
   fieldEls.forEach((el) => {
+    if (el.dataset.dr === 'customer') {
+      el.addEventListener('change', () => {
+        const r = current();
+        if (r) patchCurrent({ customerId: ensureCustomerId(el.value) });
+      });
+    }
     el.addEventListener(el.tagName === 'SELECT' || el.type === 'date' ? 'change' : 'input', () => onField(el));
   });
 
@@ -486,6 +494,8 @@ export function mountDemoReview(
       state.deck = rec;
       renderForm();
     },
+    /** 把還沒存的修改立刻寫進儲存（客戶主檔要改名、合併之前呼叫） */
+    flush,
     /** 從首頁客戶進度點進來：開啟指定複盤（有對應簡報的由簡報那邊切換） */
     openReview(id) {
       const r = state.reviews.find((x) => x.id === id);
@@ -497,6 +507,7 @@ export function mountDemoReview(
       return true;
     },
     refresh() {
+      flush();
       state.reviews = loadReviews();
       if (state.reviewId && !current()) state.reviewId = null;
       renderForm();

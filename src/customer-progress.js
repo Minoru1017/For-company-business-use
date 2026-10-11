@@ -1,12 +1,13 @@
 /**
- * 首頁「每位客戶的進度條」：把 DEMO 簡報與 DEMO 後複盤對起來，算出每位客戶走到哪一步。
+ * 首頁「每位客戶的進度條」：依客戶主檔把電訪邀約、DEMO 簡報、DEMO 後複盤對起來，算出每位客戶走到哪一步。
  * 只讀 localStorage 裡已存的資料，不依賴簡報／複盤的畫面模組（首頁不必先載入它們）。
  */
 import { DECKS_STORAGE_KEY } from './demo-deck.js';
+import { loadCustomers } from './customers.js';
 import { followUpStatus, loadReviews, outcomeLabel, reviewHasContent, reviewMissing, todayKey } from './demo-review.js';
 
 export const PROGRESS_STAGES = [
-  { key: 'customer', label: '建客戶' },
+  { key: 'invite', label: '邀約' },
   { key: 'deck', label: '簡報' },
   { key: 'demo', label: 'DEMO' },
   { key: 'video', label: '錄影分析' },
@@ -21,6 +22,7 @@ export function loadDeckBriefs() {
       .filter((d) => d && typeof d === 'object' && d.id)
       .map((d) => ({
         id: String(d.id),
+        customerId: String(d.customerId || ''),
         updatedAt: Number(d.updatedAt) || 0,
         name: String(d.input?.name || '').trim() || String(d.deck?.customer || '').trim(),
         filled: Object.values(d.input || {}).some((v) => String(v || '').trim()),
@@ -52,9 +54,10 @@ export function dueFollowUps(items) {
 }
 
 function nextHint(stages, review) {
-  const todo = stages.find((s) => !s.done);
+  // 邀約是來源紀錄，不是業務下一步要做的事；其他都走完了才提醒歸戶
+  const todo = stages.find((s) => !s.done && s.key !== 'invite') || stages.find((s) => !s.done);
   if (!todo) return '';
-  if (todo.key === 'customer') return '先填客戶資料';
+  if (todo.key === 'invite') return '把這位客戶的電訪邀約歸戶（客戶主檔）';
   if (todo.key === 'deck') return '產生這位客戶的 DEMO 簡報';
   if (todo.key === 'demo') return 'DEMO 後填 DEMO 結果';
   if (todo.key === 'video') {
@@ -70,29 +73,46 @@ function nextHint(stages, review) {
 /**
  * @param {Array} decks  loadDeckBriefs() 的結果
  * @param {Array} reviews  loadReviews() 的結果
- * @returns {Array} 每位客戶一筆：{ key, name, deckId, reviewId, stages, done, percent, next, outcome, followUp, followUpDate, updatedAt }
+ * @param {Array} [customers]  客戶主檔；沒有歸戶的舊紀錄仍以 deckId 湊成一位
+ * @returns {Array} 每位客戶一筆：{ key, customerId, name, deckId, reviewId, stages, done, percent, next, outcome, followUp, followUpDate, updatedAt }
  *   排序：該跟進的最前面 → 進行中（最近更新優先）→ 已走完
  */
-export function buildCustomerProgress(decks, reviews, today = todayKey()) {
-  const reviewByDeck = new Map();
-  const reviewsLeft = [];
-  (reviews || []).forEach((r) => {
-    if (r.deckId && (decks || []).some((d) => d.id === r.deckId) && !reviewByDeck.has(r.deckId)) reviewByDeck.set(r.deckId, r);
-    else reviewsLeft.push(r);
+export function buildCustomerProgress(decks, reviews, today = todayKey(), customers = []) {
+  const latest = (list) => [...list].sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0))[0] || null;
+  const usedDecks = new Set();
+  const usedReviews = new Set();
+  const entries = [];
+
+  (customers || []).forEach((c) => {
+    const myDecks = (decks || []).filter((d) => d.customerId === c.id);
+    const myReviews = (reviews || []).filter((r) => r.customerId === c.id);
+    myDecks.forEach((d) => usedDecks.add(d.id));
+    myReviews.forEach((r) => usedReviews.add(r.id));
+    const review = latest(myReviews);
+    const deck = myDecks.find((d) => d.id === review?.deckId) || latest(myDecks.filter((d) => d.generated)) || latest(myDecks);
+    entries.push({ customer: c, deck, review });
   });
 
-  const entries = [];
-  (decks || []).forEach((d) => entries.push({ deck: d, review: reviewByDeck.get(d.id) || null }));
-  reviewsLeft.forEach((r) => entries.push({ deck: null, review: r }));
+  // 還沒歸戶的舊紀錄：簡報與複盤依 deckId 湊成一位
+  const looseDecks = (decks || []).filter((d) => !usedDecks.has(d.id));
+  const looseReviews = (reviews || []).filter((r) => !usedReviews.has(r.id));
+  const reviewByDeck = new Map();
+  const reviewsLeft = [];
+  looseReviews.forEach((r) => {
+    if (r.deckId && looseDecks.some((d) => d.id === r.deckId) && !reviewByDeck.has(r.deckId)) reviewByDeck.set(r.deckId, r);
+    else reviewsLeft.push(r);
+  });
+  looseDecks.forEach((d) => entries.push({ customer: null, deck: d, review: reviewByDeck.get(d.id) || null }));
+  reviewsLeft.forEach((r) => entries.push({ customer: null, deck: null, review: r }));
 
   const out = [];
-  entries.forEach(({ deck, review }) => {
+  entries.forEach(({ customer, deck, review }) => {
     const hasReview = !!(review && (reviewHasContent(review) || review.customer));
-    const name = String(review?.customer || deck?.name || '').trim();
-    if (!name && !deck?.filled && !hasReview) return;
+    const name = String(customer?.name || review?.customer || deck?.name || '').trim();
+    if (!customer && !name && !deck?.filled && !hasReview) return;
 
     const done = {
-      customer: !!name || !!deck?.filled || hasReview,
+      invite: !!customer?.invites?.length,
       deck: !!deck?.generated,
       demo: !!(review?.outcome || review?.video || review?.analysis),
       video: !!review?.analysis,
@@ -102,7 +122,8 @@ export function buildCustomerProgress(decks, reviews, today = todayKey()) {
     const count = stages.filter((s) => s.done).length;
     const fu = review ? followUpStatus(review, today) : '';
     out.push({
-      key: deck ? `d:${deck.id}` : `r:${review.id}`,
+      key: customer ? `c:${customer.id}` : deck ? `d:${deck.id}` : `r:${review.id}`,
+      customerId: customer?.id || '',
       name: name || '未命名客戶',
       deckId: deck?.id || '',
       reviewId: review?.id || '',
@@ -116,7 +137,7 @@ export function buildCustomerProgress(decks, reviews, today = todayKey()) {
       followUpDate: review?.followUpDate || '',
       overdueDays: fu === 'overdue' ? overdueDays(review.followUpDate, today) : 0,
       nextStep: review?.nextStep || '',
-      updatedAt: Math.max(deck?.updatedAt || 0, review?.updatedAt || 0),
+      updatedAt: Math.max(customer?.updatedAt || 0, deck?.updatedAt || 0, review?.updatedAt || 0),
     });
   });
 
@@ -125,5 +146,5 @@ export function buildCustomerProgress(decks, reviews, today = todayKey()) {
 }
 
 export function loadCustomerProgress(today = todayKey()) {
-  return buildCustomerProgress(loadDeckBriefs(), loadReviews(), today);
+  return buildCustomerProgress(loadDeckBriefs(), loadReviews(), today, loadCustomers());
 }

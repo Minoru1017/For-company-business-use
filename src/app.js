@@ -69,6 +69,7 @@ import { initReflectionJournal } from './reflection-journal-ui.js';
 import { mountHomePhilosophy, updateHeroPhilosophyBar } from './coach-philosophy-ui.js';
 import { initDayTypeHome } from './learning-library-ui.js';
 import { mountCustomerProgress } from './customer-progress-ui.js';
+import { CUSTOMERS_CHANGED_EVENT, syncCustomers } from './customers.js';
 import { REVIEWS_CHANGED_EVENT, linkAnalysisToReview, linkTranscriptToReview } from './demo-review.js';
 import { SAMPLE_TRANSCRIPT_NAME, SAMPLE_TRANSCRIPT_SRT } from './sample-transcript.js';
 import { autoGuess } from './speaker.js';
@@ -990,6 +991,11 @@ function init() {
   });
   updateHeroPhilosophyBar(resolveMode());
   try {
+    syncCustomers();
+  } catch (e) {
+    console.error('customer sync failed', e);
+  }
+  try {
     customerProgress = mountCustomerProgress($('customerProgressHome'), { onOpen: openCustomerFromHome, dueContainer: $('followUpHome') });
   } catch (e) {
     console.error('customer progress init failed', e);
@@ -1107,6 +1113,7 @@ function init() {
     if (!mode) customerProgress?.refresh();
   });
   window.addEventListener(REVIEWS_CHANGED_EVENT, () => customerProgress?.refresh());
+  window.addEventListener(CUSTOMERS_CHANGED_EVENT, () => customerProgress?.refresh());
 }
 
 init();
