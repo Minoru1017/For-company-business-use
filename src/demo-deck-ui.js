@@ -40,6 +40,7 @@ import {
 import { renderDeckSlides } from './demo-deck-slides.js';
 import { formatBarHtml, mountDeckFormatBar } from './demo-deck-format-ui.js';
 import { deleteDeckImages, loadAllDeckImages } from './demo-deck-images.js';
+import { mountDemoReview } from './demo-review-ui.js';
 import { escapeHTML } from './utils.js';
 
 const isTyping = (el) => !!el?.closest?.('input, textarea, select, [contenteditable]:not([contenteditable="false"])');
@@ -83,6 +84,7 @@ export function initDemoDeck(container, { getApiKey, setApiKey, getModel, onGemi
           <div class="dk-open-info"><b id="dkOpenTitle"></b><small id="dkOpenMeta"></small></div>
           <button type="button" class="primary" id="dkOpenEditor">開啟簡報編輯器</button>
         </section>
+        <div class="dk-review" id="dkReview"></div>
       </div>
     </div>`;
 
@@ -339,10 +341,13 @@ export function initDemoDeck(container, { getApiKey, setApiKey, getModel, onGemi
     els.viewer.focus({ preventScroll: true });
   }
 
+  let review = null;
+
   function render() {
     renderList();
     renderInput();
     renderViewer();
+    review?.setDeck(current());
   }
 
   function select(id) {
@@ -579,7 +584,10 @@ export function initDemoDeck(container, { getApiKey, setApiKey, getModel, onGemi
     if (!el || !rec) return;
     rec.input[el.dataset.input] = el.value;
     persist();
-    if (el.dataset.input === 'name' || el.dataset.input === 'demoAt') renderList();
+    if (el.dataset.input === 'name' || el.dataset.input === 'demoAt') {
+      renderList();
+      review?.syncDeckInfo(rec);
+    }
   });
 
   els.importSel.addEventListener('change', () => {
@@ -702,6 +710,11 @@ export function initDemoDeck(container, { getApiKey, setApiKey, getModel, onGemi
 
   if (!state.decks.length) state.decks.unshift(newDeckRecord());
   state.currentId = state.decks[0].id;
+  review = mountDemoReview(q('#dkReview'), {
+    hasDeck: (id) => state.decks.some((d) => d.id === id),
+    onOpenDeck: (id) => select(id),
+    showToast: toast,
+  });
   render();
   renderImport();
   loadAllDeckImages()
