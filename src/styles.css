@@ -14,4 +14,5 @@
 @import './styles/customer-progress.css'; /* 首頁客戶進度條 */
 @import './styles/backup.css'; /* 資料備份／還原 */
 @import './styles/quest.css'; /* Quest 設計語彙：暖米色 × 白色大圓角卡片 × 黑黃重點（覆寫前面的暗色主題） */
-@import './styles/tone.css'; /* 色調層級：墨／次／註三階文字、表面三階、品牌黃只做優先訊號、狀態色降飽和（最後載入） */
+@import './styles/tone.css'; /* 色調層級：墨／次／註三階文字、表面三階、品牌黃只做優先訊號、狀態色降飽和 */
+@import './styles/blocks.css'; /* 積木版面：缺角放徽章／膠囊、章節序號與模式卡箭頭坐進缺角、近 7 天列扣合（最後載入） */

@@ -1,0 +1,104 @@
+/* =====================================================================
+   積木版面（最後載入）：矩形缺一角放徽章／膠囊、方塊彼此扣合、泡泡分離。
+
+   做法：缺角＝一個與「外層底色」同色的 ::before 矩形（內角圓弧），
+   再用兩個 radial-gradient 在缺角與卡片邊線的交接處補出內凹弧度；
+   徽章或膠囊絕對定位坐進缺角。每個積木用自訂屬性設定：
+     --blk-bg   卡片本身底色      --blk-out  缺角露出的外層底色
+     --nw / --nh 缺角寬高         --nr       圓角半徑
+   ===================================================================== */
+.blk { position:relative; overflow:visible; border-color:transparent;
+  --blk-bg:var(--panel2); --blk-out:var(--panel); --nw:64px; --nh:44px; --nr:14px;
+  background-color:var(--blk-bg); background-repeat:no-repeat; }
+.blk::before { content:""; position:absolute; top:0; width:var(--nw); height:var(--nh); background:var(--blk-out); pointer-events:none; }
+
+/* 右上缺角 */
+.blk-tr::before { right:0; border-bottom-left-radius:var(--nr); }
+.blk-tr { background-image:
+    radial-gradient(circle at 0 100%, var(--blk-bg) calc(var(--nr) - .6px), var(--blk-out) var(--nr)),
+    radial-gradient(circle at 0 100%, var(--blk-bg) calc(var(--nr) - .6px), var(--blk-out) var(--nr));
+  background-size:var(--nr) var(--nr), var(--nr) var(--nr);
+  background-position:right var(--nw) top 0, right 0 top var(--nh); }
+
+/* 左上缺角 */
+.blk-tl::before { left:0; border-bottom-right-radius:var(--nr); }
+.blk-tl { background-image:
+    radial-gradient(circle at 100% 100%, var(--blk-bg) calc(var(--nr) - .6px), var(--blk-out) var(--nr)),
+    radial-gradient(circle at 100% 100%, var(--blk-bg) calc(var(--nr) - .6px), var(--blk-out) var(--nr));
+  background-size:var(--nr) var(--nr), var(--nr) var(--nr);
+  background-position:left var(--nw) top 0, left 0 top var(--nh); }
+
+/* 坐進缺角的徽章（圓）與膠囊 */
+.blk-badge { position:absolute; top:4px; display:grid; place-items:center; width:36px; height:36px; border-radius:50%;
+  background:#fff; color:var(--ink); border:1px solid var(--hairline-2); z-index:1; }
+.blk-badge .ic { width:1.05rem; height:1.05rem; stroke-width:1.8; }
+.blk-badge.deep { background:var(--deep); color:var(--brand); border-color:var(--deep); }
+.blk-badge.brand { background:var(--brand); color:var(--ink); border-color:var(--brand); }
+.blk-tr > .blk-badge { right:4px; left:auto; }
+.blk-tl > .blk-badge { left:4px; right:auto; }
+.blk-pill { position:absolute; top:4px; z-index:1; display:inline-flex; align-items:center; gap:6px; height:36px; padding:0 16px; border-radius:999px;
+  background:var(--deep); color:var(--on-deep); font-family:var(--disp); font-size:.86rem; font-weight:700; letter-spacing:0; white-space:nowrap; margin:0; }
+.blk-tl > .blk-pill { left:4px; right:auto; }
+.blk-tr > .blk-pill { right:4px; left:auto; }
+
+/* ---- 章節卡：序號圓章坐進左上缺角 ---- */
+section.sec { --blk-bg:var(--panel); --blk-out:var(--bg); --nw:62px; --nh:56px; --nr:16px; }
+section.sec:not(.history-sec) { position:relative; overflow:visible; border-color:transparent; background-color:var(--blk-bg); background-repeat:no-repeat; }
+section.sec:not(.history-sec)::before { content:""; position:absolute; top:0; left:0; width:var(--nw); height:var(--nh); background:var(--blk-out); border-bottom-right-radius:var(--nr); pointer-events:none; }
+section.sec:not(.history-sec) { background-image:
+    radial-gradient(circle at 100% 100%, var(--blk-bg) calc(var(--nr) - .6px), var(--blk-out) var(--nr)),
+    radial-gradient(circle at 100% 100%, var(--blk-bg) calc(var(--nr) - .6px), var(--blk-out) var(--nr));
+  background-size:var(--nr) var(--nr), var(--nr) var(--nr);
+  background-position:left var(--nw) top 0, left 0 top var(--nh); }
+section.sec > .sec-head .num, .sec:nth-of-type(n) > .sec-head .num { position:absolute; top:8px; left:8px; width:40px; height:40px; min-width:0; padding:0; z-index:1;
+  display:grid; place-items:center; border-radius:50%; font-size:.8rem; }
+section.sec > .sec-head, .sec:nth-of-type(n) > .sec-head { position:static; min-height:34px; padding:0 0 0 34px; }
+
+/* ---- 首頁模式卡：箭頭圓鈕坐進右上缺角 ---- */
+.mode-card, .mode-card:hover, .mode-card.accent, .mode-card.accent:hover, .mode-card.log, .mode-card.brief, .mode-card.deck, .mode-card.drill {
+  --blk-bg:var(--panel); --blk-out:var(--bg); --nw:62px; --nh:58px; --nr:16px;
+  position:relative; overflow:visible; border-color:transparent; background-color:var(--blk-bg); background-repeat:no-repeat;
+  background-image:
+    radial-gradient(circle at 0 100%, var(--blk-bg) calc(var(--nr) - .6px), var(--blk-out) var(--nr)),
+    radial-gradient(circle at 0 100%, var(--blk-bg) calc(var(--nr) - .6px), var(--blk-out) var(--nr));
+  background-size:var(--nr) var(--nr), var(--nr) var(--nr);
+  background-position:right var(--nw) top 0, right 0 top var(--nh); }
+.mode-card::before { content:""; position:absolute; top:0; right:0; width:var(--nw); height:var(--nh); background:var(--blk-out); border-bottom-left-radius:var(--nr); pointer-events:none; clip-path:none; left:auto; }
+.mode-card::after { top:9px; right:9px; width:40px; height:40px; background-color:#fff; border:1px solid var(--hairline-2); z-index:1; }
+.mode-card:hover::after { background-color:var(--brand); border-color:var(--brand); }
+
+/* ---- 症狀紀錄：日曆卡「今天」膠囊扣進右上缺角 ---- */
+.slog .card.slog-cal { --blk-bg:var(--panel2); --blk-out:var(--panel); --nw:84px; --nh:46px; --nr:14px; }
+.slog-cal .slog-cal-head { margin-right:calc(var(--nw) - 12px); }
+.slog-cal .slog-today { position:absolute; top:4px; right:4px; height:36px; padding:0 16px; border-radius:999px; background:var(--deep); color:var(--brand); border-color:var(--deep); font-weight:700; z-index:1; }
+.slog-cal .slog-today:hover { background:var(--deep-2); color:var(--brand); }
+
+/* ---- 症狀紀錄：當天卡的日期膠囊扣進左上缺角 ---- */
+.slog .card.slog-funnel { --blk-bg:var(--panel2); --blk-out:var(--panel); --nw:160px; --nh:46px; --nr:14px; padding-top:54px; }
+.slog-funnel > h2 { margin:0; }
+.slog-funnel-head { display:flex; flex-wrap:wrap; align-items:center; gap:8px; min-height:0; margin:0 0 12px; }
+.slog-funnel-head .slog-count { margin-right:auto; }
+
+/* ---- 漏斗步驟：圖示徽章坐進右上缺角；最後一步（結果 KPI）反白 ---- */
+.slog-step { --blk-bg:#fff; --blk-out:var(--panel2); --nw:46px; --nh:42px; --nr:12px; padding:12px 14px; }
+.slog-step > .slog-step-n { padding-right:40px; }
+.slog-step.blk { border-color:transparent; }
+.slog-step-ic { display:none; }
+.slog-step > .blk-badge { top:3px; right:3px; width:34px; height:34px; background:#fff; color:var(--text-2); }
+.slog-step > .blk-badge .ic { width:1rem; height:1rem; }
+.slog-step:last-child { --blk-bg:var(--deep); background-color:var(--deep); }
+.slog-step:last-child .blk-badge { background:var(--brand); color:var(--ink); border-color:var(--brand); }
+
+/* ---- 近 7 天：列與列像積木貼合，選取列浮出成「泡泡」 ---- */
+.slog-week-list { gap:4px; }
+.slog-week-row { border-radius:10px; }
+.slog-week-row:first-child { border-radius:16px 16px 10px 10px; }
+.slog-week-row:last-child { border-radius:10px 10px 16px 16px; }
+.slog-week-row.selected { border-radius:999px; box-shadow:0 10px 24px -14px rgba(23,21,15,.35), inset 0 0 0 1px var(--ink); transform:translateX(6px); }
+
+@media (max-width:720px) {
+  section.sec { --nw:56px; --nh:52px; }
+  section.sec > .sec-head .num { top:6px; left:6px; }
+  section.sec > .sec-head, .sec:nth-of-type(n) > .sec-head { padding-left:44px; }
+  .slog .card.slog-funnel { --nw:150px; }
+}

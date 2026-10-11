@@ -322,7 +322,7 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
     }
     state.day ||= { date: key, note: {} };
     dayEl.hidden = false;
-    q('#slDayTitle').textContent = `${fmtDateLabel(key)} 的漏斗`;
+    q('#slDayTitle').textContent = fmtDateLabel(key);
     renderFunnelInputs();
     renderFunnelBar();
     renderCalls();
@@ -356,7 +356,7 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
     if (!el) return;
     const f = funnelFromCalls(state.day || {}, state.calls, state.settings);
     const step = (icon, label, n, rate, rateLabel) =>
-      `<div class="slog-step"><svg class="ic slog-step-ic" aria-hidden="true"><use href="#${icon}"/></svg><span class="slog-step-n">${n}</span><span class="slog-step-l">${label}</span>${
+      `<div class="slog-step blk blk-tr"><span class="blk-badge" aria-hidden="true"><svg class="ic"><use href="#${icon}"/></svg></span><span class="slog-step-n">${n}</span><span class="slog-step-l">${label}</span>${
         rate != null
           ? `<span class="slog-step-bar" title="${rateLabel} ${fmtPct(rate)}"><i style="width:${Math.round(Math.min(1, Math.max(0, rate)) * 100)}%"></i></span><span class="slog-step-r">${rateLabel} ${fmtPct(rate)}</span>`
           : ''
