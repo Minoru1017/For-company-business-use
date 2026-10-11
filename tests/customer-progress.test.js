@@ -7,6 +7,7 @@ const SUMMARY = { totalDur: 600, custRatio: 0.4, sQuestions: 5, steps: 3, deepes
 
 const deck = (over = {}) => ({ id: 'd1', updatedAt: 1, name: '涵小姐', filled: true, generated: false, ...over });
 const review = (over = {}) => normalizeReview({ ...emptyReview({ customer: '涵小姐', deckId: 'd1' }), ...over });
+const cust = (over = {}) => ({ id: 'c1', name: '涵小姐', invites: [], updatedAt: 1, ...over });
 const stageKeys = (c) => c.stages.filter((s) => s.done).map((s) => s.key);
 
 beforeEach(() => {
@@ -19,17 +20,17 @@ beforeEach(() => {
 });
 
 describe('customer progress: stages', () => {
-  it('a new customer only has the first stage', () => {
+  it('a new customer has no stage done yet', () => {
     const [c] = buildCustomerProgress([deck()], [], TODAY);
-    expect(stageKeys(c)).toEqual(['customer']);
-    expect(c.percent).toBe(20);
+    expect(stageKeys(c)).toEqual([]);
+    expect(c.percent).toBe(0);
     expect(c.next).toBe('產生這位客戶的 DEMO 簡報');
     expect(c.stages).toHaveLength(PROGRESS_STAGES.length);
   });
 
   it('a generated deck moves the bar forward and asks for DEMO result next', () => {
     const [c] = buildCustomerProgress([deck({ generated: true })], [], TODAY);
-    expect(stageKeys(c)).toEqual(['customer', 'deck']);
+    expect(stageKeys(c)).toEqual(['deck']);
     expect(c.next).toBe('DEMO 後填 DEMO 結果');
   });
 
@@ -47,11 +48,14 @@ describe('customer progress: stages', () => {
     const d = deck({ generated: true });
     const analysis = { historyId: 'h1', at: 1, summary: SUMMARY };
     const partial = buildCustomerProgress([d], [review({ outcome: 'closed', analysis })], TODAY)[0];
-    expect(stageKeys(partial)).toEqual(['customer', 'deck', 'demo', 'video']);
+    expect(stageKeys(partial)).toEqual(['deck', 'demo', 'video']);
     expect(partial.next).toContain('複盤還缺：');
     const full = buildCustomerProgress([d], [review({ outcome: 'closed', analysis, wentWell: 'a', improve: 'b' })], TODAY)[0];
-    expect(full.percent).toBe(100);
-    expect(full.next).toBe('');
+    expect(full.percent).toBe(80);
+    expect(full.next).toBe('把這位客戶的電訪邀約歸戶（客戶主檔）');
+    const withInvite = buildCustomerProgress([{ ...d, customerId: 'c1' }], [review({ customerId: 'c1', outcome: 'closed', analysis, wentWell: 'a', improve: 'b' })], TODAY, [cust({ invites: ['2026-10-01#0'] })])[0];
+    expect(withInvite.percent).toBe(100);
+    expect(withInvite.next).toBe('');
     expect(full.outcomeLabel).toBe('當場成交');
   });
 });
@@ -72,14 +76,14 @@ describe('customer progress: customers and order', () => {
   });
 
   it('puts follow-ups first, then in-progress, then finished customers', () => {
-    const finished = review({ deckId: 'd3', customer: 'C', outcome: 'closed', wentWell: 'a', improve: 'b', analysis: { historyId: 'h', at: 1, summary: SUMMARY } });
+    const finished = review({ deckId: 'd3', customer: 'C', customerId: 'c3', outcome: 'closed', wentWell: 'a', improve: 'b', analysis: { historyId: 'h', at: 1, summary: SUMMARY } });
     const due = review({ deckId: 'd2', customer: 'B', outcome: 'thinking', nextStep: 'call', followUpDate: '2026-10-09' });
     const decks = [
       deck({ id: 'd1', name: 'A', updatedAt: 99 }),
       deck({ id: 'd2', name: 'B', generated: true, updatedAt: 1 }),
-      deck({ id: 'd3', name: 'C', generated: true, updatedAt: 50 }),
+      deck({ id: 'd3', name: 'C', generated: true, updatedAt: 50, customerId: 'c3' }),
     ];
-    const list = buildCustomerProgress(decks, [finished, due], TODAY);
+    const list = buildCustomerProgress(decks, [finished, due], TODAY, [cust({ id: 'c3', name: 'C', invites: ['k'], updatedAt: 50 })]);
     expect(list.map((c) => c.name)).toEqual(['B', 'A', 'C']);
     expect(list[0].followUp).toBe('overdue');
   });
@@ -89,7 +93,7 @@ describe('customer progress: reading storage', () => {
   it('reads decks without loading the deck module and tolerates bad data', () => {
     expect(loadDeckBriefs()).toEqual([]);
     localStorage.setItem('call_coach_demo_decks_v1', JSON.stringify([{ id: 'd1', input: { name: '涵小姐' }, deck: { slides: [{}] }, updatedAt: 4 }, null, { nope: 1 }]));
-    expect(loadDeckBriefs()).toEqual([{ id: 'd1', updatedAt: 4, name: '涵小姐', filled: true, generated: true }]);
+    expect(loadDeckBriefs()).toEqual([{ id: 'd1', customerId: '', updatedAt: 4, name: '涵小姐', filled: true, generated: true }]);
     localStorage.setItem('call_coach_demo_decks_v1', '{bad');
     expect(loadDeckBriefs()).toEqual([]);
   });
@@ -127,5 +131,27 @@ describe('customer progress: follow-ups due today', () => {
     expect(due.map((c) => c.name)).toEqual(['B', 'A', 'C', 'D']);
     expect(due[0]).toMatchObject({ overdueDays: 6, nextStep: 'B 的下一步', followUp: 'overdue' });
     expect(dueFollowUps(null)).toEqual([]);
+  });
+});
+
+describe('customer progress: customer master', () => {
+  it('groups a customer\'s decks and reviews by id, even when the names differ', () => {
+    const c = cust({ invites: ['2026-10-01#0'] });
+    const decks = [deck({ id: 'a', name: '涵', customerId: 'c1', generated: true, updatedAt: 1 }), deck({ id: 'b', name: '涵小姐 二', customerId: 'c1', updatedAt: 5 })];
+    const reviews = [review({ deckId: 'a', customerId: 'c1', customer: '涵 DEMO', outcome: 'next', nextStep: 'x', followUpDate: '2999-01-01' })];
+    const list = buildCustomerProgress(decks, reviews, TODAY, [c]);
+    expect(list).toHaveLength(1);
+    expect(list[0]).toMatchObject({ key: 'c:c1', customerId: 'c1', name: '涵小姐', deckId: 'a' });
+    expect(stageKeys(list[0])).toEqual(['invite', 'deck', 'demo']);
+  });
+
+  it('lists a customer who only has an invite so far', () => {
+    const [c] = buildCustomerProgress([], [], TODAY, [cust({ invites: ['k'] })]);
+    expect(c).toMatchObject({ name: '涵小姐', deckId: '', reviewId: '', percent: 20, next: '產生這位客戶的 DEMO 簡報' });
+  });
+
+  it('keeps unlinked old records working next to the master list', () => {
+    const list = buildCustomerProgress([deck({ id: 'old', name: '舊客戶' })], [], TODAY, [cust()]);
+    expect(list.map((c) => c.name).sort()).toEqual(['舊客戶', '涵小姐'].sort());
   });
 });

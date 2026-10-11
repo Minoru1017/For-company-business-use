@@ -41,6 +41,8 @@ import { renderDeckSlides } from './demo-deck-slides.js';
 import { formatBarHtml, mountDeckFormatBar } from './demo-deck-format-ui.js';
 import { deleteDeckImages, loadAllDeckImages } from './demo-deck-images.js';
 import { mountDemoReview } from './demo-review-ui.js';
+import { assignInviteTo, ensureCustomerId, loadCustomers, syncCustomers } from './customers.js';
+import { mountCustomerDatalist, mountCustomerMaster } from './customer-master-ui.js';
 import { escapeHTML } from './utils.js';
 
 const isTyping = (el) => !!el?.closest?.('input, textarea, select, [contenteditable]:not([contenteditable="false"])');
@@ -62,6 +64,7 @@ export function initDemoDeck(
         <p class="hint dk-side-hint">簡報只存在這台電腦。</p>
       </aside>
       <div class="dk-workspace">
+        <div class="dk-customers" id="dkCustomers"></div>
         <section class="card dk-input">
           <div class="dk-input-head">
             <h3>客戶資料 <small>有邀約的開發紀錄——簡報每一頁都要回應他喜歡或想知道的事</small></h3>
@@ -169,7 +172,7 @@ export function initDemoDeck(
   els.fields.innerHTML = INPUT_FIELDS.map(
     (f) => `<label class="dk-field${f.short ? ' short' : ''}${f.rows ? ' wide' : ''}"><span>${escapeHTML(f.label)}</span>${
       f.short
-        ? `<input type="text" class="field" data-input="${f.key}" placeholder="${escapeHTML(f.placeholder)}">`
+        ? `<input type="text" class="field" data-input="${f.key}" placeholder="${escapeHTML(f.placeholder)}"${f.key === 'name' ? ' list="ccCustomers" autocomplete="off"' : ''}>`
         : `<textarea class="field" data-input="${f.key}" rows="${f.rows || 2}" placeholder="${escapeHTML(f.placeholder)}"></textarea>`
     }</label>`
   ).join('');
@@ -345,12 +348,14 @@ export function initDemoDeck(
   }
 
   let review = null;
+  let customerMaster = null;
 
   function render() {
     renderList();
     renderInput();
     renderViewer();
     review?.setDeck(current());
+    customerMaster?.refresh();
   }
 
   function select(id) {
@@ -360,6 +365,45 @@ export function initDemoDeck(
     fmtBar?.clear();
     els.status.textContent = '';
     render();
+  }
+
+  /** 客戶主檔改過名、合併過：簡報在儲存裡已經更新，重新載入畫面上的清單 */
+  function reloadDecks() {
+    state.decks = loadDecks();
+    if (!state.decks.length) state.decks.unshift(newDeckRecord());
+    if (!state.decks.some((d) => d.id === state.currentId)) state.currentId = state.decks[0].id;
+    render();
+    review?.refresh();
+  }
+
+  function createDeckForCustomer(c) {
+    const { rec, decks } = addDeckFromInput(state.decks, { name: c.name }, { source: 'customer' });
+    rec.customerId = c.id;
+    state.decks = decks;
+    persistNow();
+    select(rec.id);
+    toast(`已為「${c.name}」新增簡報，補上客戶資料後再產生`);
+    container.querySelector('.dk-input')?.scrollIntoView?.({ behavior: 'smooth', block: 'start' });
+  }
+
+  function openCustomer({ deckId, reviewId, customerId } = {}) {
+    if (deckId && state.decks.some((d) => d.id === deckId)) {
+      select(deckId);
+      if (reviewId) review?.openReview(reviewId);
+      return true;
+    }
+    if (reviewId && review?.openReview(reviewId)) return true;
+    const deck = customerId && state.decks.find((d) => d.customerId === customerId);
+    if (deck) {
+      select(deck.id);
+      return true;
+    }
+    const c = customerId && loadCustomers().find((x) => x.id === customerId);
+    if (c) {
+      createDeckForCustomer(c);
+      return true;
+    }
+    return false;
   }
 
   function createDeck() {
@@ -593,15 +637,29 @@ export function initDemoDeck(
     }
   });
 
+  els.fields.addEventListener('change', (e) => {
+    const el = e.target.closest('[data-input="name"]');
+    const rec = current();
+    if (!el || !rec) return;
+    rec.customerId = ensureCustomerId(rec.input.name);
+    persistNow();
+    syncCustomers();
+    review?.refresh();
+    customerMaster?.refresh();
+  });
+
   els.importSel.addEventListener('change', () => {
     const it = (els.importSel._items || []).find((x) => x.key === els.importSel.value);
     const rec = current();
     els.importSel.value = '';
     if (!it || !rec) return;
     rec.input.raw = appendRawNote(rec.input.raw, it.text);
+    rec.inviteKeys = [...new Set([...(rec.inviteKeys || []), it.key])];
+    if (rec.customerId) assignInviteTo(rec.customerId, it.key);
     persist();
     renderInput();
-    toast(`已帶入：${it.label}`);
+    customerMaster?.refresh();
+    toast(rec.customerId ? `已帶入：${it.label}（歸入這位客戶）` : `已帶入：${it.label}。填上客戶姓名後，這通邀約會歸到他名下`);
   });
 
   els.course.addEventListener('input', () => saveCourseNotes(els.course.value));
@@ -721,6 +779,18 @@ export function initDemoDeck(
     onOpenAnalysis,
     showToast: toast,
   });
+  mountCustomerDatalist();
+  customerMaster = mountCustomerMaster(q('#dkCustomers'), {
+    getInviteItems: () => invitedReflectionEntries(listJournalDays()),
+    beforeChange: () => {
+      if (state.saveT) persistNow();
+      review?.flush();
+    },
+    afterChange: reloadDecks,
+    onOpen: (c) => openCustomer({ customerId: c.id }),
+    onNewDeck: (c) => createDeckForCustomer(c),
+    showToast: toast,
+  });
   render();
   renderImport();
   loadAllDeckImages()
@@ -738,15 +808,8 @@ export function initDemoDeck(
       renderViewer();
     },
     openEditor,
-    /** 首頁客戶進度點進來：優先開那份簡報（複盤會跟著切過去），沒有簡報就直接開複盤 */
-    openCustomer({ deckId, reviewId } = {}) {
-      if (deckId && state.decks.some((d) => d.id === deckId)) {
-        select(deckId);
-        if (reviewId) review?.openReview(reviewId);
-        return true;
-      }
-      return !!(reviewId && review?.openReview(reviewId));
-    },
+    /** 首頁客戶進度點進來：優先開那份簡報（複盤會跟著切過去），沒有簡報就開複盤；什麼都沒有就為他新增一份簡報 */
+    openCustomer,
     /** 從其他模式帶入客戶資料，開一份新簡報（不自動產生，讓業務先檢查欄位） */
     createFromInput(input = {}) {
       const { rec, decks } = addDeckFromInput(state.decks, input);

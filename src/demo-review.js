@@ -57,11 +57,12 @@ function validDate(v) {
   return d.getMonth() === Number(m[2]) - 1 && d.getDate() === Number(m[3]) ? s : '';
 }
 
-export function emptyReview({ deckId = '', customer = '', demoAt = '' } = {}) {
+export function emptyReview({ deckId = '', customerId = '', customer = '', demoAt = '' } = {}) {
   const now = Date.now();
   return {
     id: rid(),
     deckId,
+    customerId: clip(customerId, 60),
     createdAt: now,
     updatedAt: now,
     customer: clip(customer, SHORT_LIMIT),
@@ -121,6 +122,7 @@ export function normalizeReview(r = {}) {
   const out = { ...base, ...r };
   out.id = clip(r.id, 60) || base.id;
   out.deckId = clip(r.deckId, 60);
+  out.customerId = clip(r.customerId, 60);
   out.customer = clip(out.customer, SHORT_LIMIT);
   out.demoAt = clip(out.demoAt, 40);
   out.outcome = outcomeByKey[out.outcome] ? out.outcome : '';
