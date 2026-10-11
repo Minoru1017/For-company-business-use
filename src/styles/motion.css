@@ -1,0 +1,83 @@
+/* =====================================================================
+   動態層（最後載入）：進場編排、懸停／按壓微互動、選取回饋。
+   原則：位移小（≤ 4px）、時間短（.2–.6s）、出場快進場慢、以 ease-out 為主，
+   彈性曲線只給「扣進缺角」的小物件；尊重 prefers-reduced-motion。
+   ===================================================================== */
+:root {
+  --ease-out:cubic-bezier(.16,1,.3,1);
+  --ease-spring:cubic-bezier(.34,1.45,.64,1);
+  --ease-in-out:cubic-bezier(.65,0,.35,1);
+  --t-fast:.18s; --t-base:.32s; --t-slow:.6s;
+}
+
+@keyframes mo-rise { from { opacity:0; transform:translateY(10px); } }
+@keyframes mo-pop { from { opacity:0; transform:scale(.55); } }
+@keyframes mo-settle { 0% { transform:scale(.92); } 60% { transform:scale(1.03); } 100% { transform:none; } }
+@keyframes mo-slide-in { from { transform:translateX(0); border-radius:10px; box-shadow:none; } }
+
+/* ---- 進場：首頁卡片依序浮起；工作區頁首、章節卡與序號圓章錯時出現（每次切換都會重播） ---- */
+#modeChooser:not([hidden]) .mode-card { animation:mo-rise var(--t-slow) var(--ease-out) both; animation-delay:calc(var(--i, 0) * 55ms); }
+.mode-cards .mode-card:nth-child(1) { --i:0; } .mode-cards .mode-card:nth-child(2) { --i:1; } .mode-cards .mode-card:nth-child(3) { --i:2; }
+.mode-cards .mode-card:nth-child(4) { --i:3; } .mode-cards .mode-card:nth-child(5) { --i:4; } .mode-cards .mode-card:nth-child(6) { --i:5; }
+#mainApp:not([hidden]) .ws-head { animation:mo-rise var(--t-slow) var(--ease-out) both; }
+section.sec:not([hidden]) { animation:mo-rise var(--t-slow) var(--ease-out) .08s both; }
+section.sec:not([hidden]) > .sec-head .num { animation:mo-pop .5s var(--ease-spring) .26s both; }
+section.sec:not([hidden]) .card.blk { animation:mo-rise var(--t-slow) var(--ease-out) .16s both; }
+.slog .card.slog-cal > .slog-today, .slog .card.slog-funnel > .blk-pill { animation:mo-pop .5s var(--ease-spring) .34s both; }
+
+/* ---- 首頁模式卡：整卡浮起、圖示微傾、缺角裡的箭頭鈕往右上「出發」 ---- */
+.mode-card, .mode-card.accent, .mode-card.log, .mode-card.brief, .mode-card.deck, .mode-card.drill {
+  transition:transform .5s var(--ease-out), filter .5s var(--ease-out), background-color var(--t-fast);
+}
+.mode-card:hover, .mode-card.accent:hover { transform:translateY(-4px); }
+.mode-card:active, .mode-card.accent:active { transform:translateY(-1px) scale(.99); transition-duration:.1s; }
+.mode-card::after { transition:transform .45s var(--ease-spring), background-color .2s, border-color .2s; }
+.mode-card:hover::after { transform:translate(2px,-2px); }
+.mode-card-icon { transition:transform .5s var(--ease-spring); }
+.mode-card:hover .mode-card-icon { transform:rotate(-5deg) scale(1.05); }
+.mode-card-cta { transition:background-color .25s var(--ease-out), color .25s var(--ease-out), transform .35s var(--ease-out); }
+.mode-card:hover .mode-card-cta { transform:translateX(2px); }
+
+/* ---- 積木：坐進缺角的徽章／膠囊，卡片懸停時輕輕彈起 ---- */
+.blk-badge, .blk-pill, .slog-cal .slog-today { transition:transform .45s var(--ease-spring), background-color .2s, color .2s, border-color .2s; }
+.slog-step { transition:transform .35s var(--ease-out); }
+.slog-step:hover { transform:translateY(-2px); }
+.slog-step:hover > .blk-badge { transform:scale(1.1) rotate(-8deg); }
+.slog-cal .slog-today:hover { transform:translateY(-1px); }
+
+/* ---- 日曆：格子懸停微浮、按壓縮回；選取格以「落下再回彈」確認；缺角方塊懸停放大 ---- */
+.slog-cell { transition:transform .3s var(--ease-out), background-color .3s var(--ease-out), border-color .2s, color .2s; }
+.slog-cell::before { transition:background-color .3s var(--ease-out), box-shadow .2s; }
+.slog-cell:hover { transform:translateY(-1px); }
+.slog-cell:active { transform:scale(.95); transition-duration:.08s; }
+.slog-cell.selected { animation:mo-settle .4s var(--ease-out); }
+.slog-cell-chip { transition:transform .4s var(--ease-spring); }
+.slog-cell:hover .slog-cell-chip { transform:scale(1.18); }
+.slog-cell.today .slog-cell-d { transition:box-shadow .3s var(--ease-out); }
+
+/* ---- 近 7 天：列懸停右滑一點點；選取列從貼合狀態「滑出」成泡泡 ---- */
+.slog-week-row { transition:transform .4s var(--ease-spring), border-radius .4s var(--ease-out), box-shadow .4s var(--ease-out), background-color .2s, border-color .2s; }
+.slog-week-row:hover { transform:translateX(3px); }
+.slog-week-row.selected { animation:mo-slide-in .5s var(--ease-spring); }
+.slog-week-row.selected:hover { transform:translateX(8px); }
+
+/* ---- 漏斗：數字由 JS 滾動；比率條寬度過渡 ---- */
+.slog-step-bar i { transition:width .6s var(--ease-out); }
+.slog-step-n { font-variant-numeric:tabular-nums; }
+.slog-storage-bar i { transition:width .8s var(--ease-out); }
+
+/* ---- 摺疊說明：展開內容往下淡入；ⓘ 按鈕懸停有底 ---- */
+.slog details[open] > :not(summary) { animation:mo-rise .35s var(--ease-out) both; }
+.slog-info > summary { transition:background-color .2s, color .2s; }
+.slog-info > summary:hover, .slog-info[open] > summary { background:var(--panel2); color:var(--ink); }
+
+/* ---- 按鈕：主按鈕按壓更明確；焦點環更貼合圓角 ---- */
+button, .btn { transition:background-color .2s var(--ease-out), border-color .2s, color .2s, transform .25s var(--ease-out), box-shadow .25s var(--ease-out); }
+button:active { transform:scale(.97); transition-duration:.08s; }
+button.primary:hover, .btn.primary:hover { transform:translateY(-1px); }
+button.primary:active, .btn.primary:active { transform:translateY(0) scale(.98); }
+
+/* ---- 降低動態 ---- */
+@media (prefers-reduced-motion:reduce) {
+  *, *::before, *::after { animation-duration:.01ms !important; animation-delay:0s !important; transition-duration:.01ms !important; }
+}

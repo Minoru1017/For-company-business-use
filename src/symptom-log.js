@@ -57,6 +57,7 @@ import { fmtPct, fmtDateLabel, startKey, probeDuration, srtToSegments, plainSegs
 import { createMonthlyPanels } from './symptom-log-monthly.js';
 import { createSheetSync } from './symptom-log-sheet.js';
 import { symptomLogTemplate } from './symptom-log-template.js';
+import { createFunnelMotion } from './motion.js';
 
 /**
  * @param {HTMLElement} container
@@ -99,6 +100,7 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
   };
 
   container.innerHTML = symptomLogTemplate();
+  const animateFunnel = createFunnelMotion();
 
   const q = (sel) => container.querySelector(sel);
   const gridEl = q('#slGrid');
@@ -368,6 +370,7 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
       step('i-clock', `>${f.shortMin} 分`, f.over, f.retentionRate ?? f.overRate, '留存率') +
       step('i-clock-long', `長 Call ≥${f.longMin} 分`, f.long, f.longRate, '占 >N 分') +
       step('i-cal-check', '同意時間', f.invites, f.inviteRate, '邀約率');
+    animateFunnel(el);
     renderIceStats(f);
   }
 
