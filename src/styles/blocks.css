@@ -1,32 +1,62 @@
 /* =====================================================================
    積木版面（最後載入）：矩形缺一角放徽章／膠囊、方塊彼此扣合、泡泡分離。
 
-   做法：缺角＝一個與「外層底色」同色的 ::before 矩形（內角圓弧），
-   再用兩個 radial-gradient 在缺角與卡片邊線的交接處補出內凹弧度；
-   徽章或膠囊絕對定位坐進缺角。每個積木用自訂屬性設定：
-     --blk-bg   卡片本身底色      --blk-out  缺角露出的外層底色
-     --nw / --nh 缺角寬高         --nr       圓角半徑
+   缺角是「真的挖掉」：卡片本身不畫底色，底色畫在 ::before 上，
+   再用 CSS mask 把右上（或左上）一角遮掉，露出後面任何東西。
+   外陰影畫在 ::after（用 clip-path 一併切掉缺角），徽章或膠囊絕對定位坐進缺角。
+   每個積木用自訂屬性設定：
+     --blk-bg  卡片底色   --nw / --nh  缺角寬高   --nr  圓角半徑
    ===================================================================== */
-.blk { position:relative; overflow:visible; border-color:transparent;
-  --blk-bg:var(--panel2); --blk-out:var(--panel); --nw:64px; --nh:44px; --nr:14px;
-  background-color:var(--blk-bg); background-repeat:no-repeat; }
-.blk::before { content:""; position:absolute; top:0; width:var(--nw); height:var(--nh); background:var(--blk-out); pointer-events:none; }
+.blk, section.sec:not(.history-sec),
+.mode-card, .mode-card:hover, .mode-card.accent, .mode-card.accent:hover, .mode-card.log, .mode-card.brief, .mode-card.deck, .mode-card.drill {
+  position:relative; overflow:visible; isolation:isolate;
+  background:transparent; background-image:none; border-color:transparent; box-shadow:none;
+  --blk-bg:var(--panel2); --nw:64px; --nh:44px; --nr:14px;
+  --blk-shadow:0 1px 2px rgba(40,34,20,.04), 0 14px 34px -24px rgba(40,34,20,.32);
+}
 
-/* 右上缺角 */
-.blk-tr::before { right:0; border-bottom-left-radius:var(--nr); }
-.blk-tr { background-image:
-    radial-gradient(circle at 0 100%, var(--blk-bg) calc(var(--nr) - .6px), var(--blk-out) var(--nr)),
-    radial-gradient(circle at 0 100%, var(--blk-bg) calc(var(--nr) - .6px), var(--blk-out) var(--nr));
-  background-size:var(--nr) var(--nr), var(--nr) var(--nr);
-  background-position:right var(--nw) top 0, right 0 top var(--nh); }
+/* 右上缺角：七片遮罩拼成 L 形（相鄰片重疊 1px 避免接縫），兩個外凸圓角＋一個內凹圓角 */
+.blk-tr, .mode-card, .slog .card.slog-cal {
+  --blk-mask:
+    linear-gradient(#000 0 0) left 0 bottom 0 / calc(100% - var(--nr)) calc(100% - var(--nh)) no-repeat,
+    linear-gradient(#000 0 0) right 0 bottom 0 / calc(var(--nr) + 1px) calc(100% - var(--nh) - var(--nr) + 1px) no-repeat,
+    radial-gradient(circle at 1px 100%, #000 calc(var(--nr) - .5px), transparent var(--nr)) right 0 top var(--nh) / calc(var(--nr) + 1px) var(--nr) no-repeat,
+    linear-gradient(#000 0 0) left 0 top 0 / calc(100% - var(--nw) - var(--nr)) calc(var(--nh) + 1px) no-repeat,
+    linear-gradient(#000 0 0) right var(--nw) top calc(var(--nr) - 1px) / calc(var(--nr) + 1px) calc(var(--nh) - var(--nr) + 2px) no-repeat,
+    radial-gradient(circle at 1px 100%, #000 calc(var(--nr) - .5px), transparent var(--nr)) right var(--nw) top 0 / calc(var(--nr) + 1px) var(--nr) no-repeat,
+    radial-gradient(circle at 100% 0, transparent calc(var(--nr) - .5px), #000 var(--nr)) right calc(var(--nw) - var(--nr)) top calc(var(--nh) - var(--nr)) / calc(var(--nr) + 1px) calc(var(--nr) + 1px) no-repeat;
+  --blk-clip:polygon(-80px -80px, calc(100% - var(--nw)) -80px, calc(100% - var(--nw)) var(--nh), calc(100% + 80px) var(--nh), calc(100% + 80px) calc(100% + 80px), -80px calc(100% + 80px));
+}
 
 /* 左上缺角 */
-.blk-tl::before { left:0; border-bottom-right-radius:var(--nr); }
-.blk-tl { background-image:
-    radial-gradient(circle at 100% 100%, var(--blk-bg) calc(var(--nr) - .6px), var(--blk-out) var(--nr)),
-    radial-gradient(circle at 100% 100%, var(--blk-bg) calc(var(--nr) - .6px), var(--blk-out) var(--nr));
-  background-size:var(--nr) var(--nr), var(--nr) var(--nr);
-  background-position:left var(--nw) top 0, left 0 top var(--nh); }
+.blk-tl, section.sec:not(.history-sec) {
+  --blk-mask:
+    linear-gradient(#000 0 0) right 0 bottom 0 / calc(100% - var(--nr)) calc(100% - var(--nh)) no-repeat,
+    linear-gradient(#000 0 0) left 0 bottom 0 / calc(var(--nr) + 1px) calc(100% - var(--nh) - var(--nr) + 1px) no-repeat,
+    radial-gradient(circle at calc(100% - 1px) 100%, #000 calc(var(--nr) - .5px), transparent var(--nr)) left 0 top var(--nh) / calc(var(--nr) + 1px) var(--nr) no-repeat,
+    linear-gradient(#000 0 0) right 0 top 0 / calc(100% - var(--nw) - var(--nr)) calc(var(--nh) + 1px) no-repeat,
+    linear-gradient(#000 0 0) left var(--nw) top calc(var(--nr) - 1px) / calc(var(--nr) + 1px) calc(var(--nh) - var(--nr) + 2px) no-repeat,
+    radial-gradient(circle at calc(100% - 1px) 100%, #000 calc(var(--nr) - .5px), transparent var(--nr)) left var(--nw) top 0 / calc(var(--nr) + 1px) var(--nr) no-repeat,
+    radial-gradient(circle at 0 0, transparent calc(var(--nr) - .5px), #000 var(--nr)) left calc(var(--nw) - var(--nr)) top calc(var(--nh) - var(--nr)) / calc(var(--nr) + 1px) calc(var(--nr) + 1px) no-repeat;
+  --blk-clip:polygon(var(--nw) -80px, calc(100% + 80px) -80px, calc(100% + 80px) calc(100% + 80px), -80px calc(100% + 80px), -80px var(--nh), var(--nw) var(--nh));
+}
+
+/* 底色層（被遮罩挖角） */
+.blk::before, section.sec:not(.history-sec)::before, .mode-card::before {
+  content:""; position:absolute; inset:0; z-index:-1; pointer-events:none;
+  border-radius:inherit; background:var(--blk-bg); box-shadow:inset 0 1px 0 rgba(255,255,255,.7);
+  -webkit-mask:var(--blk-mask); mask:var(--blk-mask);
+  width:auto; height:auto; clip-path:none;
+}
+/* 陰影層（只給章節卡；首頁卡用 filter，內層小卡不需陰影） */
+section.sec:not(.history-sec)::after {
+  content:""; position:absolute; inset:0; z-index:-2; pointer-events:none;
+  border-radius:inherit; box-shadow:var(--blk-shadow); clip-path:var(--blk-clip);
+}
+.mode-card, .mode-card.accent, .mode-card.log, .mode-card.brief, .mode-card.deck, .mode-card.drill {
+  filter:drop-shadow(0 1px 1px rgba(40,34,20,.04)) drop-shadow(0 12px 18px rgba(40,34,20,.10));
+}
+.mode-card:hover, .mode-card.accent:hover { filter:drop-shadow(0 1px 1px rgba(40,34,20,.04)) drop-shadow(0 18px 24px rgba(60,50,30,.16)); }
 
 /* 坐進缺角的徽章（圓）與膠囊 */
 .blk-badge { position:absolute; top:4px; display:grid; place-items:center; width:36px; height:36px; border-radius:50%;
@@ -42,51 +72,35 @@
 .blk-tr > .blk-pill { right:4px; left:auto; }
 
 /* ---- 章節卡：序號圓章坐進左上缺角 ---- */
-section.sec { --blk-bg:var(--panel); --blk-out:var(--bg); --nw:62px; --nh:56px; --nr:16px; }
-section.sec:not(.history-sec) { position:relative; overflow:visible; border-color:transparent; background-color:var(--blk-bg); background-repeat:no-repeat; }
-section.sec:not(.history-sec)::before { content:""; position:absolute; top:0; left:0; width:var(--nw); height:var(--nh); background:var(--blk-out); border-bottom-right-radius:var(--nr); pointer-events:none; }
-section.sec:not(.history-sec) { background-image:
-    radial-gradient(circle at 100% 100%, var(--blk-bg) calc(var(--nr) - .6px), var(--blk-out) var(--nr)),
-    radial-gradient(circle at 100% 100%, var(--blk-bg) calc(var(--nr) - .6px), var(--blk-out) var(--nr));
-  background-size:var(--nr) var(--nr), var(--nr) var(--nr);
-  background-position:left var(--nw) top 0, left 0 top var(--nh); }
+section.sec { --blk-bg:var(--panel); --nw:62px; --nh:56px; --nr:16px; }
 section.sec > .sec-head .num, .sec:nth-of-type(n) > .sec-head .num { position:absolute; top:8px; left:8px; width:40px; height:40px; min-width:0; padding:0; z-index:1;
-  display:grid; place-items:center; border-radius:50%; font-size:.8rem; }
+  display:grid; place-items:center; border-radius:50%; font-size:.8rem; box-shadow:0 1px 2px rgba(40,34,20,.08); }
 section.sec > .sec-head, .sec:nth-of-type(n) > .sec-head { position:static; min-height:34px; padding:0 0 0 34px; }
 
 /* ---- 首頁模式卡：箭頭圓鈕坐進右上缺角 ---- */
-.mode-card, .mode-card:hover, .mode-card.accent, .mode-card.accent:hover, .mode-card.log, .mode-card.brief, .mode-card.deck, .mode-card.drill {
-  --blk-bg:var(--panel); --blk-out:var(--bg); --nw:62px; --nh:58px; --nr:16px;
-  position:relative; overflow:visible; border-color:transparent; background-color:var(--blk-bg); background-repeat:no-repeat;
-  background-image:
-    radial-gradient(circle at 0 100%, var(--blk-bg) calc(var(--nr) - .6px), var(--blk-out) var(--nr)),
-    radial-gradient(circle at 0 100%, var(--blk-bg) calc(var(--nr) - .6px), var(--blk-out) var(--nr));
-  background-size:var(--nr) var(--nr), var(--nr) var(--nr);
-  background-position:right var(--nw) top 0, right 0 top var(--nh); }
-.mode-card::before { content:""; position:absolute; top:0; right:0; width:var(--nw); height:var(--nh); background:var(--blk-out); border-bottom-left-radius:var(--nr); pointer-events:none; clip-path:none; left:auto; }
-.mode-card::after { top:9px; right:9px; width:40px; height:40px; background-color:#fff; border:1px solid var(--hairline-2); z-index:1; }
+.mode-card, .mode-card.accent, .mode-card.log, .mode-card.brief, .mode-card.deck, .mode-card.drill { --blk-bg:var(--panel); --nw:62px; --nh:58px; --nr:16px; }
+.mode-card::after { top:9px; right:9px; width:40px; height:40px; background-color:#fff; border:1px solid var(--hairline-2); z-index:1; box-shadow:0 1px 2px rgba(40,34,20,.08); }
 .mode-card:hover::after { background-color:var(--brand); border-color:var(--brand); }
 
 /* ---- 症狀紀錄：日曆卡「今天」膠囊扣進右上缺角 ---- */
-.slog .card.slog-cal { --blk-bg:var(--panel2); --blk-out:var(--panel); --nw:84px; --nh:46px; --nr:14px; }
+.slog .card.slog-cal { --blk-bg:var(--panel2); --nw:84px; --nh:46px; --nr:14px; }
 .slog-cal .slog-cal-head { margin-right:calc(var(--nw) - 12px); }
 .slog-cal .slog-today { position:absolute; top:4px; right:4px; height:36px; padding:0 16px; border-radius:999px; background:var(--deep); color:var(--brand); border-color:var(--deep); font-weight:700; z-index:1; }
 .slog-cal .slog-today:hover { background:var(--deep-2); color:var(--brand); }
 
 /* ---- 症狀紀錄：當天卡的日期膠囊扣進左上缺角 ---- */
-.slog .card.slog-funnel { --blk-bg:var(--panel2); --blk-out:var(--panel); --nw:160px; --nh:46px; --nr:14px; padding-top:54px; }
+.slog .card.slog-funnel { --blk-bg:var(--panel2); --nw:160px; --nh:46px; --nr:14px; padding-top:54px; }
 .slog-funnel > h2 { margin:0; }
 .slog-funnel-head { display:flex; flex-wrap:wrap; align-items:center; gap:8px; min-height:0; margin:0 0 12px; }
 .slog-funnel-head .slog-count { margin-right:auto; }
 
 /* ---- 漏斗步驟：圖示徽章坐進右上缺角；最後一步（結果 KPI）反白 ---- */
-.slog-step { --blk-bg:#fff; --blk-out:var(--panel2); --nw:46px; --nh:42px; --nr:12px; padding:12px 14px; }
+.slog-step { --blk-bg:#fff; --nw:46px; --nh:42px; --nr:12px; padding:12px 14px; }
 .slog-step > .slog-step-n { padding-right:40px; }
-.slog-step.blk { border-color:transparent; }
 .slog-step-ic { display:none; }
 .slog-step > .blk-badge { top:3px; right:3px; width:34px; height:34px; background:#fff; color:var(--text-2); }
 .slog-step > .blk-badge .ic { width:1rem; height:1rem; }
-.slog-step:last-child { --blk-bg:var(--deep); background-color:var(--deep); }
+.slog-step:last-child { --blk-bg:var(--deep); }
 .slog-step:last-child .blk-badge { background:var(--brand); color:var(--ink); border-color:var(--brand); }
 
 /* ---- 近 7 天：列與列像積木貼合，選取列浮出成「泡泡」 ---- */
