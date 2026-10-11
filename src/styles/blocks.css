@@ -75,7 +75,7 @@ section.sec:not(.history-sec)::after {
 section.sec { --blk-bg:var(--panel); --nw:62px; --nh:56px; --nr:16px; }
 section.sec > .sec-head .num, .sec:nth-of-type(n) > .sec-head .num { position:absolute; top:8px; left:8px; width:40px; height:40px; min-width:0; padding:0; z-index:1;
   display:grid; place-items:center; border-radius:50%; font-size:.8rem; box-shadow:0 1px 2px rgba(40,34,20,.08); }
-section.sec > .sec-head, .sec:nth-of-type(n) > .sec-head { position:static; min-height:34px; padding:0 0 0 34px; }
+section.sec > .sec-head, .sec:nth-of-type(n) > .sec-head { position:static; min-height:34px; padding:0 0 0 calc(var(--nw) - 12px); }
 
 /* ---- 首頁模式卡：箭頭圓鈕坐進右上缺角 ---- */
 .mode-card, .mode-card.accent, .mode-card.log, .mode-card.brief, .mode-card.deck, .mode-card.drill { --blk-bg:var(--panel); --nw:62px; --nh:58px; --nr:16px; }
@@ -113,6 +113,6 @@ section.sec > .sec-head, .sec:nth-of-type(n) > .sec-head { position:static; min-
 @media (max-width:720px) {
   section.sec { --nw:56px; --nh:52px; }
   section.sec > .sec-head .num { top:6px; left:6px; }
-  section.sec > .sec-head, .sec:nth-of-type(n) > .sec-head { padding-left:44px; }
+  section.sec > .sec-head, .sec:nth-of-type(n) > .sec-head { padding-left:calc(var(--nw) - 4px); }
   .slog .card.slog-funnel { --nw:150px; }
 }
