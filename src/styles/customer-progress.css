@@ -24,3 +24,15 @@
 .cp-next { font-size:.76rem; color:var(--muted); line-height:1.45; }
 .cp-next.ok { color:var(--ok); }
 .cp-more { align-self:flex-start; padding:4px 12px; font-size:.78rem; }
+
+/* 首頁：今天該跟進 */
+.cp-due { margin:var(--s4) 0; display:flex; flex-direction:column; gap:8px; padding:12px 14px; border:1px solid rgba(245,197,24,.45); border-radius:8px; background:rgba(245,197,24,.06); }
+.cp-due[hidden] { display:none; }
+.cp-due-list { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:4px; }
+.cp-due-item { width:100%; display:grid; grid-template-columns:84px minmax(70px,auto) 1fr auto; align-items:center; gap:4px 12px; padding:7px 10px; text-align:left; border:1px solid transparent; border-radius:6px; background:rgba(0,0,0,.18); color:var(--text); font-family:var(--sans); letter-spacing:0; box-shadow:none; cursor:pointer; }
+.cp-due-item:hover, .cp-due-item:focus-visible { border-color:var(--accent); transform:none; box-shadow:none; outline:none; }
+.cp-due-when { font-size:.72rem; font-weight:700; color:var(--warn); }
+.cp-due-when.overdue { color:var(--bad); }
+.cp-due-step { min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:.8rem; color:var(--muted); }
+.cp-due-date { font-family:var(--mono); font-size:.72rem; color:var(--muted); }
+@media (max-width:640px) { .cp-due-item { grid-template-columns:1fr auto; } .cp-due-step { grid-column:1 / -1; } }

@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { PROGRESS_STAGES, buildCustomerProgress, loadCustomerProgress, loadDeckBriefs } from '../src/customer-progress.js';
+import { PROGRESS_STAGES, buildCustomerProgress, dueFollowUps, loadCustomerProgress, loadDeckBriefs, overdueDays } from '../src/customer-progress.js';
 import { emptyReview, normalizeReview, saveReviews } from '../src/demo-review.js';
 
 const TODAY = '2026-10-11';
@@ -101,5 +101,31 @@ describe('customer progress: reading storage', () => {
     expect(c.name).toBe('涵小姐');
     expect(stageKeys(c)).toContain('demo');
     expect(c.followUp).toBe('upcoming');
+  });
+});
+
+describe('customer progress: follow-ups due today', () => {
+  it('counts overdue days and ignores future or missing dates', () => {
+    expect(overdueDays('2026-10-08', TODAY)).toBe(3);
+    expect(overdueDays('2026-10-11', TODAY)).toBe(0);
+    expect(overdueDays('2026-10-20', TODAY)).toBe(0);
+    expect(overdueDays('', TODAY)).toBe(0);
+  });
+
+  it('lists overdue first (longest first), then today, then missing dates', () => {
+    const mk = (id, name, over) => review({ deckId: id, customer: name, outcome: 'thinking', nextStep: `${name} 的下一步`, ...over });
+    const decks = ['a', 'b', 'c', 'd', 'e'].map((id) => deck({ id, name: id }));
+    const reviews = [
+      mk('a', 'A', { followUpDate: '2026-10-10' }),
+      mk('b', 'B', { followUpDate: '2026-10-05' }),
+      mk('c', 'C', { followUpDate: TODAY }),
+      mk('d', 'D', { followUpDate: '' }),
+      mk('e', 'E', { followUpDate: '2026-12-01' }),
+      review({ deckId: 'gone', customer: 'F', outcome: 'closed' }),
+    ];
+    const due = dueFollowUps(buildCustomerProgress(decks, reviews, TODAY));
+    expect(due.map((c) => c.name)).toEqual(['B', 'A', 'C', 'D']);
+    expect(due[0]).toMatchObject({ overdueDays: 6, nextStep: 'B 的下一步', followUp: 'overdue' });
+    expect(dueFollowUps(null)).toEqual([]);
   });
 });

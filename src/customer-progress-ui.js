@@ -1,15 +1,24 @@
 /** 首頁：每位客戶一條進度條（建客戶 → 簡報 → DEMO → 錄影分析 → 複盤），點一下回到那位客戶。 */
-import { loadCustomerProgress } from './customer-progress.js';
+import { dueFollowUps, loadCustomerProgress } from './customer-progress.js';
 import { escapeHTML } from './utils.js';
 
 const COLLAPSED_COUNT = 6;
 const FOLLOW_TEXT = { overdue: '跟進已過期', today: '今天跟進', nodate: '未填跟進日', upcoming: '' };
 
+const DUE_LIMIT = 5;
+
+function dueLabel(c) {
+  if (c.followUp === 'today') return '今天';
+  if (c.followUp === 'overdue') return `過期 ${c.overdueDays} 天`;
+  return '未填日期';
+}
+
 /**
- * @param {HTMLElement} container
- * @param {{ onOpen?: (item:object)=>void }} [opts]
+ * @param {HTMLElement} container  客戶進度條
+ * @param {{ onOpen?: (item:object)=>void, dueContainer?: HTMLElement }} [opts]
+ *   dueContainer：首頁上方的「今天該跟進」清單（不給就不顯示）
  */
-export function mountCustomerProgress(container, { onOpen } = {}) {
+export function mountCustomerProgress(container, { onOpen, dueContainer } = {}) {
   if (!container) return { refresh() {} };
   let expanded = false;
   let items = [];
@@ -35,8 +44,33 @@ export function mountCustomerProgress(container, { onOpen } = {}) {
     </li>`;
   }
 
+  function renderDue() {
+    if (!dueContainer) return;
+    const due = dueFollowUps(items);
+    dueContainer.hidden = !due.length;
+    if (!due.length) {
+      dueContainer.innerHTML = '';
+      return;
+    }
+    const rows = due
+      .slice(0, DUE_LIMIT)
+      .map(
+        (c) => `<li><button type="button" class="cp-due-item" data-cp-due="${escapeHTML(c.key)}">
+          <span class="cp-due-when ${c.followUp}">${dueLabel(c)}</span>
+          <b>${escapeHTML(c.name)}</b>
+          <span class="cp-due-step">${c.nextStep ? escapeHTML(c.nextStep) : '還沒寫下一步'}</span>
+          <span class="cp-due-date">${c.followUpDate ? escapeHTML(c.followUpDate) : '補上跟進日期 →'}</span>
+        </button></li>`
+      )
+      .join('');
+    dueContainer.innerHTML = `
+      <div class="cp-head"><h3>今天該跟進 <small>${due.length} 位${due.length > DUE_LIMIT ? `（顯示前 ${DUE_LIMIT} 位）` : ''}</small></h3></div>
+      <ul class="cp-due-list">${rows}</ul>`;
+  }
+
   function render() {
     items = loadCustomerProgress();
+    renderDue();
     container.hidden = !items.length;
     if (!items.length) {
       container.innerHTML = '';
@@ -60,6 +94,12 @@ export function mountCustomerProgress(container, { onOpen } = {}) {
     }
     const btn = e.target.closest('[data-cp]');
     const item = btn && items.find((c) => c.key === btn.dataset.cp);
+    if (item) onOpen?.(item);
+  });
+
+  dueContainer?.addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-cp-due]');
+    const item = btn && items.find((c) => c.key === btn.dataset.cpDue);
     if (item) onOpen?.(item);
   });
 

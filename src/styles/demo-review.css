@@ -48,3 +48,5 @@
 .dr-video-state.warn { color:var(--warn); }
 .dr-video-actions { display:flex; flex-wrap:wrap; gap:6px; }
 .dr-video-actions [hidden] { display:none; }
+.dr-video-auto { display:flex; align-items:center; gap:6px; font-size:.76rem; color:var(--muted); }
+.dr-video-auto[hidden] { display:none; }

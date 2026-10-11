@@ -11,6 +11,7 @@ import {
   emptyReview,
   filterReviews,
   followUpStatus,
+  getPendingReview,
   formatAnalysisSummary,
   loadReviews,
   mergeLinkFields,
@@ -24,12 +25,14 @@ import {
   reviewToText,
   reviewsToCsv,
   saveReviews,
+  setPendingReview,
   tierLabel,
   upsertReview,
   videoFromFile,
 } from './demo-review.js';
 import { escapeHTML } from './utils.js';
 
+const AUTO_START_KEY = 'call_coach_review_autostart';
 const FOLLOW_LABELS = { overdue: '已過期', today: '今天跟進', nodate: '未填日期', upcoming: '' };
 
 function downloadText(name, text, type = 'text/csv;charset=utf-8') {
@@ -48,7 +51,7 @@ function downloadText(name, text, type = 'text/csv;charset=utf-8') {
  * @param {object} opts
  * @param {(deckId:string)=>boolean} opts.hasDeck  這份簡報還在不在
  * @param {(deckId:string)=>void} opts.onOpenDeck  切到那份簡報（會再呼叫 setDeck）
- * @param {(file:File)=>Promise<{ok:boolean,reason?:string}>} [opts.onSendVideo]  把錄影送進 DEMO 轉錄
+ * @param {(file:File, o:{autoStart:boolean})=>Promise<{ok:boolean,filename?:string,reason?:string}>} [opts.onSendVideo]  把錄影送進 DEMO 轉錄
  * @param {(historyId:string)=>boolean} [opts.hasAnalysis]  「最近分析」裡還找不找得到這筆
  * @param {(historyId:string)=>void} [opts.onOpenAnalysis]  開啟那筆分析
  * @param {(msg:string)=>void} [opts.showToast]
@@ -103,6 +106,7 @@ export function mountDemoReview(
         <p class="dr-video-state" id="drVideoState"></p>
         <div class="dr-video-actions">
           <button type="button" class="btn primary slog-mini" id="drVideoSend" hidden>送到 DEMO 轉錄分析</button>
+          <label class="dr-video-auto" id="drVideoAutoWrap" hidden><input type="checkbox" id="drVideoAuto"> 送出後自動開始轉錄</label>
           <button type="button" class="btn slog-mini" id="drVideoOpen" hidden>開啟分析結果</button>
           <button type="button" class="btn slog-mini" id="drVideoClear" hidden>移除錄影</button>
         </div>
@@ -143,6 +147,8 @@ export function mountDemoReview(
     videoFile: q('#drVideoFile'),
     videoState: q('#drVideoState'),
     videoSend: q('#drVideoSend'),
+    videoAuto: q('#drVideoAuto'),
+    videoAutoWrap: q('#drVideoAutoWrap'),
     videoOpen: q('#drVideoOpen'),
     videoClear: q('#drVideoClear'),
   };
@@ -209,7 +215,7 @@ export function mountDemoReview(
       text = '逐字稿已轉好。到「DEMO 轉錄」標記說話者（業務／客戶）後按「開始分析」，結果會回填到這裡。';
       tone = 'warn';
     } else if (v?.sentAt) {
-      text = '錄影已放進轉錄助手。到「DEMO 轉錄」面板按「開始轉錄」；轉好後會自動對上這筆複盤。';
+      text = '錄影已送進轉錄助手。若沒有自動開始，到「DEMO 轉錄」面板按「開始轉錄」；轉好後會自動對上這筆複盤。';
       tone = 'warn';
     } else if (v) {
       text = inMemory ? '已選擇錄影，還沒送進轉錄。' : '複盤只記住檔名；要轉錄請重新選擇這個檔案。';
@@ -217,6 +223,7 @@ export function mountDemoReview(
     els.videoState.textContent = text;
     els.videoState.className = `dr-video-state ${tone}`;
     els.videoSend.hidden = !v || !onSendVideo || !!a;
+    els.videoAutoWrap.hidden = els.videoSend.hidden;
     els.videoSend.disabled = state.sending;
     els.videoSend.textContent = state.sending ? '送出中…' : inMemory ? (v.sentAt ? '重新送到 DEMO 轉錄' : '送到 DEMO 轉錄分析') : '重新選擇檔案並送出';
     els.videoOpen.hidden = !(a && onOpenAnalysis && hasAnalysis(a.historyId));
@@ -314,9 +321,10 @@ export function mountDemoReview(
     renderVideo();
     flush();
     try {
-      const res = await onSendVideo(state.videoFile);
+      const res = await onSendVideo(state.videoFile, { autoStart: els.videoAuto.checked });
       if (res?.ok) {
-        patchCurrent({ video: { ...current().video, sentAt: Date.now() } });
+        patchCurrent({ video: { ...current().video, sentAt: Date.now(), bridgeName: res.filename || current().video.bridgeName } });
+        setPendingReview(current().id);
         flush();
       }
     } catch (e) {
@@ -351,6 +359,18 @@ export function mountDemoReview(
     els.videoFile.value = '';
     pickVideo(file, { send });
   });
+  try {
+    els.videoAuto.checked = localStorage.getItem(AUTO_START_KEY) === '1';
+  } catch {
+    /* ignore */
+  }
+  els.videoAuto.addEventListener('change', () => {
+    try {
+      localStorage.setItem(AUTO_START_KEY, els.videoAuto.checked ? '1' : '0');
+    } catch {
+      /* ignore */
+    }
+  });
   els.videoSend.addEventListener('click', sendVideo);
   els.videoOpen.addEventListener('click', () => {
     const a = current()?.analysis;
@@ -359,7 +379,9 @@ export function mountDemoReview(
   els.videoClear.addEventListener('click', () => {
     if (!current()?.video) return;
     if (!window.confirm('移除這筆複盤的錄影與分析連結？（不會刪除轉錄助手裡的檔案）')) return;
+    const removedId = current().id;
     patchCurrent({ video: null, analysis: null });
+    if (getPendingReview() === removedId) setPendingReview('');
     state.videoFile = null;
     state.videoFileFor = null;
     renderVideo();

@@ -52,6 +52,8 @@ let pinnedLogState = null;
 let uploadXhr = null;
 let uploadStartAt = 0;
 let bridgeApiToken = null;
+/** initLocalTranscribe 綁定的回呼，讓面板以外（DEMO 複盤）也能啟動轉錄 */
+let bridgeCtx = null;
 
 function syncSelectedMp4(files) {
   selectedMp4 = pickSelectedMp4(selectedMp4, files);
@@ -834,6 +836,7 @@ export function initLocalTranscribe({ onTranscriptReady, showToast, getMode }) {
   refreshTimer = setInterval(refreshStatus, 8000);
   setInterval(() => refreshAssistantUpdate(showToast, { force: true }), 6 * 60 * 60 * 1000);
   window.__refreshBridge = refreshStatus;
+  bridgeCtx = { onTranscriptReady, showToast, refreshStatus };
 
   api('/api/job')
     .then((j) => {
@@ -984,6 +987,7 @@ async function uploadMp4(file, showToast, refreshStatus) {
   showToast(`開始複製 ${file.name}…（大檔請耐心等候）`);
 
   let ok = false;
+  let savedName = '';
   try {
     const r = await uploadMp4XHR(file, ({ loaded, total, pct, sec, speed }) => {
       const stalled = pct < 1 && sec > 30;
@@ -998,6 +1002,7 @@ async function uploadMp4(file, showToast, refreshStatus) {
       });
     });
     selectedMp4 = r.filename;
+    savedName = r.filename;
     setUploadUI({ state: 'ok', message: `✓ 已放入本機 input：${r.filename}（${fmtSize(file.size)}）` });
     showToast(`已放入本機 input：${r.filename} — 可按「開始本機轉錄」`);
     setTimeout(() => setUploadUI({ state: 'idle' }), 5000);
@@ -1011,20 +1016,31 @@ async function uploadMp4(file, showToast, refreshStatus) {
     uploadXhr = null;
     await refreshStatus();
   }
-  return ok;
+  return ok ? savedName || true : false;
 }
 
 /**
  * 從 DEMO 複盤把錄影送進本機轉錄助手的 input 資料夾（之後在 DEMO 轉錄面板按「開始轉錄」）。
- * @returns {Promise<{ok:boolean, reason?:'offline'|'busy'|'failed'}>}
+ * autoStart：放好後直接開始轉錄（雲端／遠端模式沒同意時仍會擋下，維持手動）。
+ * @returns {Promise<{ok:boolean, filename?:string, started?:boolean, reason?:'offline'|'busy'|'failed'}>}
  */
-export async function sendMp4ToBridge(file, showToast) {
+export async function sendMp4ToBridge(file, showToast, { autoStart = false } = {}) {
   if (uploadBusy || transcribeBusy) return { ok: false, reason: 'busy' };
   if (!(await checkLocalBridge())) return { ok: false, reason: 'offline' };
-  const ok = await uploadMp4(file, showToast, async () => {
+  const saved = await uploadMp4(file, showToast, async () => {
     await window.__refreshBridge?.();
   });
-  return ok ? { ok: true } : { ok: false, reason: 'failed' };
+  if (!saved) return { ok: false, reason: 'failed' };
+  const filename = typeof saved === 'string' ? saved : '';
+  if (autoStart && bridgeCtx) {
+    const reason = transcribeBlockReason(getBridgeStatus());
+    if (reason) showToast(`錄影已放入 input，但還不能自動轉錄：${reason}`);
+    else {
+      await runTranscribe(bridgeCtx.onTranscriptReady, showToast, bridgeCtx.refreshStatus);
+      return { ok: true, filename, started: transcribeBusy };
+    }
+  }
+  return { ok: true, filename, started: false };
 }
 
 function notifyButtonLabel() {

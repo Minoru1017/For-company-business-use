@@ -9,12 +9,14 @@ import {
   linkTranscriptToReview,
   loadReviews,
   matchReviewByVideo,
+  getPendingReview,
   mergeLinkFields,
   normalizeReview,
   reviewHasContent,
   reviewToText,
   reviewsToCsv,
   saveReviews,
+  setPendingReview,
   upsertReview,
   videoFromFile,
   videoKey,
@@ -40,7 +42,7 @@ describe('demo review video: normalize', () => {
     expect(normalizeReview({}).video).toBeNull();
     expect(normalizeReview({ video: { name: '  ' } }).video).toBeNull();
     const r = normalizeReview({ video: { name: 'a.mp4', size: -5, addedAt: 'x', sentAt: 5, transcribedAt: 9, blob: 'big' } });
-    expect(r.video).toEqual({ name: 'a.mp4', size: 0, addedAt: 0, sentAt: 5, transcribedAt: 9 });
+    expect(r.video).toEqual({ name: 'a.mp4', bridgeName: '', size: 0, addedAt: 0, sentAt: 5, transcribedAt: 9 });
   });
 
   it('requires a history id for the analysis link and sanitizes the summary', () => {
@@ -72,6 +74,20 @@ describe('demo review video: matching transcripts to reviews', () => {
     expect(matchReviewByVideo([a, b, c], 'nothing.srt')).toBeNull();
     expect(matchReviewByVideo([a, b, c], '')).toBeNull();
     expect(matchReviewByVideo([emptyReview()], 'x.srt')).toBeNull();
+  });
+
+  it('also matches the file name the assistant actually saved', () => {
+    const r = withVideo('涵小姐 DEMO 1011.mp4', { video: { name: '涵小姐 DEMO 1011.mp4', bridgeName: 'uploaded-demo.mp4' } });
+    expect(matchReviewByVideo([r], 'uploaded-demo.srt').id).toBe(r.id);
+    expect(matchReviewByVideo([r], '涵小姐 DEMO 1011.srt').id).toBe(r.id);
+  });
+
+  it('prefers the review the video was just sent from when names collide', () => {
+    const older = withVideo('demo.mp4', { video: { name: 'demo.mp4', sentAt: 100 }, updatedAt: 900 });
+    const newer = withVideo('demo.mp4', { video: { name: 'demo.mp4', sentAt: 500 }, updatedAt: 100 });
+    expect(matchReviewByVideo([older, newer], 'demo.srt').id).toBe(newer.id);
+    expect(matchReviewByVideo([older, newer], 'demo.srt', older.id).id).toBe(older.id);
+    expect(matchReviewByVideo([older, newer], 'demo.srt', 'rev_missing').id).toBe(newer.id);
   });
 
   it('records the transcript time once', () => {
@@ -109,6 +125,25 @@ describe('demo review video: storage helpers used by app.js', () => {
     expect(seen).toHaveBeenCalledTimes(2);
     expect(seen.mock.calls[0][0].type).toBe(REVIEWS_CHANGED_EVENT);
     expect(linkAnalysisToReview('nope.srt', { historyId: 'x' })).toBeNull();
+  });
+
+  it('links to the pending review first, then clears it once analysed', () => {
+    const store = new Map();
+    vi.stubGlobal('sessionStorage', {
+      getItem: (k) => (store.has(k) ? store.get(k) : null),
+      setItem: (k, v) => store.set(k, String(v)),
+      removeItem: (k) => store.delete(k),
+    });
+    const a = withVideo('demo.mp4', { video: { name: 'demo.mp4', sentAt: 500 }, updatedAt: 5 });
+    const b = withVideo('demo.mp4', { video: { name: 'demo.mp4', sentAt: 100 }, updatedAt: 4 });
+    saveReviews([a, b]);
+    vi.stubGlobal('window', { dispatchEvent: vi.fn() });
+    setPendingReview(b.id);
+    expect(getPendingReview()).toBe(b.id);
+    expect(linkAnalysisToReview('demo.srt', { historyId: 'h1', summary: SUMMARY }).id).toBe(b.id);
+    expect(getPendingReview()).toBe('');
+    setPendingReview('');
+    expect(getPendingReview()).toBe('');
   });
 
   it('does not throw on corrupted storage', () => {

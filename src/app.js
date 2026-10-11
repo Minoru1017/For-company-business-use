@@ -935,9 +935,9 @@ async function sendAnalysisToDeck() {
 }
 
 /** DEMO 複盤的錄影：切到 DEMO 轉錄，放進本機助手的 input 資料夾 */
-async function sendReviewVideo(file) {
+async function sendReviewVideo(file, { autoStart = false } = {}) {
   switchMode('demo');
-  const res = await sendMp4ToBridge(file, showToast);
+  const res = await sendMp4ToBridge(file, showToast, { autoStart });
   if (res.reason === 'offline') showToast('轉錄助手還沒啟動——啟動後回到 DEMO 簡報的複盤，再按「送到 DEMO 轉錄分析」');
   else if (res.reason === 'busy') showToast('轉錄助手正在處理另一個檔案，請稍後再送');
   else if (res.ok) $('demoSection')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
@@ -990,7 +990,7 @@ function init() {
   });
   updateHeroPhilosophyBar(resolveMode());
   try {
-    customerProgress = mountCustomerProgress($('customerProgressHome'), { onOpen: openCustomerFromHome });
+    customerProgress = mountCustomerProgress($('customerProgressHome'), { onOpen: openCustomerFromHome, dueContainer: $('followUpHome') });
   } catch (e) {
     console.error('customer progress init failed', e);
   }

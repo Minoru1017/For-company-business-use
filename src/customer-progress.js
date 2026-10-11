@@ -31,6 +31,26 @@ export function loadDeckBriefs() {
   }
 }
 
+const DAY_MS = 86400000;
+const parseDay = (k) => {
+  const [y, m, d] = String(k).split('-').map(Number);
+  return new Date(y, m - 1, d).getTime();
+};
+
+/** 跟進日期已經過了幾天（今天或還沒到＝0） */
+export function overdueDays(followUpDate, today = todayKey()) {
+  if (!followUpDate) return 0;
+  return Math.max(0, Math.round((parseDay(today) - parseDay(followUpDate)) / DAY_MS));
+}
+
+export const DUE_STATUSES = ['overdue', 'today', 'nodate'];
+
+/** 首頁「今天該跟進」：已過期、今天到期、還沒填日期的客戶；過期最久的排最前面，未填日期放最後 */
+export function dueFollowUps(items) {
+  const rank = (c) => (c.followUp === 'nodate' ? Number.MAX_SAFE_INTEGER : -c.overdueDays);
+  return (items || []).filter((c) => DUE_STATUSES.includes(c.followUp)).sort((a, b) => rank(a) - rank(b) || b.updatedAt - a.updatedAt);
+}
+
 function nextHint(stages, review) {
   const todo = stages.find((s) => !s.done);
   if (!todo) return '';
@@ -94,11 +114,13 @@ export function buildCustomerProgress(decks, reviews, today = todayKey()) {
       outcomeLabel: review?.outcome ? outcomeLabel(review.outcome) : '',
       followUp: fu,
       followUpDate: review?.followUpDate || '',
+      overdueDays: fu === 'overdue' ? overdueDays(review.followUpDate, today) : 0,
+      nextStep: review?.nextStep || '',
       updatedAt: Math.max(deck?.updatedAt || 0, review?.updatedAt || 0),
     });
   });
 
-  const rank = (c) => (['overdue', 'today', 'nodate'].includes(c.followUp) ? 0 : c.done < PROGRESS_STAGES.length ? 1 : 2);
+  const rank = (c) => (DUE_STATUSES.includes(c.followUp) ? 0 : c.done < PROGRESS_STAGES.length ? 1 : 2);
   return out.sort((a, b) => rank(a) - rank(b) || b.updatedAt - a.updatedAt);
 }
 
