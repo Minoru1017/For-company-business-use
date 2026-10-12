@@ -129,3 +129,37 @@ section.sec > .sec-head, .sec:nth-of-type(n) > .sec-head { position:static; min-
   .slog-cell-chip { top:3px; right:3px; width:11px; height:11px; border-radius:3px; }
   .slog-cell.blk > .slog-cell-n { top:auto; right:5px; bottom:5px; }
 }
+
+/* ---- 分析報告：五字口訣堆疊——一列積木，點哪張哪張浮起並扣進下方細節卡 ---- */
+.purpose-stack { display:grid; grid-template-columns:repeat(5, minmax(0,1fr)); gap:6px; margin:0 0 10px; }
+.purpose-tab { position:relative; display:flex; flex-direction:column; align-items:flex-start; justify-content:flex-start; gap:4px; min-height:60px; padding:10px 24px 8px 10px;
+  border-radius:14px; border:1px solid var(--hairline); background:#fff; color:var(--ink);
+  font-family:var(--disp); font-weight:700; font-size:.9rem; letter-spacing:0; line-height:1.3; text-align:left; cursor:pointer;
+  transition:transform .4s var(--ease-spring, ease), background-color .2s, color .2s, border-color .2s, box-shadow .3s; }
+.purpose-tab.miss { background:var(--panel2); color:var(--text-2); border-color:transparent; }
+.purpose-tab:hover { transform:translateY(-2px); background:#fff; border-color:var(--hairline-2); color:var(--ink); }
+.purpose-tab.on, .purpose-tab.on:hover { background:var(--deep); color:var(--on-deep); border-color:var(--deep); transform:translateY(-4px); box-shadow:0 12px 22px -14px rgba(23,21,15,.55); }
+.purpose-tab.on::after { content:""; position:absolute; left:50%; bottom:-6px; width:12px; height:12px; border-radius:2px; background:var(--deep); transform:translateX(-50%) rotate(45deg); }
+.purpose-tab .purpose-badge { margin:0; padding:1px 7px; border-radius:999px; font-family:var(--sans); font-size:.6rem; font-weight:600; letter-spacing:0; background:var(--brand-soft); color:#6b5200; }
+.purpose-tab .purpose-badge.sec { background:var(--panel2); color:var(--text-2); }
+.purpose-tab.on .purpose-badge.dom { background:var(--brand); color:var(--ink); }
+.purpose-tab.on .purpose-badge.sec { background:rgba(255,255,255,.14); color:var(--on-deep); }
+.purpose-dot { position:absolute; top:11px; right:10px; width:7px; height:7px; border-radius:50%; background:var(--ok); }
+.purpose-tab.miss .purpose-dot { background:transparent; box-shadow:inset 0 0 0 1.5px var(--hairline-2); }
+.purpose-tab.on .purpose-dot { box-shadow:none; }
+.purpose-tab.on.miss .purpose-dot { box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.35); }
+.purpose-detail { --blk-bg:#fff; --nw:132px; --nh:44px; --nr:14px; margin:0 0 14px; padding:52px 16px 14px; border-radius:16px; font-size:.84rem; line-height:1.65; text-align:left; }
+.purpose-detail > .blk-pill { left:4px; top:4px; gap:8px; }
+.purpose-pill-role { font-family:var(--sans); font-size:.62rem; font-weight:600; color:var(--brand); }
+.purpose-detail .purpose-desc { margin:0 0 8px; color:var(--text-2); font-size:.8rem; }
+.purpose-detail .purpose-ev { margin:0 0 6px; color:var(--ink); font-size:.84rem; }
+.purpose-detail .purpose-ev.muted { color:var(--text-2); }
+.purpose-ev-k { display:inline-block; margin-right:8px; padding:1px 8px; border-radius:999px; background:var(--panel2); color:var(--text-2); font-size:.66rem; font-weight:600; vertical-align:1px; }
+.purpose-detail.is-swapping > :not(.blk-pill) { animation:mo-rise .3s var(--ease-out, ease) both; }
+@media (max-width:720px) {
+  .purpose-stack { gap:4px; }
+  .purpose-tab { min-height:54px; padding:9px 6px 8px 8px; font-size:.78rem; white-space:nowrap; }
+  .purpose-tab .purpose-badge { font-size:.56rem; padding:1px 5px; }
+  .purpose-dot { top:5px; right:5px; width:5px; height:5px; }
+  .purpose-detail { --nw:124px; padding:50px 12px 12px; }
+}

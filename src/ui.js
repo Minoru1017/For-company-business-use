@@ -32,25 +32,58 @@ export function updateReportCounts() {
   });
 }
 
+/** 五字口訣卡：堆疊成一列可點的積木，只展開被點到那一張的細節，避免五張全文一起壓上來。 */
+const purposeDetailHtml = (t, hit, role) => {
+  const roleTag = role ? `<small class="purpose-pill-role">${role}</small>` : '';
+  const dontForce = t.dontForceTo?.length ? `<p class="purpose-ev muted">勿硬導向：${t.dontForceTo.join('、')}</p>` : '';
+  const ev = hit
+    ? `<p class="purpose-ev"><span class="purpose-ev-k">客戶原話</span>${escapeHTML(hit.evidence.text.slice(0, 120))}${hit.evidence.text.length > 120 ? '…' : ''}</p>`
+    : `<p class="purpose-ev muted"><span class="purpose-ev-k">未偵測到</span>可問：${escapeHTML(t.probe)}</p>`;
+  return `<span class="blk-pill">${t.label}${roleTag}</span><p class="purpose-desc">${t.purpose}</p>${ev}${dontForce}`;
+};
+
+function bindPurposeStack(el) {
+  if (el.dataset.stackBound) return;
+  el.dataset.stackBound = '1';
+  el.addEventListener('click', (e) => {
+    const tab = e.target.closest('.purpose-tab');
+    if (!tab || !el.contains(tab)) return;
+    const panel = el.querySelector('.purpose-detail');
+    const html = tab.dataset.detail;
+    if (!panel || html == null) return;
+    el.querySelectorAll('.purpose-tab').forEach((b) => {
+      const on = b === tab;
+      b.classList.toggle('on', on);
+      b.setAttribute('aria-selected', on ? 'true' : 'false');
+    });
+    panel.classList.remove('is-swapping');
+    void panel.offsetWidth;
+    panel.innerHTML = html;
+    panel.classList.add('is-swapping');
+  });
+}
+
 export function renderPurposeProfile(profile) {
   const el = $('purposeTypes');
   if (!el) return;
 
-  const typeCards = PURPOSE_TYPES.map((t) => {
+  const defaultKey = profile.dominant?.key || profile.signals[0]?.key || PURPOSE_TYPES[0].key;
+  let defaultDetail = '';
+  const tabs = PURPOSE_TYPES.map((t) => {
     const hit = profile.signals.find((s) => s.key === t.key);
     const isDom = profile.dominant?.key === t.key;
     const isSec = profile.secondary?.key === t.key;
+    const role = isDom ? '主導' : isSec ? '次要' : '';
     const badge = isDom ? '<span class="purpose-badge dom">主導</span>' : isSec ? '<span class="purpose-badge sec">次要</span>' : '';
-    const dontForce = t.dontForceTo?.length
-      ? `<div class="purpose-ev muted">勿硬導向：${t.dontForceTo.join('、')}</div>`
-      : '';
-    return `<div class="purpose-card ${hit ? 'hit' : 'miss'} ${isDom ? 'dominant' : ''}">
-      <div class="purpose-card-head">${t.label}${badge}</div>
-      <div class="purpose-desc">${t.purpose}</div>
-      ${hit ? `<div class="purpose-ev">客戶原話：${escapeHTML(hit.evidence.text.slice(0, 60))}${hit.evidence.text.length > 60 ? '…' : ''}</div>` : `<div class="purpose-ev muted">未偵測到 — 可問：${escapeHTML(t.probe)}</div>`}
-      ${dontForce}
-    </div>`;
+    const detail = purposeDetailHtml(t, hit, role);
+    const on = t.key === defaultKey;
+    if (on) defaultDetail = detail;
+    return `<button type="button" class="purpose-tab ${hit ? 'hit' : 'miss'}${isDom ? ' dominant' : ''}${on ? ' on' : ''}" role="tab" aria-selected="${on}" data-key="${t.key}" data-detail="${escapeHTML(detail)}">
+      <span class="purpose-tab-l">${t.label}</span>${badge}<i class="purpose-dot" aria-hidden="true" title="${hit ? '有偵測到' : '未偵測到'}"></i>
+    </button>`;
   }).join('');
+  const typeCards = `<div class="purpose-stack" role="tablist" aria-label="五字口訣分級">${tabs}</div><div class="purpose-detail blk blk-tl" role="tabpanel">${defaultDetail}</div>`;
+  bindPurposeStack(el);
 
   let tierLayers = '';
   if (profile.dominant && profile.typeLayerHits?.length) {
@@ -100,7 +133,7 @@ export function renderPurposeProfile(profile) {
     playbook = '<div class="purpose-playbook muted">尚未判斷目的分級。從客戶原話辨識是「要／怕／想／愛／爽」哪一型，再依該分級往下挖五層、分別強化與對接。</div>';
   }
 
-  el.innerHTML = `<div class="purpose-grid">${typeCards}</div>${playbook}`;
+  el.innerHTML = `${typeCards}${playbook}`;
 }
 
 export function renderAnalysisUI(result) {
