@@ -61,7 +61,7 @@ function onTimeUpdate() {
 }
 
 export function seekDemoTo(seconds) {
-  if (!videoEl || !Number.isFinite(seconds)) return false;
+  if (!videoEl || !videoEl.src || !Number.isFinite(seconds)) return false;
   const t = Math.max(0, seconds);
   try {
     videoEl.currentTime = t;
