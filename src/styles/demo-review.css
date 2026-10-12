@@ -69,6 +69,7 @@
 .dr-consult-tab > span { grid-row:1 / 3; align-self:start; font-family:var(--mono); font-size:.62rem; color:var(--accent); }
 .dr-consult-tab.on > span { color:var(--brand); }
 .dr-consult-tab b { min-width:0; overflow:hidden; font-size:.77rem; line-height:1.2; text-overflow:ellipsis; white-space:nowrap; }
+.dr-consult-tab.on b { color:var(--on-deep); }
 .dr-consult-tab small { min-width:0; overflow:hidden; margin-top:4px; font-size:.62rem; color:var(--muted); text-overflow:ellipsis; white-space:nowrap; }
 .dr-consult-tab.on small { color:var(--on-deep-muted); }
 .dr-consult-detail { padding:2px; }
