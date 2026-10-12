@@ -4,6 +4,7 @@
  */
 import { PURPOSE_TYPES } from './purpose-types.js';
 import { consultToText, normalizeConsult } from './demo-review-consult.js';
+import { guideToText, normalizeDemoGuide } from './demo-review-guide.js';
 
 export const REVIEWS_STORAGE_KEY = 'call_coach_demo_reviews_v1';
 
@@ -76,6 +77,7 @@ export function emptyReview({ deckId = '', customerId = '', customer = '', demoA
     video: null,
     analysis: null,
     consult: null,
+    demoGuide: null,
     ...Object.fromEntries(REVIEW_TEXT_FIELDS.map((f) => [f.key, ''])),
   };
 }
@@ -135,6 +137,7 @@ export function normalizeReview(r = {}) {
   out.video = normalizeVideo(r.video);
   out.analysis = normalizeAnalysis(r.analysis);
   out.consult = normalizeConsult(r.consult);
+  out.demoGuide = normalizeDemoGuide(r.demoGuide);
   REVIEW_TEXT_FIELDS.forEach((f) => {
     out[f.key] = clip(out[f.key], TEXT_LIMIT);
   });
@@ -147,7 +150,7 @@ export function normalizeReview(r = {}) {
 export function reviewHasContent(r) {
   if (!r) return false;
   return (
-    !!(r.outcome || r.tier || r.fit || r.nextStep || r.followUpDate || r.video || r.analysis || r.consult) ||
+    !!(r.outcome || r.tier || r.fit || r.nextStep || r.followUpDate || r.video || r.analysis || r.consult || r.demoGuide) ||
     REVIEW_TEXT_FIELDS.some((f) => String(r[f.key] || '').trim())
   );
 }
@@ -397,6 +400,7 @@ const CSV_COLUMNS = [
   ['顧問診斷', (r) => r.consult?.diagnosis?.recommendation || ''],
   ['下次必問', (r) => (r.consult?.gaps || []).map((x) => x.question).filter(Boolean).join('｜')],
   ['AI 落地驗收', (r) => r.consult?.implementation?.acceptance || ''],
+  ['DEMO 已驗證', (r) => (r.demoGuide?.routes || []).filter((x) => x.result === 'confirmed').map((x) => x.title).join('｜')],
   ...REVIEW_TEXT_FIELDS.map((f) => [f.label, (r) => r[f.key]]),
   ['建檔時間', (r) => new Date(r.createdAt).toISOString().slice(0, 16).replace('T', ' ')],
 ];
@@ -429,5 +433,7 @@ export function reviewToText(r) {
   });
   const consultText = consultToText(r.consult);
   if (consultText) lines.push('', consultText);
+  const guideText = guideToText(r.demoGuide, 'internal');
+  if (guideText) lines.push('', guideText);
   return lines.join('\n');
 }

@@ -33,6 +33,7 @@ import {
 } from './demo-review.js';
 import { openReviewCard } from './demo-review-card.js';
 import { buildConsultPrompt, consultToText, parseConsultResponse } from './demo-review-consult.js';
+import { mountDemoGuide } from './demo-review-guide-ui.js';
 import { callGeminiResilient, describeApiKeyProblem } from './gemini.js';
 import { ensureCustomerId } from './customers.js';
 import { escapeHTML } from './utils.js';
@@ -65,7 +66,7 @@ function downloadText(name, text, type = 'text/csv;charset=utf-8') {
  * @param {(tokens:number)=>void} [opts.onGeminiUsed]
  * @param {()=>string} [opts.getCourseNotes]
  * @param {(msg:string)=>void} [opts.showToast]
- * @returns {{ setDeck(rec:object|null):void, syncDeckInfo(rec:object):void, openReview(id:string):boolean, refresh():void }}
+ * @returns {{ setDeck(rec:object|null):void, syncDeckInfo(rec:object):void, syncDeckContext(rec:object):void, openReview(id:string):boolean, refresh():void }}
  */
 export function mountDemoReview(
   container,
@@ -98,6 +99,7 @@ export function mountDemoReview(
   };
 
   container.innerHTML = `
+    <div id="drGuide"></div>
     <section class="card dr-form">
       <div class="dr-head">
         <h3>DEMO 後複盤 <small id="drWho"></small></h3>
@@ -222,6 +224,7 @@ export function mountDemoReview(
   };
 
   const current = () => state.reviews.find((r) => r.id === state.reviewId) || null;
+  let demoGuideUI = null;
 
   function flush() {
     if (!state.saveT) return;
@@ -263,6 +266,7 @@ export function mountDemoReview(
     renderMissing();
     renderVideo();
     renderConsult();
+    demoGuideUI?.render();
   }
 
   function fmtSize(n) {
@@ -568,6 +572,7 @@ export function mountDemoReview(
       state.consultTab = 'diagnosis';
       els.consultStatus.textContent = '已產生。請先核對「已確認／合理推測／待確認」再採用。';
       els.consultConsent.checked = false;
+      demoGuideUI?.render();
     } catch (e) {
       els.consultStatus.textContent = e?.message || String(e);
     } finally {
@@ -766,6 +771,20 @@ export function mountDemoReview(
     renderArchive();
   });
 
+  demoGuideUI = mountDemoGuide(q('#drGuide'), {
+    getReview: current,
+    getDeck: () => state.deck,
+    updateReview: (patch) => {
+      patchCurrent(patch);
+      flush();
+    },
+    getCourseNotes,
+    getApiKey,
+    setApiKey,
+    getModel,
+    onGeminiUsed,
+    showToast,
+  });
   renderForm();
   renderArchive();
 
@@ -785,6 +804,12 @@ export function mountDemoReview(
       if (!rec || state.deck?.id !== rec.id || current()) return;
       state.deck = rec;
       renderForm();
+    },
+    /** 任何客戶資料欄位更新時，讓第一次 DEMO 的 P1 路線規劃立即知道已有前期資料。 */
+    syncDeckContext(rec) {
+      if (!rec || state.deck?.id !== rec.id) return;
+      state.deck = rec;
+      demoGuideUI?.render();
     },
     /** 把還沒存的修改立刻寫進儲存（客戶主檔要改名、合併之前呼叫） */
     flush,
