@@ -777,6 +777,11 @@ export function initDemoDeck(
     onSendVideo,
     hasAnalysis,
     onOpenAnalysis,
+    getApiKey,
+    setApiKey,
+    getModel,
+    onGeminiUsed,
+    getCourseNotes: () => els.course.value,
     showToast: toast,
   });
   mountCustomerDatalist();

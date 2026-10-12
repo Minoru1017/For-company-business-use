@@ -3,6 +3,7 @@
  * 之後可以篩選、追蹤待跟進、匯出 CSV。資料只存本機 localStorage（會跟著「全部備份」一起走）。
  */
 import { PURPOSE_TYPES } from './purpose-types.js';
+import { consultToText, normalizeConsult } from './demo-review-consult.js';
 
 export const REVIEWS_STORAGE_KEY = 'call_coach_demo_reviews_v1';
 
@@ -74,6 +75,7 @@ export function emptyReview({ deckId = '', customerId = '', customer = '', demoA
     followUpDate: '',
     video: null,
     analysis: null,
+    consult: null,
     ...Object.fromEntries(REVIEW_TEXT_FIELDS.map((f) => [f.key, ''])),
   };
 }
@@ -132,6 +134,7 @@ export function normalizeReview(r = {}) {
   out.followUpDate = validDate(out.followUpDate);
   out.video = normalizeVideo(r.video);
   out.analysis = normalizeAnalysis(r.analysis);
+  out.consult = normalizeConsult(r.consult);
   REVIEW_TEXT_FIELDS.forEach((f) => {
     out[f.key] = clip(out[f.key], TEXT_LIMIT);
   });
@@ -144,7 +147,7 @@ export function normalizeReview(r = {}) {
 export function reviewHasContent(r) {
   if (!r) return false;
   return (
-    !!(r.outcome || r.tier || r.fit || r.nextStep || r.followUpDate || r.video || r.analysis) ||
+    !!(r.outcome || r.tier || r.fit || r.nextStep || r.followUpDate || r.video || r.analysis || r.consult) ||
     REVIEW_TEXT_FIELDS.some((f) => String(r[f.key] || '').trim())
   );
 }
@@ -391,6 +394,9 @@ const CSV_COLUMNS = [
   ['跟進日期', (r) => r.followUpDate],
   ['DEMO 錄影', (r) => r.video?.name || ''],
   ['錄影分析', (r) => formatAnalysisSummary(r.analysis?.summary)],
+  ['顧問診斷', (r) => r.consult?.diagnosis?.recommendation || ''],
+  ['下次必問', (r) => (r.consult?.gaps || []).map((x) => x.question).filter(Boolean).join('｜')],
+  ['AI 落地驗收', (r) => r.consult?.implementation?.acceptance || ''],
   ...REVIEW_TEXT_FIELDS.map((f) => [f.label, (r) => r[f.key]]),
   ['建檔時間', (r) => new Date(r.createdAt).toISOString().slice(0, 16).replace('T', ' ')],
 ];
@@ -421,5 +427,7 @@ export function reviewToText(r) {
   REVIEW_TEXT_FIELDS.forEach((f) => {
     if (r[f.key]) lines.push(`${f.label}：${r[f.key]}`);
   });
+  const consultText = consultToText(r.consult);
+  if (consultText) lines.push('', consultText);
   return lines.join('\n');
 }

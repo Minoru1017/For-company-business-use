@@ -27,10 +27,13 @@ import {
   saveReviews,
   setPendingReview,
   tierLabel,
+  todayKey,
   upsertReview,
   videoFromFile,
 } from './demo-review.js';
 import { openReviewCard } from './demo-review-card.js';
+import { buildConsultPrompt, consultToText, parseConsultResponse } from './demo-review-consult.js';
+import { callGeminiResilient, describeApiKeyProblem } from './gemini.js';
 import { ensureCustomerId } from './customers.js';
 import { escapeHTML } from './utils.js';
 
@@ -56,12 +59,29 @@ function downloadText(name, text, type = 'text/csv;charset=utf-8') {
  * @param {(file:File, o:{autoStart:boolean})=>Promise<{ok:boolean,filename?:string,reason?:string}>} [opts.onSendVideo]  把錄影送進 DEMO 轉錄
  * @param {(historyId:string)=>boolean} [opts.hasAnalysis]  「最近分析」裡還找不找得到這筆
  * @param {(historyId:string)=>void} [opts.onOpenAnalysis]  開啟那筆分析
+ * @param {()=>string} [opts.getApiKey]
+ * @param {(value:string)=>void} [opts.setApiKey]
+ * @param {()=>string} [opts.getModel]
+ * @param {(tokens:number)=>void} [opts.onGeminiUsed]
+ * @param {()=>string} [opts.getCourseNotes]
  * @param {(msg:string)=>void} [opts.showToast]
  * @returns {{ setDeck(rec:object|null):void, syncDeckInfo(rec:object):void, openReview(id:string):boolean, refresh():void }}
  */
 export function mountDemoReview(
   container,
-  { hasDeck = () => false, onOpenDeck = () => {}, onSendVideo, hasAnalysis = () => false, onOpenAnalysis, showToast } = {}
+  {
+    hasDeck = () => false,
+    onOpenDeck = () => {},
+    onSendVideo,
+    hasAnalysis = () => false,
+    onOpenAnalysis,
+    getApiKey,
+    setApiKey,
+    getModel,
+    onGeminiUsed,
+    getCourseNotes = () => '',
+    showToast,
+  } = {}
 ) {
   const toast = (m) => showToast?.(m);
   const state = {
@@ -73,6 +93,8 @@ export function mountDemoReview(
     videoFile: null,
     videoFileFor: null,
     sending: false,
+    consulting: false,
+    consultTab: 'diagnosis',
   };
 
   container.innerHTML = `
@@ -113,6 +135,37 @@ export function mountDemoReview(
           <button type="button" class="btn slog-mini" id="drVideoClear" hidden>移除錄影</button>
         </div>
       </div>
+      <section class="dr-consult" id="drConsult">
+        <div class="dr-consult-head">
+          <div>
+            <span class="dr-consult-kicker">CONSULTATIVE P0</span>
+            <h3>顧問工作台 <small>AI 是第二意見；先以你的複盤為準</small></h3>
+          </div>
+          <span class="dr-consult-meta" id="drConsultMeta"></span>
+        </div>
+        <div class="dr-consult-empty" id="drConsultEmpty">
+          <b>把複盤變成下一次能行動的判斷</b>
+          <span>一次整理顧問診斷、下次必問、AI 落地定義與具體下一步。資料不足會標成待確認，不替客戶補故事。</span>
+        </div>
+        <div class="dr-consult-tabs" id="drConsultTabs" role="tablist" aria-label="顧問工作台">
+          <button type="button" class="dr-consult-tab" data-consult-tab="diagnosis"><span>01</span><b>顧問診斷</b><small>問題與適配</small></button>
+          <button type="button" class="dr-consult-tab" data-consult-tab="gaps"><span>02</span><b>下次必問</b><small>資訊缺口</small></button>
+          <button type="button" class="dr-consult-tab" data-consult-tab="implementation"><span>03</span><b>落地定義</b><small>可驗收成果</small></button>
+          <button type="button" class="dr-consult-tab" data-consult-tab="next"><span>04</span><b>具體下一步</b><small>誰在何時做什麼</small></button>
+        </div>
+        <div class="dr-consult-detail" id="drConsultDetail"></div>
+        <label class="dr-consult-consent"><input type="checkbox" id="drConsultConsent"> 我確認將這筆複盤與目前客戶資料送到 Google Gemini（建議隱去全名、電話）</label>
+        <div class="dr-consult-key" id="drConsultKeyRow" hidden>
+          <input type="password" class="field" id="drConsultKey" placeholder="貼上 Gemini API Key" autocomplete="off">
+          <span class="hint" id="drConsultKeyHint"></span>
+        </div>
+        <div class="dr-consult-actions">
+          <button type="button" class="btn primary" id="drConsultRun">產生顧問建議</button>
+          <button type="button" class="btn" id="drConsultApply" hidden>套用到下一步</button>
+          <button type="button" class="btn" id="drConsultCopy" hidden>複製四張卡</button>
+          <span class="dr-consult-status" id="drConsultStatus"></span>
+        </div>
+      </section>
       <div class="dr-foot">
         <span class="dr-missing" id="drMissing"></span>
         <span class="dr-foot-actions">
@@ -154,6 +207,18 @@ export function mountDemoReview(
     videoAutoWrap: q('#drVideoAutoWrap'),
     videoOpen: q('#drVideoOpen'),
     videoClear: q('#drVideoClear'),
+    consultMeta: q('#drConsultMeta'),
+    consultEmpty: q('#drConsultEmpty'),
+    consultTabs: q('#drConsultTabs'),
+    consultDetail: q('#drConsultDetail'),
+    consultConsent: q('#drConsultConsent'),
+    consultKeyRow: q('#drConsultKeyRow'),
+    consultKey: q('#drConsultKey'),
+    consultKeyHint: q('#drConsultKeyHint'),
+    consultRun: q('#drConsultRun'),
+    consultApply: q('#drConsultApply'),
+    consultCopy: q('#drConsultCopy'),
+    consultStatus: q('#drConsultStatus'),
   };
 
   const current = () => state.reviews.find((r) => r.id === state.reviewId) || null;
@@ -197,6 +262,7 @@ export function mountDemoReview(
     els.saved.textContent = '';
     renderMissing();
     renderVideo();
+    renderConsult();
   }
 
   function fmtSize(n) {
@@ -232,6 +298,121 @@ export function mountDemoReview(
     els.videoSend.textContent = state.sending ? '送出中…' : inMemory ? (v.sentAt ? '重新送到 DEMO 轉錄' : '送到 DEMO 轉錄分析') : '重新選擇檔案並送出';
     els.videoOpen.hidden = !(a && onOpenAnalysis && hasAnalysis(a.historyId));
     els.videoClear.hidden = !v;
+  }
+
+  const CONSULT_LABELS = {
+    current: '現況',
+    goal: '目標',
+    bottleneck: '流程斷點',
+    cost: '不處理的代價',
+    decision: '決策條件',
+    fit: '適配判斷',
+    recommendation: '負責任的建議',
+    confidence: '診斷可信度',
+    user: '實際使用者',
+    workflow: '原始工作流程',
+    input: '需要的資料',
+    output: '要產出的成果',
+    acceptance: '可驗收標準',
+    review: '人工審核點',
+    risk: '風險／前置條件',
+    action: '下一個最小行動',
+    owner: '業務要做',
+    counterpart: '客戶／決策人要做',
+    date: '建議日期',
+    condition: '完成條件',
+    message: '可直接傳給客戶',
+  };
+  const EVIDENCE_LABELS = { confirmed: '已確認', inferred: '合理推測', missing: '待確認' };
+
+  function consultRows(obj, keys) {
+    return keys
+      .filter((key) => obj?.[key])
+      .map(
+        (key) =>
+          `<div class="dr-consult-row"><dt>${escapeHTML(CONSULT_LABELS[key] || key)}</dt><dd>${escapeHTML(obj[key])}</dd></div>`
+      )
+      .join('');
+  }
+
+  function renderConsult() {
+    const consult = current()?.consult;
+    const has = !!consult;
+    els.consultEmpty.hidden = has;
+    els.consultTabs.hidden = !has;
+    els.consultDetail.hidden = !has;
+    els.consultApply.hidden = !has || !(consult.next?.action || consult.next?.date);
+    els.consultCopy.hidden = !has;
+    els.consultRun.textContent = state.consulting ? 'AI 判讀中…' : has ? '重新產生' : '產生顧問建議';
+    els.consultRun.disabled = state.consulting;
+    els.consultMeta.textContent = has
+      ? `AI 草稿 · ${consult.at ? new Date(consult.at).toLocaleString('zh-TW', { month: 'numeric', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : ''}`
+      : '尚未產生';
+    if (!has) {
+      els.consultDetail.innerHTML = '';
+      return;
+    }
+
+    [...els.consultTabs.querySelectorAll('[data-consult-tab]')].forEach((btn) => {
+      const on = btn.dataset.consultTab === state.consultTab;
+      btn.classList.toggle('on', on);
+      btn.setAttribute('aria-selected', String(on));
+    });
+
+    let html = '';
+    if (state.consultTab === 'diagnosis') {
+      const evidence = consult.evidence?.length
+        ? `<div class="dr-evidence"><h4>判斷依據</h4>${consult.evidence
+            .map(
+              (e) => `<div class="dr-evidence-item">
+                <span class="dr-evidence-status ${escapeHTML(e.status)}">${EVIDENCE_LABELS[e.status] || '合理推測'}</span>
+                <div><b>${escapeHTML(e.claim)}</b><small>${escapeHTML(e.source || '沒有直接依據')}</small></div>
+              </div>`
+            )
+            .join('')}</div>`
+        : '';
+      html = `<dl class="dr-consult-rows">${consultRows(consult.diagnosis, [
+        'current',
+        'goal',
+        'bottleneck',
+        'cost',
+        'decision',
+        'fit',
+        'recommendation',
+        'confidence',
+      ])}</dl>${evidence}`;
+    } else if (state.consultTab === 'gaps') {
+      html = consult.gaps?.length
+        ? `<ol class="dr-gap-list">${consult.gaps
+            .map(
+              (g) => `<li>
+                <span class="dr-gap-priority ${escapeHTML(g.priority)}">${g.priority === 'high' ? '優先' : g.priority === 'low' ? '可後問' : '重要'}</span>
+                <div><b>${escapeHTML(g.topic || '待確認')}</b><p>${escapeHTML(g.question)}</p>${g.why ? `<small>${escapeHTML(g.why)}</small>` : ''}</div>
+              </li>`
+            )
+            .join('')}</ol>`
+        : '<p class="hint">AI 沒有列出待追問項目；仍請由顧問確認資料是否足夠。</p>';
+    } else if (state.consultTab === 'implementation') {
+      html = `<dl class="dr-consult-rows implementation">${consultRows(consult.implementation, [
+        'user',
+        'workflow',
+        'input',
+        'output',
+        'acceptance',
+        'review',
+        'risk',
+      ])}</dl>`;
+    } else {
+      html = `<dl class="dr-consult-rows next">${consultRows(consult.next, [
+        'action',
+        'owner',
+        'counterpart',
+        'date',
+        'condition',
+        'message',
+      ])}</dl><p class="dr-ai-caution">這是 AI 建議，不代表客戶已承諾。套用前請確認日期、參與人與雙方任務。</p>`;
+    }
+    els.consultDetail.innerHTML = html || '<p class="hint">這張卡目前沒有內容，建議補充複盤後重新產生。</p>';
   }
 
   function renderMissing() {
@@ -340,6 +521,61 @@ export function mountDemoReview(
     }
   }
 
+  async function generateConsult() {
+    const r = current();
+    if (!r || !reviewHasContent(r)) return toast('先完成 DEMO 複盤，再產生顧問建議');
+    if (state.consulting) return;
+    if (!els.consultConsent.checked) {
+      els.consultStatus.textContent = '請先勾選同意把這筆資料送到 Google Gemini。';
+      els.consultConsent.focus();
+      return;
+    }
+    const key = String(getApiKey?.() || els.consultKey.value || '').trim();
+    const keyProblem = describeApiKeyProblem(key);
+    if (keyProblem) {
+      els.consultKeyRow.hidden = false;
+      els.consultKeyHint.textContent = keyProblem;
+      els.consultKey.focus();
+      return;
+    }
+
+    state.consulting = true;
+    els.consultStatus.textContent = '正在交叉整理診斷、缺口與可驗收成果…';
+    renderConsult();
+    flush();
+    try {
+      const { parsed, usedTokens, modelUsed } = await callGeminiResilient({
+        apiKey: key,
+        model: getModel?.(),
+        text: buildConsultPrompt({
+          review: r,
+          deckInput: state.deck?.input || {},
+          courseNotes: getCourseNotes?.() || '',
+          today: todayKey(),
+        }),
+        generationConfig: { temperature: 0.25, maxOutputTokens: 8192 },
+        parse: parseConsultResponse,
+        onRetry: ({ attempt, maxAttempts, delayMs, status }) => {
+          els.consultStatus.textContent = `Google 回報 ${status}，${Math.round(delayMs / 1000)} 秒後重試（${attempt}/${maxAttempts}）…`;
+        },
+        onModelSwitch: (next) => {
+          els.consultStatus.textContent = `目前模型忙碌，改用 ${next}…`;
+        },
+      });
+      patchCurrent({ consult: { ...parsed, at: Date.now(), model: modelUsed } });
+      flush();
+      onGeminiUsed?.(usedTokens);
+      state.consultTab = 'diagnosis';
+      els.consultStatus.textContent = '已產生。請先核對「已確認／合理推測／待確認」再採用。';
+      els.consultConsent.checked = false;
+    } catch (e) {
+      els.consultStatus.textContent = e?.message || String(e);
+    } finally {
+      state.consulting = false;
+      renderConsult();
+    }
+  }
+
   els.videoDrop.addEventListener('click', () => els.videoFile.click());
   els.videoDrop.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' || e.key === ' ') {
@@ -390,6 +626,46 @@ export function mountDemoReview(
     state.videoFile = null;
     state.videoFileFor = null;
     renderVideo();
+  });
+
+  els.consultTabs.addEventListener('click', (e) => {
+    const tab = e.target.closest('[data-consult-tab]')?.dataset.consultTab;
+    if (!tab) return;
+    state.consultTab = tab;
+    renderConsult();
+  });
+  els.consultRun.addEventListener('click', generateConsult);
+  els.consultKey.addEventListener('change', () => {
+    const value = els.consultKey.value.trim();
+    setApiKey?.(value);
+    const problem = describeApiKeyProblem(value);
+    els.consultKeyHint.textContent = problem || '已儲存，再按一次「產生顧問建議」';
+    if (!problem) els.consultKeyRow.hidden = true;
+  });
+  els.consultApply.addEventListener('click', () => {
+    const n = current()?.consult?.next;
+    if (!n) return;
+    const nextStep = [n.action, n.owner ? `業務：${n.owner}` : '', n.counterpart ? `客戶／決策人：${n.counterpart}` : '', n.condition ? `完成：${n.condition}` : '']
+      .filter(Boolean)
+      .join('｜')
+      .slice(0, 300);
+    const patch = { nextStep };
+    if (n.date) patch.followUpDate = n.date;
+    patchCurrent(patch);
+    container.querySelector('[data-dr="nextStep"]').value = nextStep;
+    if (n.date) container.querySelector('[data-dr="followUpDate"]').value = n.date;
+    renderMissing();
+    toast('已套用 AI 建議；請確認這確實是雙方約好的下一步');
+  });
+  els.consultCopy.addEventListener('click', async () => {
+    const text = consultToText(current()?.consult);
+    if (!text) return;
+    try {
+      await navigator.clipboard.writeText(text);
+      toast('已複製四張顧問卡');
+    } catch {
+      toast('無法複製，請確認瀏覽器權限');
+    }
   });
 
   fieldEls.forEach((el) => {

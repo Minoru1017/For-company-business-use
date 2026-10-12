@@ -51,6 +51,64 @@
 .dr-video-auto { display:flex; align-items:center; gap:6px; font-size:.76rem; color:var(--muted); }
 .dr-video-auto[hidden] { display:none; }
 
+/* P0 顧問工作台：四個步驟只展開一張，避免複盤再次資訊過載 */
+.dr-consult { display:flex; flex-direction:column; gap:12px; padding:16px; border:1px solid var(--border); border-radius:16px; background:var(--panel2); }
+.dr-consult-head { display:flex; align-items:flex-end; justify-content:space-between; gap:12px; }
+.dr-consult-head h3 { margin:2px 0 0; font-family:var(--disp); font-size:1rem; }
+.dr-consult-head h3 small { margin-left:6px; font-family:var(--sans); font-size:.7rem; font-weight:500; color:var(--muted); }
+.dr-consult-kicker { font-family:var(--mono); font-size:.58rem; font-weight:700; letter-spacing:.16em; color:var(--accent); }
+.dr-consult-meta { font-size:.68rem; color:var(--muted); }
+.dr-consult-empty { display:flex; flex-direction:column; gap:4px; padding:14px 16px 14px 20px; border-radius:12px; background:var(--deep); color:var(--on-deep); box-shadow:inset 4px 0 0 var(--brand); }
+.dr-consult-empty[hidden], .dr-consult-tabs[hidden], .dr-consult-detail[hidden], .dr-consult-key[hidden], .dr-consult-actions [hidden] { display:none; }
+.dr-consult-empty b { font-size:.88rem; }
+.dr-consult-empty span { font-size:.74rem; line-height:1.55; color:var(--on-deep-muted); }
+.dr-consult-tabs { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); gap:6px; }
+.dr-consult-tab { position:relative; display:grid; grid-template-columns:auto 1fr; grid-template-rows:auto auto; gap:0 7px; min-width:0; min-height:58px; padding:9px 10px; border:1px solid var(--border); border-radius:12px; background:var(--panel); box-shadow:none; color:var(--text-2); text-align:left; letter-spacing:0; }
+.dr-consult-tab:hover { transform:translateY(-2px); box-shadow:0 8px 18px rgba(23,21,15,.08); }
+.dr-consult-tab.on { border-color:var(--deep); background:var(--deep); color:var(--on-deep); transform:translateY(-3px); box-shadow:0 10px 22px rgba(23,21,15,.16); }
+.dr-consult-tab > span { grid-row:1 / 3; align-self:start; font-family:var(--mono); font-size:.62rem; color:var(--accent); }
+.dr-consult-tab.on > span { color:var(--brand); }
+.dr-consult-tab b { min-width:0; overflow:hidden; font-size:.77rem; line-height:1.2; text-overflow:ellipsis; white-space:nowrap; }
+.dr-consult-tab small { min-width:0; overflow:hidden; margin-top:4px; font-size:.62rem; color:var(--muted); text-overflow:ellipsis; white-space:nowrap; }
+.dr-consult-tab.on small { color:var(--on-deep-muted); }
+.dr-consult-detail { padding:2px; }
+.dr-consult-rows { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1px; margin:0; overflow:hidden; border:1px solid var(--border); border-radius:12px; background:var(--border); }
+.dr-consult-row { min-width:0; padding:11px 13px; background:var(--panel); }
+.dr-consult-row dt { margin:0 0 4px; font-size:.64rem; font-weight:700; color:var(--muted); }
+.dr-consult-row dd { margin:0; font-size:.78rem; font-weight:600; line-height:1.55; color:var(--ink); white-space:pre-wrap; }
+.dr-consult-rows.next .dr-consult-row:last-child, .dr-consult-rows.implementation .dr-consult-row:nth-last-child(1) { grid-column:1 / -1; }
+.dr-evidence { margin-top:8px; padding:12px 13px; border:1px solid var(--border); border-radius:12px; background:var(--panel); }
+.dr-evidence h4 { margin:0 0 8px; font-size:.7rem; color:var(--muted); }
+.dr-evidence-item { display:grid; grid-template-columns:64px 1fr; gap:8px; align-items:start; padding:7px 0; border-top:1px solid var(--border); }
+.dr-evidence-item:first-of-type { border-top:0; }
+.dr-evidence-item > div { display:flex; flex-direction:column; gap:3px; min-width:0; }
+.dr-evidence-item b { font-size:.75rem; line-height:1.4; }
+.dr-evidence-item small { font-size:.68rem; line-height:1.45; color:var(--muted); }
+.dr-evidence-status { padding:3px 6px; border-radius:999px; font-size:.62rem; font-weight:700; text-align:center; color:var(--text-2); background:var(--panel2); }
+.dr-evidence-status.confirmed { color:var(--ok); background:color-mix(in srgb,var(--ok) 10%,white); }
+.dr-evidence-status.inferred { color:var(--warn); background:color-mix(in srgb,var(--warn) 10%,white); }
+.dr-evidence-status.missing { color:var(--bad); background:color-mix(in srgb,var(--bad) 9%,white); }
+.dr-gap-list { display:flex; flex-direction:column; gap:6px; margin:0; padding:0; list-style:none; }
+.dr-gap-list li { display:grid; grid-template-columns:56px 1fr; gap:10px; padding:11px 13px; border:1px solid var(--border); border-radius:12px; background:var(--panel); }
+.dr-gap-list li > div { min-width:0; }
+.dr-gap-list b { display:block; margin-bottom:4px; font-size:.7rem; color:var(--muted); }
+.dr-gap-list p { margin:0; font-size:.8rem; font-weight:650; line-height:1.5; color:var(--ink); }
+.dr-gap-list small { display:block; margin-top:4px; font-size:.68rem; line-height:1.45; color:var(--muted); }
+.dr-gap-priority { align-self:start; padding:3px 5px; border-radius:999px; font-size:.6rem; font-weight:700; text-align:center; color:var(--warn); background:color-mix(in srgb,var(--warn) 10%,white); }
+.dr-gap-priority.high { color:var(--bad); background:color-mix(in srgb,var(--bad) 9%,white); }
+.dr-gap-priority.low { color:var(--muted); background:var(--panel2); }
+.dr-ai-caution { margin:8px 2px 0; font-size:.68rem; line-height:1.5; color:var(--warn); }
+.dr-consult-consent { display:flex; align-items:flex-start; gap:7px; font-size:.7rem; line-height:1.5; color:var(--muted); }
+.dr-consult-key { display:grid; grid-template-columns:minmax(180px,320px) 1fr; gap:8px; align-items:center; }
+.dr-consult-actions { display:flex; flex-wrap:wrap; align-items:center; gap:7px; }
+.dr-consult-actions .btn { font-size:.76rem; }
+.dr-consult-status { flex:1 1 220px; font-size:.7rem; line-height:1.4; color:var(--muted); }
+@media (max-width:720px) {
+  .dr-consult-tabs { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .dr-consult-rows { grid-template-columns:1fr; }
+  .dr-consult-row { grid-column:auto !important; }
+}
+
 /* 複盤檔案列：圖卡按鈕 */
 .dr-item-card { align-self:center; flex:none; margin-right:2px; padding:4px 9px; border:1px solid var(--border); border-radius:999px; background:transparent; box-shadow:none; font-family:var(--sans); font-size:.68rem; letter-spacing:0; color:var(--text-2); }
 .dr-item-card:hover { transform:none; box-shadow:none; border-color:var(--ink); color:var(--ink); background:var(--panel2); }
