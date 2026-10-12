@@ -229,14 +229,15 @@ export function mountBrowserWorkerUI(
         我了解這個${escapeHTML(mediaLabel)}將透過網路傳送到<strong>我自己指定的遠端主機</strong>轉錄（僅產生逐字稿，遠端處理完即刪除）${persistConsent ? '' : '——每次上傳都需重新勾選'}
       </label>
       <div class="bridge-actions">
-        <button type="button" class="btn" id="${id('Test')}">測試連線</button>
         <button type="button" class="btn" id="${id('Pick')}">選擇 ${escapeHTML(mediaLabel)}</button>
         <button type="button" class="btn primary" id="${id('Start')}" disabled>開始遠端轉錄</button>
         <button type="button" class="btn bridge-cancel hidden" id="${id('Cancel')}">取消</button>
+        <button type="button" class="btn bw-test" id="${id('Test')}">測試連線</button>
       </div>
       <input type="file" id="${id('File')}" accept="${escapeHTML(accept)}" hidden>
       <div class="bridge-upload-status hidden" id="${id('Status')}"></div>
-      <div class="bridge-log-panel hidden" id="${id('Log')}"></div>
+      <div class="bridge-progress bw-progress hidden" id="${id('Progress')}" role="progressbar" aria-valuemin="0" aria-valuemax="100"><div id="${id('ProgressBar')}"></div></div>
+      <pre class="bridge-log-panel bw-log hidden" id="${id('Log')}"></pre>
     </div>
   `;
 
@@ -250,6 +251,8 @@ export function mountBrowserWorkerUI(
   const fileInput = container.querySelector(`#${id('File')}`);
   const cancelBtn = container.querySelector(`#${id('Cancel')}`);
   const urlHintEl = container.querySelector(`#${id('UrlHint')}`);
+  const progressEl = container.querySelector(`#${id('Progress')}`);
+  const progressBar = container.querySelector(`#${id('ProgressBar')}`);
 
   // https 頁面填 http Worker：先提醒要允許「不安全的內容」，不要等按下去才失敗
   const renderUrlHint = () => {
@@ -279,6 +282,22 @@ export function mountBrowserWorkerUI(
     statusEl.classList.remove('hidden', 'busy', 'ok', 'err');
     statusEl.classList.add(kind === 'ok' ? 'ok' : kind === 'err' ? 'err' : 'busy');
     statusEl.textContent = msg;
+  };
+
+  // pct: 0–100 = 上傳進度；'busy' = 遠端處理中（不確定進度）；null = 收起
+  const setProgress = (pct) => {
+    if (!progressEl || !progressBar) return;
+    const show = pct != null;
+    progressEl.classList.toggle('hidden', !show);
+    progressEl.classList.toggle('indeterminate', pct === 'busy');
+    if (typeof pct === 'number') {
+      const v = Math.max(0, Math.min(100, pct));
+      progressBar.style.width = `${v}%`;
+      progressEl.setAttribute('aria-valuenow', String(Math.round(v)));
+    } else {
+      progressBar.style.width = pct === 'busy' ? '40%' : '0%';
+      progressEl.removeAttribute('aria-valuenow');
+    }
   };
 
   const appendLog = (line) => {
@@ -339,6 +358,7 @@ export function mountBrowserWorkerUI(
     cancelBtn.classList.add('hidden');
     refreshStart();
     setStatus('已取消', 'err');
+    setProgress(null);
   });
 
   startBtn?.addEventListener('click', async () => {
@@ -348,18 +368,23 @@ export function mountBrowserWorkerUI(
     refreshStart();
     cancelBtn?.classList.remove('hidden');
     logEl.textContent = '';
-    logEl.classList.remove('hidden');
+    logEl.classList.add('hidden');
     let jobId = null;
     try {
       setStatus(`上傳 ${mediaLabel} 到遠端主機…`);
+      setProgress(0);
       jobId = await uploadMedia(
         urlEl.value,
         tokenEl.value,
         picked,
-        (pct) => setStatus(`上傳中 ${Math.round(pct)}%…`),
+        (pct) => {
+          setStatus(`上傳中 ${Math.round(pct)}%…`);
+          setProgress(pct);
+        },
         registerAbort
       );
       setStatus('遠端 GPU 轉錄中（可在 DeskIn 看新竹主機）…');
+      setProgress('busy');
       await pollWorkerJob(urlEl.value, tokenEl.value, jobId, appendLog);
       const srt = await downloadWorkerSrt(urlEl.value, tokenEl.value, jobId);
       const name = picked.name.replace(/\.[a-z0-9]+$/i, '') + '.srt';
@@ -371,6 +396,7 @@ export function mountBrowserWorkerUI(
       showToast?.(e.message || '遠端轉錄失敗');
     } finally {
       busy = false;
+      setProgress(null);
       cancelBtn?.classList.add('hidden');
       if (!persistConsent && consentEl) consentEl.checked = false;
       refreshStart();

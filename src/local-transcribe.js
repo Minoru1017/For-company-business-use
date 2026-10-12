@@ -261,31 +261,29 @@ export async function openBridgeFolder(folder = 'output') {
 
 function renderOfflineWizard(offlineEl, { onTranscriptReady, showToast } = {}) {
   offlineEl.innerHTML = `
-    <p><strong>尚未連線本機轉錄助手</strong></p>
-    <p class="hint">公司電腦若無法安裝 .exe，請直接用下方「瀏覽器直連遠端 GPU」；若能裝助手，助手啟動後此區會自動消失。</p>
+    <div class="wiz-head">
+      <strong>尚未連線本機轉錄助手</strong>
+      <span class="wiz-wait"><i class="wiz-wait-dot" aria-hidden="true"></i><span id="bridgeConnectStatus">正在偵測本機助手…</span></span>
+    </div>
+    <p class="hint">公司電腦裝不了 .exe 就走「瀏覽器直連」；裝得了助手的話，助手啟動後此區會自動消失。</p>
     <ol class="setup-wizard-steps">
-      <li>
-        <strong>① 無法安裝助手 — 瀏覽器直連新竹 GPU（推薦）</strong>
+      <li class="wiz-step wiz-primary">
+        <div class="wiz-step-head"><strong>瀏覽器直連新竹 GPU</strong><span class="wiz-tag">推薦 · 免安裝</span></div>
         <div id="browserWorkerMount"></div>
       </li>
-      <li>
-        <strong>② 公司電腦 — 安裝精靈</strong>
-        <p class="hint">下載 <code>CallCoachAssistant-Setup.exe</code>，執行安裝精靈（建議安裝到 <code>C:\\CallCoachAssistant</code>）。若主管有給你 <code>team-config.env</code>，把它放在 Setup.exe 旁邊再執行，安裝後即可直接用 Azure 雲端轉錄（不需下載 WhisperX、不需 Token）。完成後從開始選單啟動「Call Coach 本機助手」。</p>
+      <li class="wiz-step">
+        <div class="wiz-step-head"><strong>安裝本機助手</strong><span class="wiz-tag">公司電腦可裝 .exe 時</span></div>
+        <p class="hint">執行 <code>CallCoachAssistant-Setup.exe</code>（建議安裝到 <code>C:\\CallCoachAssistant</code>），完成後從開始選單啟動「Call Coach 本機助手」。</p>
         <div class="bridge-actions">
           <a class="btn primary" href="${ASSISTANT_SETUP_URL}" target="_blank" rel="noopener noreferrer">下載安裝精靈（Setup.exe）</a>
-          <a class="btn" href="${ASSISTANT_RELEASE_PAGE}" target="_blank" rel="noopener noreferrer">Releases 頁面</a>
+          <a class="btn" href="${ASSISTANT_ZIP_URL}" target="_blank" rel="noopener noreferrer">ZIP 免安裝版</a>
+          <a class="wiz-link" href="${ASSISTANT_RELEASE_PAGE}" target="_blank" rel="noopener noreferrer">所有版本</a>
         </div>
-      </li>
-      <li>
-        <strong>③ 或 ZIP 免安裝版</strong>
-        <p class="hint">下載 <code>CallCoachAssistant-Windows.zip</code>，解壓後雙擊 <code>啟動 Call Coach.cmd</code>（部分公司電腦會封鎖 .cmd）。</p>
-        <div class="bridge-actions">
-          <a class="btn" href="${ASSISTANT_ZIP_URL}" target="_blank" rel="noopener noreferrer">下載 ZIP 版</a>
-        </div>
-      </li>
-      <li>
-        <strong>④ 等待本機助手連線</strong>
-        <p class="hint"><span id="bridgeConnectStatus">正在偵測本機助手…</span></p>
+        <details class="wiz-more">
+          <summary><svg class="ic" aria-hidden="true"><use href="#i-info"/></svg>主管有給 team-config.env？／.cmd 被封鎖？</summary>
+          <p class="hint">把 <code>team-config.env</code> 放在 Setup.exe 旁邊再執行，安裝後即可直接用 Azure 雲端轉錄（不需下載 WhisperX、不需 Token）。</p>
+          <p class="hint">ZIP 版解壓後雙擊 <code>啟動 Call Coach.cmd</code>；部分公司電腦會封鎖 .cmd，此時請改用安裝精靈。</p>
+        </details>
       </li>
     </ol>
     <p class="hint">助手連線後會出現「首次啟動檢查」清單；沒有助手也可先按「載入範例逐字稿」試用分析。</p>

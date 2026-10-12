@@ -115,6 +115,58 @@
 .mm-tab.active::before { background:var(--ink); }
 .slog-sym.common { border-color:var(--ink); box-shadow:inset 0 0 0 1px var(--ink); }
 
-/* ---- 主要按鈕保持墨底黃字；次要按鈕白底髮絲線 ---- */
+/* ---- 主要按鈕保持墨底黃字；次要按鈕白底髮絲線；<a class="btn"> 與 <button> 同尺寸、不帶底線 ---- */
 button, .btn { border-color:var(--hairline-2); }
+a.btn { display:inline-flex; align-items:center; justify-content:center; gap:6px; padding:10px 20px; font-size:.85rem; line-height:1.2; text-decoration:none; cursor:pointer; }
 button.primary, .btn.primary { border-color:var(--deep); background:var(--deep); }
+
+/* ---- DEMO 離線精靈：等待狀態收進標題列、兩步驟卡片（直連 / 安裝）、細節摺疊 ---- */
+.demo-offline { padding:18px 20px; background:transparent; border:1px dashed var(--hairline-2); border-radius:var(--r-field); }
+.wiz-head { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px 16px; }
+.demo-offline .wiz-head strong { font-family:var(--disp); font-size:1.02rem; color:var(--ink); }
+.wiz-wait { display:inline-flex; align-items:center; gap:8px; font-size:.76rem; color:var(--text-2); font-variant-numeric:tabular-nums; }
+.wiz-wait-dot { width:8px; height:8px; border-radius:50%; background:var(--warn); animation:wiz-pulse 1.6s ease-in-out infinite; }
+@keyframes wiz-pulse { 0%, 100% { opacity:1; transform:scale(1); } 50% { opacity:.3; transform:scale(.7); } }
+.demo-offline > .hint { margin:6px 0 0; }
+.setup-wizard-steps { list-style:none; margin:14px 0 0; padding:0; display:flex; flex-direction:column; gap:12px; counter-reset:wiz; }
+.setup-wizard-steps > li.wiz-step { position:relative; margin:0; padding:16px 18px 16px 56px; background:#fff; border:1px solid var(--hairline); border-radius:var(--r-field); }
+.wiz-step::before { counter-increment:wiz; content:counter(wiz); position:absolute; top:14px; left:16px; width:26px; height:26px; display:grid; place-items:center;
+  border-radius:50%; background:var(--panel2); color:var(--text-2); font-family:var(--mono); font-size:.72rem; font-weight:700; }
+.wiz-primary::before { background:var(--deep); color:var(--brand); }
+.wiz-step-head { display:flex; flex-wrap:wrap; align-items:center; gap:6px 10px; margin-bottom:8px; min-height:26px; }
+.setup-wizard-steps li strong { display:inline; margin:0; }
+.setup-wizard-steps li .wiz-step-head strong { font-size:.95rem; color:var(--ink); }
+.wiz-tag { padding:2px 9px; border-radius:999px; background:var(--panel2); color:var(--text-2); font-size:.68rem; font-weight:600; }
+.wiz-primary .wiz-tag { background:var(--brand-soft); color:#6b5200; }
+.wiz-step > .hint { margin:0 0 10px; }
+.wiz-step .bridge-actions { align-items:center; margin:0; }
+.wiz-link { margin-left:4px; font-size:.78rem; color:var(--text-2); text-decoration:underline; text-underline-offset:3px; }
+.wiz-link:hover { color:var(--ink); }
+.wiz-more { margin-top:10px; }
+.wiz-more > summary { display:inline-flex; align-items:center; gap:4px; list-style:none; cursor:pointer; font-size:.74rem; color:var(--text-2); padding:3px 8px 3px 4px; border-radius:999px; }
+.wiz-more > summary::-webkit-details-marker { display:none; }
+.wiz-more > summary:hover, .wiz-more[open] > summary { background:var(--panel2); color:var(--ink); }
+.wiz-more > summary .ic { width:.95rem; height:.95rem; }
+.wiz-more[open] > .hint { margin:8px 0 0; padding:10px 12px; background:var(--panel2); border-left:3px solid var(--hairline-2); border-radius:0 var(--r-field) var(--r-field) 0; }
+.wiz-more[open] > .hint + .hint { margin-top:6px; }
+
+/* 瀏覽器直連 Worker 表單：欄位 → 同意 → 動作列（測試連線靠右）→ 狀態＋進度條 → 日誌 */
+.browser-worker > .hint:first-child { margin:0 0 10px; }
+.browser-worker .bridge-token { margin-bottom:8px; }
+.browser-worker .bridge-consent { margin:4px 0 12px; }
+.browser-worker .bridge-actions { align-items:center; margin:0; }
+.browser-worker .bw-test { margin-left:auto; }
+.browser-worker .bridge-upload-status { margin:12px 0 0; }
+.bw-progress { height:6px; margin:8px 0 0; overflow:hidden; border-radius:99px; background:#e4dfd3; }
+.bw-progress > div { height:100%; width:0; border-radius:99px; background:var(--ink); transition:width .25s var(--ease-out, ease); }
+.bw-progress.indeterminate > div { animation:bw-slide 1.4s var(--ease-in-out, ease-in-out) infinite; }
+@keyframes bw-slide { from { transform:translateX(-100%); } to { transform:translateX(260%); } }
+.bw-log { margin:10px 0 0; padding:10px 12px; max-height:160px; overflow:auto; white-space:pre-wrap; word-break:break-all;
+  font-family:var(--code); font-size:.72rem; line-height:1.55; color:var(--text-2); background:var(--panel2); border:1px solid var(--hairline); border-radius:var(--r-field); }
+.bw-log:empty { display:none; }
+@media (max-width:720px) {
+  .demo-offline { padding:14px; }
+  .setup-wizard-steps > li.wiz-step { padding:14px 14px 14px 48px; }
+  .wiz-step::before { left:12px; }
+  .browser-worker .bw-test { margin-left:0; }
+}
