@@ -197,6 +197,25 @@ button.primary, .btn.primary { border-color:var(--deep); background:var(--deep);
 /* 通話中只給聲音提示：虛線框、不填色 */
 .drill-log.drill-live-blind .drill-audio-cue { color:var(--text-2); border-color:var(--hairline-2) !important; box-shadow:none; }
 .drill-log.drill-live-blind .drill-msg.s .drill-audio-cue { color:var(--ink); border-color:var(--ink) !important; }
+/* 記憶點：墨色泡泡右下角的黃色點陣暈（像訊號擴散）、沒接上話的泡泡點陣往右淡出（訊號斷掉） */
+.drill-log .drill-msg .drill-text { position:relative; overflow:hidden; }
+.drill-log .drill-msg.s .drill-text::after { content:""; position:absolute; inset:0; pointer-events:none; border-radius:inherit;
+  background:radial-gradient(circle, rgba(247,197,49,.55) 1px, transparent 1.5px) 0 0 / 7px 7px;
+  -webkit-mask:radial-gradient(140px 100px at 100% 100%, #000, transparent 70%); mask:radial-gradient(140px 100px at 100% 100%, #000, transparent 70%); }
+.drill-log .drill-msg.s.blank .drill-text::after { background:radial-gradient(circle, rgba(187,58,36,.4) 1px, transparent 1.5px) 0 0 / 7px 7px;
+  -webkit-mask:linear-gradient(90deg, #000, transparent 85%); mask:linear-gradient(90deg, #000, transparent 85%); }
+.drill-log.drill-live-blind .drill-msg .drill-text::after { content:none; }
+/* 反應秒數＝小圓環，弧長是用掉的限時比例；超過七成轉警示色 */
+.drill-who em.drill-dial { display:flex; align-items:center; gap:5px; margin-top:4px; font-family:var(--mono); font-size:.62rem; color:var(--text-2); font-variant-numeric:tabular-nums; }
+.drill-msg.s .drill-who em.drill-dial { flex-direction:row-reverse; justify-content:flex-start; }
+.drill-dial i { --c:var(--ink); flex:0 0 auto; width:16px; height:16px; border-radius:50%;
+  background:conic-gradient(var(--c) calc(var(--p, 0) * 1turn), var(--hairline-2) 0);
+  -webkit-mask:radial-gradient(circle, transparent 4.5px, #000 5px); mask:radial-gradient(circle, transparent 4.5px, #000 5px); }
+.drill-dial.slow { color:var(--warn); }
+.drill-dial.slow i { --c:var(--warn); }
+/* 客戶正在想：三點 */
+.drill-log .drill-msg.drill-typing .drill-text { display:inline-flex; align-items:center; gap:5px; padding:13px 14px; min-height:0; }
+.drill-typing i { width:6px; height:6px; border-radius:50%; background:var(--text-2); opacity:.4; }
 @media (max-width:760px) {
   .drill-log, .drill-log.drill-log-replay { padding:12px 10px; gap:12px; }
   .drill-msg, .drill-msg.s { max-width:92%; }
