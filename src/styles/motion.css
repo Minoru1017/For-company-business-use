@@ -81,3 +81,6 @@ button.primary:active, .btn.primary:active { transform:translateY(0) scale(.98);
 @media (prefers-reduced-motion:reduce) {
   *, *::before, *::after { animation-duration:.01ms !important; animation-delay:0s !important; transition-duration:.01ms !important; }
 }
+
+/* ---- 陪練：新泡泡從下方浮入 ---- */
+.drill-log .drill-msg { animation:mo-rise .4s var(--ease-out) both; }

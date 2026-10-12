@@ -170,3 +170,35 @@ button.primary, .btn.primary { border-color:var(--deep); background:var(--deep);
   .wiz-step::before { left:12px; }
   .browser-worker .bw-test { margin-left:0; }
 }
+
+/* ---- 陪練對話：你＝墨色泡泡、客戶＝白色泡泡；客戶情緒只用左側細線＋小標籤表達，不整顆上色 ---- */
+.drill-log, .drill-log.drill-log-replay { padding:16px 14px; gap:14px; background:var(--panel2); border:none; border-radius:var(--r-tile); }
+.drill-msg { gap:8px; max-width:76%; }
+.drill-msg.s { max-width:72%; }
+.drill-who { align-self:flex-end; min-width:0; padding:0 0 7px; font-family:var(--sans); font-size:.62rem; letter-spacing:.02em; color:var(--muted); text-align:left; }
+.drill-msg.s .drill-who { text-align:right; }
+.drill-who em { margin-top:1px; font-family:var(--mono); font-size:.62rem; color:var(--text-2); font-variant-numeric:tabular-nums; }
+.drill-text { padding:10px 14px 9px; font-size:.92rem; line-height:1.65; letter-spacing:.005em; }
+.drill-log .drill-msg.s .drill-text { background:var(--deep); color:var(--on-deep); border:none; border-radius:18px 18px 4px 18px; }
+.drill-log .drill-msg.c .drill-text { background:#fff; color:var(--ink); border:1px solid var(--hairline); border-radius:18px 18px 18px 4px; }
+.drill-log .drill-msg.c.k-objection .drill-text, .drill-log .drill-msg.c.k-pressure .drill-text, .drill-log .drill-msg.c.k-pushback .drill-text,
+.drill-log .drill-msg.c.k-deflect .drill-text, .drill-log .drill-msg.c.k-repeat .drill-text, .drill-log .drill-msg.c.k-vague .drill-text {
+  background:#fff; color:var(--ink); border-color:var(--hairline); box-shadow:inset 3px 0 0 var(--warn); }
+.drill-log .drill-msg.c.k-hangup .drill-text { background:#fff; color:var(--ink); border-color:var(--hairline); box-shadow:inset 3px 0 0 var(--bad); }
+.drill-log .drill-msg.s.blank .drill-text { background:transparent; color:var(--bad); border:1px dashed var(--line-bad); font-style:normal; }
+.drill-flags { gap:6px; margin-top:8px; }
+.drill-flag { padding:2px 8px; border:none; border-radius:999px; font-family:var(--sans); font-size:.66rem; font-weight:600; letter-spacing:0; background:var(--panel2); color:var(--text-2); }
+.drill-flag.c { color:var(--warn); }
+.drill-msg.c.k-hangup .drill-flag.c { color:var(--bad); }
+.drill-msg.s .drill-flag { background:rgba(255,255,255,.1); color:var(--on-deep-muted); }
+.drill-msg.s .drill-flag.good { color:#9fd7b5; }
+.drill-msg.s .drill-flag.bad { color:var(--brand); background:rgba(247,197,49,.14); }
+.drill-msg.s.blank .drill-flag { background:var(--tint-bad); color:var(--bad); }
+/* 通話中只給聲音提示：虛線框、不填色 */
+.drill-log.drill-live-blind .drill-audio-cue { color:var(--text-2); border-color:var(--hairline-2) !important; box-shadow:none; }
+.drill-log.drill-live-blind .drill-msg.s .drill-audio-cue { color:var(--ink); border-color:var(--ink) !important; }
+@media (max-width:760px) {
+  .drill-log, .drill-log.drill-log-replay { padding:12px 10px; gap:12px; }
+  .drill-msg, .drill-msg.s { max-width:92%; }
+  .drill-text { font-size:.9rem; }
+}
