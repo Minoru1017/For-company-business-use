@@ -66,7 +66,7 @@ function downloadText(name, text, type = 'text/csv;charset=utf-8') {
  * @param {(tokens:number)=>void} [opts.onGeminiUsed]
  * @param {()=>string} [opts.getCourseNotes]
  * @param {(msg:string)=>void} [opts.showToast]
- * @returns {{ setDeck(rec:object|null):void, syncDeckInfo(rec:object):void, openReview(id:string):boolean, refresh():void }}
+ * @returns {{ setDeck(rec:object|null):void, syncDeckInfo(rec:object):void, syncDeckContext(rec:object):void, openReview(id:string):boolean, refresh():void }}
  */
 export function mountDemoReview(
   container,
@@ -99,6 +99,7 @@ export function mountDemoReview(
   };
 
   container.innerHTML = `
+    <div id="drGuide"></div>
     <section class="card dr-form">
       <div class="dr-head">
         <h3>DEMO 後複盤 <small id="drWho"></small></h3>
@@ -167,7 +168,6 @@ export function mountDemoReview(
           <span class="dr-consult-status" id="drConsultStatus"></span>
         </div>
       </section>
-      <div id="drGuide"></div>
       <div class="dr-foot">
         <span class="dr-missing" id="drMissing"></span>
         <span class="dr-foot-actions">
@@ -804,6 +804,12 @@ export function mountDemoReview(
       if (!rec || state.deck?.id !== rec.id || current()) return;
       state.deck = rec;
       renderForm();
+    },
+    /** 任何客戶資料欄位更新時，讓第一次 DEMO 的 P1 路線規劃立即知道已有前期資料。 */
+    syncDeckContext(rec) {
+      if (!rec || state.deck?.id !== rec.id) return;
+      state.deck = rec;
+      demoGuideUI?.render();
     },
     /** 把還沒存的修改立刻寫進儲存（客戶主檔要改名、合併之前呼叫） */
     flush,

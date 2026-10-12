@@ -59,7 +59,6 @@ export function mountDemoGuide(
   } = {}
 ) {
   if (!container) return { render() {} };
-  const toast = (m) => showToast?.(m);
   const state = { routeId: '', busy: '', status: '' };
 
   container.innerHTML = `
@@ -78,7 +77,7 @@ export function mountDemoGuide(
         </div>
         <div class="dr-decision-result" id="drDecisionResult"></div>
       </div>
-      <label class="dr-consult-consent"><input type="checkbox" id="drGuideConsent"> 我確認將 P0 診斷、客戶資料與現場驗證筆記送到 Google Gemini（建議隱去全名、電話）</label>
+      <label class="dr-consult-consent"><input type="checkbox" id="drGuideConsent"> 我確認將客戶資料、P0 診斷（若有）與現場驗證筆記送到 Google Gemini（建議隱去全名、電話）</label>
       <div class="dr-consult-key" id="drGuideKeyRow" hidden>
         <input type="password" class="field" id="drGuideKey" placeholder="貼上 Gemini API Key" autocomplete="off">
         <span class="hint" id="drGuideKeyHint"></span>
@@ -177,7 +176,10 @@ export function mountDemoGuide(
   function render() {
     const r = review();
     const g = guide();
+    const input = getDeck?.()?.input || {};
     const hasP0 = !!r?.consult;
+    const hasPreDemoContext = !!Object.values(input).some((x) => String(x || '').trim());
+    const hasContext = hasP0 || hasPreDemoContext;
     const hasGuide = !!g?.routes?.length;
     const stats = guideStats(g);
     els.gate.hidden = hasGuide;
@@ -186,8 +188,10 @@ export function mountDemoGuide(
       ? ''
       : hasP0
         ? '<b>用 P0 診斷規劃這場 DEMO</b><span>AI 只安排 1–3 個需要驗證的場景，不會把整套功能塞進來。</span>'
-        : '<b>先完成 P0 顧問診斷</b><span>P1 必須從可追溯的診斷開始，否則只是換一種方式介紹產品。</span>';
-    els.generate.disabled = !hasP0 || !!state.busy;
+        : hasPreDemoContext
+          ? '<b>第一次 DEMO：先把前期資料變成待驗證假設</b><span>這些不是結論；現場必須由客戶確認、修正或推翻。完成 P0 後可再重新規劃。</span>'
+          : '<b>先填上方客戶資料</b><span>至少需要目標、疑慮或開發紀錄，才能規劃一場有依據的 DEMO。</span>';
+    els.generate.disabled = !hasContext || !!state.busy;
     els.generate.textContent = state.busy === 'route' ? '規劃中…' : hasGuide ? '重新規劃路線' : '規劃驗證路線';
     els.decision.hidden = !hasGuide;
     els.decision.disabled = !stats.tested || !!state.busy;
@@ -235,8 +239,10 @@ export function mountDemoGuide(
   }
 
   async function generateRoutes() {
-    const r = review();
-    if (!r?.consult || state.busy || !canSend()) return;
+    const r = review() || {};
+    const input = getDeck?.()?.input || {};
+    const hasContext = !!r.consult || Object.values(input).some((x) => String(x || '').trim());
+    if (!hasContext || state.busy || !canSend()) return;
     const key = apiKey();
     if (!key) return;
     state.busy = 'route';
@@ -246,7 +252,7 @@ export function mountDemoGuide(
       const { parsed, usedTokens, modelUsed } = await callGeminiResilient({
         apiKey: key,
         model: getModel?.(),
-        text: buildDemoGuidePrompt({ review: r, deckInput: getDeck?.()?.input || {}, courseNotes: getCourseNotes?.() || '' }),
+        text: buildDemoGuidePrompt({ review: r, deckInput: input, courseNotes: getCourseNotes?.() || '' }),
         generationConfig: { temperature: 0.25, maxOutputTokens: 6144 },
         parse: parseDemoGuideResponse,
         onRetry: ({ status, delayMs }) => {

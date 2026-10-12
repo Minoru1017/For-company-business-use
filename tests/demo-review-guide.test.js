@@ -96,5 +96,14 @@ describe('consultative DEMO P1', () => {
     expect(internalCard.rows.some((x) => x.text.includes('B 部分適合'))).toBe(true);
     expect(externalCard.rows.some((x) => x.text.includes('B 部分適合'))).toBe(false);
     expect(externalCard.footer).toContain('不代表正式合約');
+
+    const leaked = normalizeDemoGuide({
+      ...guide,
+      decision: {
+        ...decision,
+        external: { ...decision.external, goal: 'B 部分適合，成交機率 80%' },
+      },
+    });
+    expect(leaked.decision.external.goal).toBe('');
   });
 });

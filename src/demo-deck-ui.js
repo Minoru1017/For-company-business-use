@@ -631,6 +631,7 @@ export function initDemoDeck(
     if (!el || !rec) return;
     rec.input[el.dataset.input] = el.value;
     persist();
+    review?.syncDeckContext(rec);
     if (el.dataset.input === 'name' || el.dataset.input === 'demoAt') {
       renderList();
       review?.syncDeckInfo(rec);

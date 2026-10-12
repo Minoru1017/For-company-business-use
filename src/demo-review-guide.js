@@ -12,6 +12,8 @@ const ROUTE_RESULTS = new Set(['pending', 'confirmed', 'revise', 'rejected']);
 const REACTIONS = new Set(['none', 'inquiry', 'agreed', 'hesitant', 'objection']);
 const RESISTANCE_CATEGORIES = new Set(['outcome', 'self', 'process', 'authority', 'timing', 'price', 'fit', 'none']);
 const RESISTANCE_STATUS = new Set(['unconfirmed', 'confirmed', 'rejected']);
+const EXTERNAL_FORBIDDEN_RE =
+  /(?:^|[\s：:，,。；;])(?:A\s*高度適合|B\s*部分適合|C\s*不適合)|成交機率|業務評分|AI\s*可信度|客戶分級|[要怕想愛爽]什麼/u;
 
 const clip = (v, n = MAX_SHORT) => String(v ?? '').trim().slice(0, n);
 
@@ -42,6 +44,12 @@ function parseObject(raw) {
 
 function list(value, max = 6, itemMax = MAX_TEXT) {
   return (Array.isArray(value) ? value : []).map((x) => clip(x, itemMax)).filter(Boolean).slice(0, max);
+}
+
+/** 客戶版採內容防線：即使模型沒遵守 prompt，含內部標籤的整欄也不顯示。 */
+function externalText(value) {
+  const text = clip(value, MAX_TEXT);
+  return EXTERNAL_FORBIDDEN_RE.test(text) ? '' : text;
 }
 
 function routeId(value, i) {
@@ -94,14 +102,14 @@ function normalizeDecision(value) {
       investment: clip(internal.investment, MAX_TEXT),
     },
     external: {
-      current: clip(external.current, MAX_TEXT),
-      goal: clip(external.goal, MAX_TEXT),
-      validatedScene: clip(external.validatedScene, MAX_TEXT),
-      pilot: clip(external.pilot, MAX_TEXT),
-      roles: clip(external.roles, MAX_TEXT),
-      acceptance: clip(external.acceptance, MAX_TEXT),
-      risks: clip(external.risks, MAX_TEXT),
-      nextDecision: clip(external.nextDecision, MAX_TEXT),
+      current: externalText(external.current),
+      goal: externalText(external.goal),
+      validatedScene: externalText(external.validatedScene),
+      pilot: externalText(external.pilot),
+      roles: externalText(external.roles),
+      acceptance: externalText(external.acceptance),
+      risks: externalText(external.risks),
+      nextDecision: externalText(external.nextDecision),
     },
   };
   const has =
