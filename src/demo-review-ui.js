@@ -33,6 +33,7 @@ import {
 } from './demo-review.js';
 import { openReviewCard } from './demo-review-card.js';
 import { buildConsultPrompt, consultToText, parseConsultResponse } from './demo-review-consult.js';
+import { mountDemoGuide } from './demo-review-guide-ui.js';
 import { callGeminiResilient, describeApiKeyProblem } from './gemini.js';
 import { ensureCustomerId } from './customers.js';
 import { escapeHTML } from './utils.js';
@@ -166,6 +167,7 @@ export function mountDemoReview(
           <span class="dr-consult-status" id="drConsultStatus"></span>
         </div>
       </section>
+      <div id="drGuide"></div>
       <div class="dr-foot">
         <span class="dr-missing" id="drMissing"></span>
         <span class="dr-foot-actions">
@@ -222,6 +224,7 @@ export function mountDemoReview(
   };
 
   const current = () => state.reviews.find((r) => r.id === state.reviewId) || null;
+  let demoGuideUI = null;
 
   function flush() {
     if (!state.saveT) return;
@@ -263,6 +266,7 @@ export function mountDemoReview(
     renderMissing();
     renderVideo();
     renderConsult();
+    demoGuideUI?.render();
   }
 
   function fmtSize(n) {
@@ -568,6 +572,7 @@ export function mountDemoReview(
       state.consultTab = 'diagnosis';
       els.consultStatus.textContent = '已產生。請先核對「已確認／合理推測／待確認」再採用。';
       els.consultConsent.checked = false;
+      demoGuideUI?.render();
     } catch (e) {
       els.consultStatus.textContent = e?.message || String(e);
     } finally {
@@ -766,6 +771,20 @@ export function mountDemoReview(
     renderArchive();
   });
 
+  demoGuideUI = mountDemoGuide(q('#drGuide'), {
+    getReview: current,
+    getDeck: () => state.deck,
+    updateReview: (patch) => {
+      patchCurrent(patch);
+      flush();
+    },
+    getCourseNotes,
+    getApiKey,
+    setApiKey,
+    getModel,
+    onGeminiUsed,
+    showToast,
+  });
   renderForm();
   renderArchive();
 
