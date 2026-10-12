@@ -170,3 +170,54 @@ button.primary, .btn.primary { border-color:var(--deep); background:var(--deep);
   .wiz-step::before { left:12px; }
   .browser-worker .bw-test { margin-left:0; }
 }
+
+/* ---- 陪練對話：你＝墨色泡泡、客戶＝白色泡泡；客戶情緒只用左側細線＋小標籤表達，不整顆上色 ---- */
+.drill-log, .drill-log.drill-log-replay { padding:16px 14px; gap:14px; background:var(--panel2); border:none; border-radius:var(--r-tile); }
+.drill-msg { gap:8px; max-width:76%; }
+.drill-msg.s { max-width:72%; }
+.drill-who { align-self:flex-end; min-width:0; padding:0 0 7px; font-family:var(--sans); font-size:.62rem; letter-spacing:.02em; color:var(--muted); text-align:left; }
+.drill-msg.s .drill-who { text-align:right; }
+.drill-who em { margin-top:1px; font-family:var(--mono); font-size:.62rem; color:var(--text-2); font-variant-numeric:tabular-nums; }
+.drill-text { padding:10px 14px 9px; font-size:.92rem; line-height:1.65; letter-spacing:.005em; }
+.drill-log .drill-msg.s .drill-text { background:var(--deep); color:var(--on-deep); border:none; border-radius:18px 18px 4px 18px; }
+.drill-log .drill-msg.c .drill-text { background:#fff; color:var(--ink); border:1px solid var(--hairline); border-radius:18px 18px 18px 4px; }
+.drill-log .drill-msg.c.k-objection .drill-text, .drill-log .drill-msg.c.k-pressure .drill-text, .drill-log .drill-msg.c.k-pushback .drill-text,
+.drill-log .drill-msg.c.k-deflect .drill-text, .drill-log .drill-msg.c.k-repeat .drill-text, .drill-log .drill-msg.c.k-vague .drill-text {
+  background:#fff; color:var(--ink); border-color:var(--hairline); box-shadow:inset 3px 0 0 var(--warn); }
+.drill-log .drill-msg.c.k-hangup .drill-text { background:#fff; color:var(--ink); border-color:var(--hairline); box-shadow:inset 3px 0 0 var(--bad); }
+.drill-log .drill-msg.s.blank .drill-text { background:transparent; color:var(--bad); border:1px dashed var(--line-bad); font-style:normal; }
+.drill-flags { gap:6px; margin-top:8px; }
+.drill-flag { padding:2px 8px; border:none; border-radius:999px; font-family:var(--sans); font-size:.66rem; font-weight:600; letter-spacing:0; background:var(--panel2); color:var(--text-2); }
+.drill-flag.c { color:var(--warn); }
+.drill-msg.c.k-hangup .drill-flag.c { color:var(--bad); }
+.drill-msg.s .drill-flag { background:rgba(255,255,255,.1); color:var(--on-deep-muted); }
+.drill-msg.s .drill-flag.good { color:#9fd7b5; }
+.drill-msg.s .drill-flag.bad { color:var(--brand); background:rgba(247,197,49,.14); }
+.drill-msg.s.blank .drill-flag { background:var(--tint-bad); color:var(--bad); }
+/* 通話中只給聲音提示：虛線框、不填色 */
+.drill-log.drill-live-blind .drill-audio-cue { color:var(--text-2); border-color:var(--hairline-2) !important; box-shadow:none; }
+.drill-log.drill-live-blind .drill-msg.s .drill-audio-cue { color:var(--ink); border-color:var(--ink) !important; }
+/* 記憶點：墨色泡泡右下角的黃色點陣暈（像訊號擴散）、沒接上話的泡泡點陣往右淡出（訊號斷掉） */
+.drill-log .drill-msg .drill-text { position:relative; overflow:hidden; }
+.drill-log .drill-msg.s .drill-text::after { content:""; position:absolute; inset:0; pointer-events:none; border-radius:inherit;
+  background:radial-gradient(circle, rgba(247,197,49,.55) 1px, transparent 1.5px) 0 0 / 7px 7px;
+  -webkit-mask:radial-gradient(140px 100px at 100% 100%, #000, transparent 70%); mask:radial-gradient(140px 100px at 100% 100%, #000, transparent 70%); }
+.drill-log .drill-msg.s.blank .drill-text::after { background:radial-gradient(circle, rgba(187,58,36,.4) 1px, transparent 1.5px) 0 0 / 7px 7px;
+  -webkit-mask:linear-gradient(90deg, #000, transparent 85%); mask:linear-gradient(90deg, #000, transparent 85%); }
+.drill-log.drill-live-blind .drill-msg .drill-text::after { content:none; }
+/* 反應秒數＝小圓環，弧長是用掉的限時比例；超過七成轉警示色 */
+.drill-who em.drill-dial { display:flex; align-items:center; gap:5px; margin-top:4px; font-family:var(--mono); font-size:.62rem; color:var(--text-2); font-variant-numeric:tabular-nums; }
+.drill-msg.s .drill-who em.drill-dial { flex-direction:row-reverse; justify-content:flex-start; }
+.drill-dial i { --c:var(--ink); flex:0 0 auto; width:16px; height:16px; border-radius:50%;
+  background:conic-gradient(var(--c) calc(var(--p, 0) * 1turn), var(--hairline-2) 0);
+  -webkit-mask:radial-gradient(circle, transparent 4.5px, #000 5px); mask:radial-gradient(circle, transparent 4.5px, #000 5px); }
+.drill-dial.slow { color:var(--warn); }
+.drill-dial.slow i { --c:var(--warn); }
+/* 客戶正在想：三點 */
+.drill-log .drill-msg.drill-typing .drill-text { display:inline-flex; align-items:center; gap:5px; padding:13px 14px; min-height:0; }
+.drill-typing i { width:6px; height:6px; border-radius:50%; background:var(--text-2); opacity:.4; }
+@media (max-width:760px) {
+  .drill-log, .drill-log.drill-log-replay { padding:12px 10px; gap:12px; }
+  .drill-msg, .drill-msg.s { max-width:92%; }
+  .drill-text { font-size:.9rem; }
+}

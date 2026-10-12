@@ -476,9 +476,26 @@ async function rewordWithAI(classification, reply) {
   }
 }
 
+/** 客戶「正在想」的三點泡泡：出現在下一句台詞之前，台詞進來就拿掉。 */
+function showTyping() {
+  const log = $('drillLog');
+  if (!log || log.querySelector('.drill-typing')) return;
+  const div = document.createElement('div');
+  div.className = 'drill-msg c drill-typing';
+  div.setAttribute('aria-hidden', 'true');
+  div.innerHTML = '<span class="drill-who">客戶</span><div class="drill-text"><i></i><i></i><i></i></div>';
+  log.appendChild(div);
+  log.scrollTop = log.scrollHeight;
+}
+
+function hideTyping() {
+  $('drillLog')?.querySelector('.drill-typing')?.remove();
+}
+
 async function deliverReplies(replies, classification) {
   for (const rep of replies) {
     let text = rep.text;
+    showTyping();
     if (session.engine === 'ai' && rep.reword && classification) {
       const alt = await rewordWithAI(classification, rep);
       if (alt) {
@@ -488,6 +505,7 @@ async function deliverReplies(replies, classification) {
     } else {
       await wait(rep.kind === 'objection' ? 900 : 450);
     }
+    hideTyping();
     appendBubble('C', text, { kind: rep.kind });
     await speak(text);
   }
@@ -669,6 +687,14 @@ function flagBadges(flags = []) {
     .join('');
 }
 
+/** 反應秒數畫成小圓環：弧長＝用掉的限時比例；超過七成轉成警示色。 */
+function reactionDial(ms, limitSec) {
+  const sec = ms / 1000;
+  const ratio = limitSec > 0 ? Math.min(1, sec / limitSec) : 0;
+  const slow = ratio >= 0.7;
+  return `<em class="drill-dial${slow ? ' slow' : ''}" style="--p:${ratio.toFixed(3)}" title="限時 ${limitSec} 秒，用了 ${sec.toFixed(1)} 秒"><i aria-hidden="true"></i>${sec.toFixed(1)}s</em>`;
+}
+
 const C_KIND_LABEL = { objection: '突襲', pressure: '催促', hangup: '掛電話', pushback: '打回', deflect: '帶開', repeat: '不耐', vague: '敷衍', situation: '情境' };
 
 function renderDebrief(quiz) {
@@ -696,7 +722,7 @@ function renderDebrief(quiz) {
     .map((t) => {
       if (t.who === 'S') {
         const blank = t.kind === 'blank';
-        return `<div class="drill-msg s${blank ? ' blank' : ''}"><span class="drill-who">你${t.reactionMs != null && !blank ? `<em>${(t.reactionMs / 1000).toFixed(1)}s</em>` : ''}</span><div class="drill-text">${blank ? '（沒接上話）' : escapeHTML(t.text)}<div class="drill-flags">${flagBadges(t.flags)}</div></div></div>`;
+        return `<div class="drill-msg s${blank ? ' blank' : ''}"><span class="drill-who">你${t.reactionMs != null && !blank ? reactionDial(t.reactionMs, session.limitSec) : ''}</span><div class="drill-text">${blank ? '（沒接上話）' : escapeHTML(t.text)}<div class="drill-flags">${flagBadges(t.flags)}</div></div></div>`;
       }
       const tag = C_KIND_LABEL[t.kind] ? `<span class="drill-flag c">${C_KIND_LABEL[t.kind]}</span>` : '';
       return `<div class="drill-msg c k-${t.kind}"><span class="drill-who">客戶</span><div class="drill-text">${escapeHTML(t.text)}${tag ? `<div class="drill-flags">${tag}</div>` : ''}</div></div>`;
