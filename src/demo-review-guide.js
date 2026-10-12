@@ -73,8 +73,72 @@ function normalizeRoute(value, i) {
     result: ROUTE_RESULTS.has(r.result) ? r.result : 'pending',
     reaction: REACTIONS.has(r.reaction) ? r.reaction : 'none',
     observedQuote: clip(r.observedQuote, MAX_TEXT),
+    quoteAt: quoteTime(r.quoteAt),
     note: clip(r.note, MAX_TEXT),
   };
+}
+
+function quoteTime(v) {
+  if (v === '' || v == null) return null;
+  const n = Number(v);
+  return Number.isFinite(n) && n >= 0 ? Math.round(n * 10) / 10 : null;
+}
+
+/** 秒數 → 「32:18」或「1:02:05」 */
+export function formatClock(sec) {
+  const s = Math.max(0, Math.floor(Number(sec) || 0));
+  const h = Math.floor(s / 3600);
+  const m = Math.floor((s % 3600) / 60);
+  const ss = String(s % 60).padStart(2, '0');
+  return h ? `${h}:${String(m).padStart(2, '0')}:${ss}` : `${m}:${ss}`;
+}
+
+/** 「32:18」「1:02:05」「95」→ 秒數；格式不對回 null */
+export function parseClock(text) {
+  const t = String(text || '').trim().replace(/：/g, ':');
+  if (!t) return null;
+  if (!/^\d+(?::[0-5]?\d){0,2}$/.test(t)) return null;
+  return t.split(':').reduce((acc, part) => acc * 60 + Number(part), 0);
+}
+
+function grams(text) {
+  const s = String(text || '')
+    .toLowerCase()
+    .replace(/[\s\p{P}\p{S}]+/gu, '');
+  const out = new Set();
+  for (let i = 0; i < s.length - 1; i++) out.add(s.slice(i, i + 2));
+  if (s.length === 1) out.add(s);
+  return out;
+}
+
+/**
+ * 從逐字稿找客戶說過、最接近 query 的句子（字元雙字組重疊）。
+ * query 空白時回傳最長的幾句客戶發言，方便業務直接挑。
+ * @returns {{index:number, start:number, text:string, score:number}[]}
+ */
+export function findQuoteMoments(segs, query, { limit = 6 } = {}) {
+  const customer = (Array.isArray(segs) ? segs : [])
+    .map((s, index) => ({ index, start: Number(s?.start) || 0, text: String(s?.text || '').trim(), spk: s?.spk }))
+    .filter((s) => s.spk === 'C' && s.text);
+  const q = grams(query);
+  if (!q.size) {
+    return customer
+      .filter((s) => s.text.length >= 8)
+      .sort((a, b) => b.text.length - a.text.length)
+      .slice(0, limit)
+      .sort((a, b) => a.start - b.start)
+      .map(({ index, start, text }) => ({ index, start, text, score: 0 }));
+  }
+  return customer
+    .map((s) => {
+      const g = grams(s.text);
+      let hit = 0;
+      q.forEach((x) => g.has(x) && hit++);
+      return { index: s.index, start: s.start, text: s.text, score: hit / q.size };
+    })
+    .filter((s) => s.score > 0)
+    .sort((a, b) => b.score - a.score || a.start - b.start)
+    .slice(0, limit);
 }
 
 function normalizeDecision(value) {
@@ -202,7 +266,8 @@ export function guideStats(guide) {
   const revised = routes.filter((r) => r.result === 'revise').length;
   const rejected = routes.filter((r) => r.result === 'rejected').length;
   const withQuote = routes.filter((r) => r.observedQuote).length;
-  return { total: routes.length, tested, confirmed, revised, rejected, withQuote, complete: routes.length > 0 && tested === routes.length };
+  const withTime = routes.filter((r) => r.observedQuote && r.quoteAt != null).length;
+  return { total: routes.length, tested, confirmed, revised, rejected, withQuote, withTime, complete: routes.length > 0 && tested === routes.length };
 }
 
 export function patchGuideRoute(guide, id, patch) {
@@ -223,7 +288,7 @@ function routeEvidenceLines(guide) {
     `原假設：${r.hypothesis}`,
     `驗證結果：${r.result}`,
     `客戶反應：${r.reaction}`,
-    `客戶現場原話：${r.observedQuote || '未記錄'}`,
+    `客戶現場原話：${r.observedQuote || '未記錄'}${r.observedQuote && r.quoteAt != null ? `（錄影 ${formatClock(r.quoteAt)}）` : ''}`,
     `現場備註：${r.note || '無'}`,
   ]);
 }

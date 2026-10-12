@@ -2,9 +2,12 @@ import { describe, expect, it } from 'vitest';
 import {
   buildDecisionPrompt,
   buildDemoGuidePrompt,
+  findQuoteMoments,
+  formatClock,
   guideStats,
   guideToText,
   normalizeDemoGuide,
+  parseClock,
   parseDecisionResponse,
   parseDemoGuideResponse,
   patchGuideRoute,
@@ -105,5 +108,44 @@ describe('consultative DEMO P1', () => {
       },
     });
     expect(leaked.decision.external.goal).toBe('');
+  });
+
+  it('formats and parses recording clock times', () => {
+    expect(formatClock(0)).toBe('0:00');
+    expect(formatClock(1938.6)).toBe('32:18');
+    expect(formatClock(3725)).toBe('1:02:05');
+    expect(parseClock('32:18')).toBe(1938);
+    expect(parseClock('1:02:05')).toBe(3725);
+    expect(parseClock('95')).toBe(95);
+    expect(parseClock('3２:1')).toBeNull();
+    expect(parseClock('32：18')).toBe(1938);
+    expect(parseClock('12:75')).toBeNull();
+    expect(parseClock('')).toBeNull();
+  });
+
+  it('keeps quote timestamps on routes and in evidence text', () => {
+    const base = normalizeDemoGuide({ routes: ROUTES });
+    expect(base.routes[0].quoteAt).toBeNull();
+    const g = patchGuideRoute(base, 'route_1', { result: 'confirmed', observedQuote: '這樣每週能省三小時', quoteAt: 1938.64 });
+    expect(g.routes[0].quoteAt).toBe(1938.6);
+    expect(patchGuideRoute(g, 'route_1', { quoteAt: -3 }).routes[0].quoteAt).toBeNull();
+    expect(guideStats(g)).toMatchObject({ withQuote: 1, withTime: 1 });
+    const prompt = buildDecisionPrompt({ review: { customer: '王小姐' }, guide: g, deckInput: {}, courseNotes: '' });
+    expect(prompt).toContain('這樣每週能省三小時（錄影 32:18）');
+  });
+
+  it('finds the closest customer lines in a transcript', () => {
+    const segs = [
+      { start: 10, text: '每週整理報表要花四個小時', spk: 'S' },
+      { start: 62, text: '我們每週整理報表真的要四小時左右', spk: 'C' },
+      { start: 130, text: '好', spk: 'C' },
+      { start: 200, text: '主管最在意的是數字有沒有錯', spk: 'C' },
+    ];
+    const hits = findQuoteMoments(segs, '整理報表四小時');
+    expect(hits[0]).toMatchObject({ index: 1, start: 62 });
+    expect(hits.every((h) => segs[h.index].spk === 'C')).toBe(true);
+    const fallback = findQuoteMoments(segs, '');
+    expect(fallback.map((h) => h.start)).toEqual([62, 200]);
+    expect(findQuoteMoments(null, 'x')).toEqual([]);
   });
 });

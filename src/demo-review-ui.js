@@ -66,6 +66,8 @@ function downloadText(name, text, type = 'text/csv;charset=utf-8') {
  * @param {(tokens:number)=>void} [opts.onGeminiUsed]
  * @param {()=>string} [opts.getCourseNotes]
  * @param {(msg:string)=>void} [opts.showToast]
+ * @param {(historyId:string)=>Array<{start:number,text:string,spk:string}>|null} [opts.getTranscript]  關聯分析的逐字稿
+ * @param {(historyId:string, sec:number)=>void} [opts.onPlayAt]  跳到錄影／逐字稿時間點
  * @returns {{ setDeck(rec:object|null):void, syncDeckInfo(rec:object):void, syncDeckContext(rec:object):void, openReview(id:string):boolean, refresh():void }}
  */
 export function mountDemoReview(
@@ -82,6 +84,8 @@ export function mountDemoReview(
     onGeminiUsed,
     getCourseNotes = () => '',
     showToast,
+    getTranscript,
+    onPlayAt,
   } = {}
 ) {
   const toast = (m) => showToast?.(m);
@@ -784,6 +788,8 @@ export function mountDemoReview(
     getModel,
     onGeminiUsed,
     showToast,
+    getTranscript,
+    onPlayAt,
   });
   renderForm();
   renderArchive();

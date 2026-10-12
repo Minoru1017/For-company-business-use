@@ -49,7 +49,7 @@ const isTyping = (el) => !!el?.closest?.('input, textarea, select, [contentedita
 
 export function initDemoDeck(
   container,
-  { getApiKey, setApiKey, getModel, onGeminiUsed, showToast, onSendVideo, hasAnalysis, onOpenAnalysis } = {}
+  { getApiKey, setApiKey, getModel, onGeminiUsed, showToast, onSendVideo, hasAnalysis, onOpenAnalysis, getTranscript, onPlayAt } = {}
 ) {
   if (!container) return { activate() {}, syncApiKey() {} };
   const toast = (m) => showToast?.(m);
@@ -784,6 +784,8 @@ export function initDemoDeck(
     onGeminiUsed,
     getCourseNotes: () => els.course.value,
     showToast: toast,
+    getTranscript,
+    onPlayAt,
   });
   mountCustomerDatalist();
   customerMaster = mountCustomerMaster(q('#dkCustomers'), {

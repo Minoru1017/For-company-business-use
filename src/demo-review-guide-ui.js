@@ -5,9 +5,12 @@
 import {
   buildDecisionPrompt,
   buildDemoGuidePrompt,
+  findQuoteMoments,
+  formatClock,
   guideStats,
   normalizeDemoGuide,
   parseDecisionResponse,
+  parseClock,
   parseDemoGuideResponse,
   patchGuideRoute,
 } from './demo-review-guide.js';
@@ -21,6 +24,7 @@ const RESULT_LABELS = {
   revise: '需修正',
   rejected: '不適用',
 };
+const FIELD_RESULTS = ['confirmed', 'revise', 'rejected'];
 const REACTION_OPTIONS = [
   ['none', '尚未記錄反應'],
   ['inquiry', '主動追問'],
@@ -56,10 +60,12 @@ export function mountDemoGuide(
     getModel,
     onGeminiUsed,
     showToast,
+    getTranscript,
+    onPlayAt,
   } = {}
 ) {
   if (!container) return { render() {} };
-  const state = { routeId: '', busy: '', status: '' };
+  const state = { routeId: '', busy: '', status: '', pickOpen: false, pickQuery: null, openDetails: new Set() };
 
   container.innerHTML = `
     <section class="dr-guide">
@@ -121,42 +127,89 @@ export function mountDemoGuide(
     updateReview?.({ demoGuide: next });
   }
 
-  function routeCardHtml(r) {
-    const resultButtons = Object.entries(RESULT_LABELS)
+  function transcript() {
+    const id = review()?.analysis?.historyId;
+    const segs = id ? getTranscript?.(id) : null;
+    return Array.isArray(segs) && segs.length ? segs : null;
+  }
+
+  function pickListHtml(r, query) {
+    const hits = findQuoteMoments(transcript(), query);
+    if (!hits.length) return '<p class="dr-pick-empty">逐字稿裡找不到相近的客戶發言，換幾個關鍵字試試。</p>';
+    return hits
       .map(
-        ([key, label]) =>
-          `<button type="button" class="dr-result-btn ${r.result === key ? 'on' : ''} ${key}" data-result="${key}" aria-pressed="${r.result === key}">${label}</button>`
+        (h) =>
+          `<button type="button" class="dr-pick-item ${r.quoteAt === h.start ? 'on' : ''}" data-pick-start="${h.start}" data-pick-index="${h.index}">
+            <time>${formatClock(h.start)}</time><span>${escapeHTML(h.text)}</span>
+          </button>`
       )
       .join('');
+  }
+
+  function routeCardHtml(r) {
+    const resultButtons = FIELD_RESULTS.map(
+      (key) =>
+        `<button type="button" class="dr-result-btn ${r.result === key ? 'on' : ''} ${key}" data-result="${key}" aria-pressed="${r.result === key}">${RESULT_LABELS[key]}</button>`
+    ).join('');
+    const hasTranscript = !!transcript();
+    const hasTime = r.quoteAt != null;
+    const timeChip = hasTime
+      ? `<button type="button" class="dr-quote-time" data-play title="跳到錄影／逐字稿這個時間點">▶ ${formatClock(r.quoteAt)}</button><button type="button" class="dr-quote-clear" data-clear-time aria-label="移除時間點">×</button>`
+      : '';
+    const pickToggle = hasTranscript
+      ? `<button type="button" class="dr-quote-pick-btn ${state.pickOpen ? 'on' : ''}" data-pick-toggle>${state.pickOpen ? '收起逐字稿' : '從逐字稿挑原話'}</button>`
+      : '';
+    const query = state.pickQuery ?? (r.observedQuote || r.hypothesis || '');
+    const picker =
+      hasTranscript && state.pickOpen
+        ? `<div class="dr-pick">
+            <input type="search" class="field" data-pick-query value="${escapeHTML(query)}" placeholder="輸入客戶可能說過的關鍵字">
+            <div class="dr-pick-list" id="drPickList">${pickListHtml(r, query)}</div>
+          </div>`
+        : '';
+    const open = (key) => (state.openDetails.has(key) ? 'open' : '');
     return `
       <header class="dr-route-title">
         <span>待驗證假設</span>
         <h4>${escapeHTML(r.title)}</h4>
         <p>${escapeHTML(r.hypothesis)}</p>
-        <blockquote>依據：${escapeHTML(r.customerQuote || '目前無直接原話')}</blockquote>
       </header>
       <div class="dr-route-flow">
         <section><span>BEFORE</span><b>展示前先問</b><p>${escapeHTML(r.beforeQuestion)}</p></section>
         <section class="demo"><span>DEMO</span><b>只展示這個場景</b><p>${escapeHTML(r.demo)}</p></section>
         <section><span>VERIFY</span><b>展示後驗收</b><p>${escapeHTML(r.afterQuestion)}</p></section>
       </div>
-      <div class="dr-route-guard">
-        <div><b>觀察訊號</b><ul>${(r.signals || []).map((x) => `<li>${escapeHTML(x)}</li>`).join('') || '<li>尚未設定</li>'}</ul></div>
-        <div><b>停損條件</b><p>${escapeHTML(r.stopCondition || '尚未設定')}</p></div>
-        <div><b>這段不要講</b><p>${escapeHTML(r.avoid || '尚未設定')}</p></div>
-      </div>
       <div class="dr-field-evidence">
-        <div class="dr-result-pick" role="group" aria-label="驗證結果">${resultButtons}</div>
-        <label>客戶反應
-          <select class="field" data-route-field="reaction">${REACTION_OPTIONS.map(([key, label]) => `<option value="${key}" ${r.reaction === key ? 'selected' : ''}>${label}</option>`).join('')}</select>
-        </label>
-        <label class="wide">客戶現場原話
+        <div class="dr-result-pick" role="group" aria-label="驗證結果（再按一次可取消）">${resultButtons}</div>
+        <div class="dr-quote">
+          <div class="dr-quote-head"><b>客戶原話</b>${timeChip}${pickToggle}</div>
           <textarea class="field" rows="2" data-route-field="observedQuote" placeholder="只記客戶真的說過的話，不替他下結論">${escapeHTML(r.observedQuote)}</textarea>
-        </label>
-        <label class="wide">現場備註
-          <textarea class="field" rows="2" data-route-field="note" placeholder="資料限制、誰是決策人、哪個假設需要改…">${escapeHTML(r.note)}</textarea>
-        </label>
-      </div>`;
+          ${picker}
+        </div>
+      </div>
+      <details class="dr-route-more" data-details="prep" ${open('prep')}>
+        <summary>展示前提醒：觀察訊號・停損・不要講</summary>
+        <div class="dr-route-guard">
+          <div><b>觀察訊號</b><ul>${(r.signals || []).map((x) => `<li>${escapeHTML(x)}</li>`).join('') || '<li>尚未設定</li>'}</ul></div>
+          <div><b>停損條件</b><p>${escapeHTML(r.stopCondition || '尚未設定')}</p></div>
+          <div><b>這段不要講</b><p>${escapeHTML(r.avoid || '尚未設定')}</p></div>
+        </div>
+        <blockquote>假設依據：${escapeHTML(r.customerQuote || '目前無直接原話')}</blockquote>
+      </details>
+      <details class="dr-route-more" data-details="after" ${open('after')}>
+        <summary>會後補充：反應・時間點・備註</summary>
+        <div class="dr-after-grid">
+          <label>客戶反應
+            <select class="field" data-route-field="reaction">${REACTION_OPTIONS.map(([key, label]) => `<option value="${key}" ${r.reaction === key ? 'selected' : ''}>${label}</option>`).join('')}</select>
+          </label>
+          <label>原話時間點
+            <input class="field" data-route-field="quoteAtClock" inputmode="numeric" placeholder="例：32:18" value="${hasTime ? formatClock(r.quoteAt) : ''}">
+          </label>
+          <label class="wide">現場備註
+            <textarea class="field" rows="2" data-route-field="note" placeholder="資料限制、誰是決策人、哪個假設需要改…">${escapeHTML(r.note)}</textarea>
+          </label>
+        </div>
+      </details>`;
   }
 
   function decisionHtml(d) {
@@ -197,11 +250,19 @@ export function mountDemoGuide(
     els.decision.disabled = !stats.tested || !!state.busy;
     els.decision.textContent = state.busy === 'decision' ? '整理中…' : g?.decision ? '重新整理阻力與決策卡' : '整理阻力與決策卡';
     els.cards.hidden = !g?.decision;
-    els.progress.textContent = hasGuide ? `已驗證 ${stats.tested} / ${stats.total} · 有原話 ${stats.withQuote}` : '尚未規劃';
+    els.progress.textContent = hasGuide ? `已驗證 ${stats.tested} / ${stats.total} · 有原話 ${stats.withQuote} · 有時間點 ${stats.withTime}` : '尚未規劃';
     els.status.textContent = state.status;
     if (!hasGuide) return;
 
     if (!state.routeId || !g.routes.some((x) => x.id === state.routeId)) state.routeId = g.routes[0].id;
+    renderNav(g);
+    const route = activeRoute();
+    els.card.innerHTML = route ? routeCardHtml(route) : '';
+    els.resistanceWords.value = g.resistanceWords || '';
+    els.decisionResult.innerHTML = decisionHtml(g.decision);
+  }
+
+  function renderNav(g) {
     els.nav.innerHTML = g.routes
       .map(
         (x, i) =>
@@ -210,10 +271,18 @@ export function mountDemoGuide(
           </button>`
       )
       .join('');
-    const route = activeRoute();
-    els.card.innerHTML = route ? routeCardHtml(route) : '';
-    els.resistanceWords.value = g.resistanceWords || '';
+  }
+
+  /** 打字欄位只更新進度與分頁，避免整張卡重畫讓游標跳掉 */
+  function renderLight() {
+    const g = guide();
+    if (!g?.routes?.length) return render();
+    const stats = guideStats(g);
+    els.progress.textContent = `已驗證 ${stats.tested} / ${stats.total} · 有原話 ${stats.withQuote} · 有時間點 ${stats.withTime}`;
+    els.decision.disabled = !stats.tested || !!state.busy;
+    els.cards.hidden = !g.decision;
     els.decisionResult.innerHTML = decisionHtml(g.decision);
+    renderNav(g);
   }
 
   function apiKey() {
@@ -313,22 +382,82 @@ export function mountDemoGuide(
     const id = e.target.closest('[data-route]')?.dataset.route;
     if (!id) return;
     state.routeId = id;
+    state.pickOpen = false;
+    state.pickQuery = null;
     render();
   });
-  els.card.addEventListener('click', (e) => {
-    const result = e.target.closest('[data-result]')?.dataset.result;
+  function patchRoute(patch) {
     const r = activeRoute();
-    if (!result || !r) return;
-    saveGuide(patchGuideRoute(guide(), r.id, { result }));
-    render();
+    if (!r) return;
+    saveGuide(patchGuideRoute(guide(), r.id, patch));
+  }
+
+  els.card.addEventListener('click', (e) => {
+    const r = activeRoute();
+    if (!r) return;
+    const resultBtn = e.target.closest('[data-result]');
+    if (resultBtn) {
+      const result = resultBtn.dataset.result;
+      patchRoute({ result: r.result === result ? 'pending' : result });
+      return render();
+    }
+    if (e.target.closest('[data-play]')) {
+      if (r.quoteAt != null) onPlayAt?.(review()?.analysis?.historyId || '', r.quoteAt);
+      return;
+    }
+    if (e.target.closest('[data-clear-time]')) {
+      patchRoute({ quoteAt: null });
+      return render();
+    }
+    if (e.target.closest('[data-pick-toggle]')) {
+      state.pickOpen = !state.pickOpen;
+      state.pickQuery = null;
+      return render();
+    }
+    const pick = e.target.closest('[data-pick-start]');
+    if (pick) {
+      const segs = transcript() || [];
+      const seg = segs[Number(pick.dataset.pickIndex)];
+      patchRoute({ observedQuote: String(seg?.text || '').trim(), quoteAt: Number(pick.dataset.pickStart) });
+      state.pickOpen = false;
+      state.pickQuery = null;
+      showToast?.(`已帶入 ${formatClock(pick.dataset.pickStart)} 的客戶原話`);
+      return render();
+    }
+  });
+  els.card.addEventListener('input', (e) => {
+    if (!e.target.matches('[data-pick-query]')) return;
+    state.pickQuery = e.target.value;
+    const list = els.card.querySelector('#drPickList');
+    const r = activeRoute();
+    if (list && r) list.innerHTML = pickListHtml(r, state.pickQuery);
   });
   els.card.addEventListener('change', (e) => {
     const key = e.target.dataset.routeField;
-    const r = activeRoute();
-    if (!key || !r) return;
-    saveGuide(patchGuideRoute(guide(), r.id, { [key]: e.target.value }));
-    render();
+    if (!key || !activeRoute()) return;
+    if (key === 'quoteAtClock') {
+      const raw = e.target.value.trim();
+      const sec = parseClock(raw);
+      if (raw && sec == null) {
+        showToast?.('時間格式請用 32:18 或 1:02:05');
+        return;
+      }
+      patchRoute({ quoteAt: sec });
+      return render();
+    }
+    patchRoute({ [key]: e.target.value });
+    renderLight();
   });
+  els.card.addEventListener(
+    'toggle',
+    (e) => {
+      const key = e.target.dataset?.details;
+      if (!key) return;
+      if (e.target.open) state.openDetails.add(key);
+      else state.openDetails.delete(key);
+    },
+    true
+  );
   els.resistanceWords.addEventListener('change', () => {
     const g = guide();
     if (!g) return;

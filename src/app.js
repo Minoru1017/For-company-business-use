@@ -47,6 +47,7 @@ import {
   sendMp4ToBridge,
 } from './local-transcribe.js';
 import { initDemoPlayer, refreshDemoPlayerFromBridge, seekDemoTo, updateDemoPlayerSegments } from './demo-player.js';
+import { formatClock } from './demo-review-guide.js';
 import { mountDevAudioUpload } from './dev-audio-upload.js';
 import { goToModeHome, initModeChooser, resolveMode, setMode } from './mode.js';
 import { findCallBySourceName, listCallsBetween } from './symptom-store.js';
@@ -950,6 +951,31 @@ function openReviewAnalysis(historyId) {
   loadFromHistory(historyId);
 }
 
+/** 複盤裡的客戶原話：開啟那筆分析，跳到逐字稿該句；有錄影就從那裡播放 */
+function openReviewAnalysisAt(historyId, sec) {
+  const item = historyId ? getHistory(historyId) : null;
+  if (!item) return showToast('這段原話沒有關聯的分析紀錄，無法跳到錄影');
+  if (currentHistoryId !== item.id) openReviewAnalysis(historyId);
+  else switchMode('demo');
+  const list = item.segs || [];
+  let idx = 0;
+  list.forEach((s, i) => {
+    if (Number(s.start) <= sec + 0.05) idx = i;
+  });
+  setTimeout(() => {
+    const row = document.querySelector(`#labelList .seg[data-i="${idx}"]`);
+    if (row) {
+      row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      row.classList.remove('quote-flash');
+      void row.offsetWidth;
+      row.classList.add('quote-flash');
+    }
+    const clock = formatClock(sec);
+    if (seekDemoTo(sec)) showToast(`從 ${clock} 開始播放客戶原話`);
+    else showToast(`已跳到逐字稿 ${clock}（錄影需在轉錄助手開啟後才能播放）`);
+  }, 350);
+}
+
 /** 首頁客戶進度：回到那位客戶的簡報／複盤 */
 async function openCustomerFromHome(item) {
   if (dayTypeHomeCtrl && !dayTypeHomeCtrl.canEnterWorkModes?.()) {
@@ -1103,6 +1129,8 @@ function init() {
     onSendVideo: sendReviewVideo,
     hasAnalysis: (id) => !!getHistory(id),
     onOpenAnalysis: openReviewAnalysis,
+    getTranscript: (id) => getHistory(id)?.segs || null,
+    onPlayAt: openReviewAnalysisAt,
   };
   // 從網址直接進入時 initModeChooser 已先觸發 onModeChange，當時 modeDeps 還沒建好
   if (MODE_LOADERS[resolveMode()]) activateMode(resolveMode());
