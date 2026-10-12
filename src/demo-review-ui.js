@@ -30,6 +30,7 @@ import {
   upsertReview,
   videoFromFile,
 } from './demo-review.js';
+import { openReviewCard } from './demo-review-card.js';
 import { ensureCustomerId } from './customers.js';
 import { escapeHTML } from './utils.js';
 
@@ -115,6 +116,7 @@ export function mountDemoReview(
       <div class="dr-foot">
         <span class="dr-missing" id="drMissing"></span>
         <span class="dr-foot-actions">
+          <button type="button" class="btn primary slog-mini" id="drCard" title="做成一張圖卡，直接傳給主管">分享圖卡</button>
           <button type="button" class="btn slog-mini" id="drCopy">複製這筆</button>
           <button type="button" class="btn slog-mini" id="drNew" title="不綁簡報，單獨建一筆">＋ 另開一筆</button>
         </span>
@@ -275,6 +277,7 @@ export function mountDemoReview(
                 <small>${escapeHTML(meta)}</small>
                 ${r.nextStep ? `<small class="dr-next">下一步：${escapeHTML(r.nextStep)}</small>` : ''}
               </button>
+              <button type="button" class="dr-item-card" data-card title="分享圖卡" aria-label="分享圖卡">圖卡</button>
               <button type="button" class="dk-deck-del" data-del title="刪除這筆複盤" aria-label="刪除">×</button>
             </li>`;
           })
@@ -410,6 +413,13 @@ export function mountDemoReview(
     container.querySelector('[data-dr="customer"]').focus();
   });
 
+  q('#drCard').addEventListener('click', () => {
+    const r = current();
+    if (!r || !reviewHasContent(r)) return toast('先填結果或下一步，才有東西可以做成圖卡');
+    flush();
+    openReviewCard(r, { showToast });
+  });
+
   q('#drCopy').addEventListener('click', async () => {
     const r = current();
     if (!r || !reviewHasContent(r)) return toast('這筆還沒有內容');
@@ -444,6 +454,12 @@ export function mountDemoReview(
     if (!li) return;
     const r = state.reviews.find((x) => x.id === li.dataset.id);
     if (!r) return;
+    if (e.target.closest('[data-card]')) {
+      if (!reviewHasContent(r)) return toast('這筆還沒有內容');
+      flush();
+      openReviewCard(r, { showToast });
+      return;
+    }
     if (e.target.closest('[data-del]')) {
       if (!window.confirm(`刪除「${r.customer || '未命名客戶'}」的複盤檔案？`)) return;
       flush();
