@@ -401,7 +401,8 @@ export async function openReviewCard(review, { showToast } = {}) {
     const img = new Image();
     img.alt = 'DEMO 複盤圖卡';
     img.className = 'drc-img';
-    img.src = URL.createObjectURL(blob);
+    // CSP 的 img-src 只放行 self 與 data:，預覽用 data URL（下載仍走 blob）
+    img.src = cv.toDataURL('image/png');
     const box = modal.querySelector('.drc-preview');
     box.innerHTML = '';
     box.appendChild(img);
