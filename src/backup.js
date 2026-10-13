@@ -19,8 +19,11 @@ const EXTRA_KEYS = ['gemini_key', 'gemini_limit', 'gemini_model', 'gemini_rememb
 /** 金鑰與 Token：預設不進備份；還原時保留這台電腦原本的值 */
 export const SECRET_KEYS = ['gemini_key', 'callCoachBrowserWorkerToken'];
 
+/** 雲端登入、同步密碼與同步狀態屬於「這台裝置」，不進備份、還原時也不動 */
+const DEVICE_KEY_PREFIX = 'callCoachCloud';
+
 export function isAppKey(key) {
-  if (!key || key === LAST_BACKUP_KEY) return false;
+  if (!key || key === LAST_BACKUP_KEY || key.startsWith(DEVICE_KEY_PREFIX)) return false;
   return EXTRA_KEYS.includes(key) || KEY_PREFIXES.some((p) => key.startsWith(p));
 }
 

@@ -1,5 +1,6 @@
 import { runAnalysis } from './analyze.js';
 import { initBackupUI } from './backup-ui.js';
+import { initCloudSyncUI } from './cloud-sync-ui.js';
 import { drawChart } from './chart.js';
 import {
   buildTranscript,
@@ -1044,6 +1045,11 @@ function init() {
     initBackupUI({ showToast });
   } catch (e) {
     console.error('backup init failed', e);
+  }
+  try {
+    initCloudSyncUI({ showToast });
+  } catch (e) {
+    console.error('cloud sync init failed', e);
   }
   try {
     reflectionJournalCtrl = initReflectionJournal({
