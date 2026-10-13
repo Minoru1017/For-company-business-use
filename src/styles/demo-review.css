@@ -173,6 +173,26 @@
 .dr-pick-item.on { border-color:var(--deep); }
 .dr-pick-item time { font-family:var(--mono); font-size:.66rem; color:var(--accent); }
 .dr-pick-empty { margin:0; padding:6px; font-size:.68rem; color:var(--muted); }
+.dr-match { display:flex; flex-direction:column; gap:6px; padding:9px; border:1px solid var(--border); border-radius:12px; background:var(--panel2); }
+.dr-match-head { display:flex; flex-wrap:wrap; align-items:baseline; gap:4px 8px; }
+.dr-match-head b { font-size:.72rem; }
+.dr-match-head span, .dr-match-empty { font-size:.64rem; color:var(--muted); }
+.dr-match-empty { margin:0; }
+.dr-match-item { display:grid; grid-template-columns:1fr auto; gap:5px 10px; align-items:center; padding:8px 10px; border:1px solid transparent; border-left:3px solid var(--border); border-radius:8px; background:var(--panel); }
+.dr-match-item.support { border-left-color:var(--ok); }
+.dr-match-item.revise { border-left-color:var(--warn); }
+.dr-match-item.reject { border-left-color:var(--bad); }
+.dr-match-item.used { border-color:var(--deep); border-left-width:3px; }
+.dr-match-meta { grid-column:1 / -1; display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
+.dr-match-meta small { margin-right:auto; font-size:.62rem; color:var(--muted); }
+.dr-match-item p { margin:0; font-size:.74rem; line-height:1.45; }
+.dr-stance { padding:2px 8px; border-radius:999px; font-size:.62rem; font-weight:700; color:#fff; background:var(--deep); }
+.dr-stance.support { background:var(--ok); }
+.dr-stance.revise { background:var(--warn); }
+.dr-stance.reject { background:var(--bad); }
+.dr-match-use { padding:5px 11px; border:1px solid var(--ink); border-radius:999px; background:transparent; box-shadow:none; font-size:.66rem; font-weight:700; color:var(--text); }
+.dr-match-use:hover { transform:none; box-shadow:none; background:var(--panel2); }
+.dr-match-item.used .dr-match-use { border-color:var(--deep); background:var(--deep); color:var(--on-deep); }
 .dr-route-more { border-top:1px solid var(--border); background:var(--panel); }
 .dr-route-more > summary { padding:9px 12px; cursor:pointer; font-size:.68rem; font-weight:700; color:var(--muted); }
 .dr-route-more[open] > summary { color:var(--text); }

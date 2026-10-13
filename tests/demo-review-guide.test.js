@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import {
+  applyQuoteMatches,
   buildDecisionPrompt,
   buildDemoGuidePrompt,
+  buildQuoteMatchPrompt,
   findQuoteMoments,
   formatClock,
   guideStats,
@@ -10,7 +12,10 @@ import {
   parseClock,
   parseDecisionResponse,
   parseDemoGuideResponse,
+  parseQuoteMatchResponse,
   patchGuideRoute,
+  quoteMatchSchema,
+  selectQuoteCandidates,
 } from '../src/demo-review-guide.js';
 import { decisionCardModel } from '../src/demo-review-decision-card.js';
 
@@ -147,5 +152,61 @@ describe('consultative DEMO P1', () => {
     const fallback = findQuoteMoments(segs, '');
     expect(fallback.map((h) => h.start)).toEqual([62, 200]);
     expect(findQuoteMoments(null, 'x')).toEqual([]);
+  });
+
+  const SEGS = [
+    { start: 5, text: '今天幫您看看週報要怎麼整理比較快', spk: 'S' },
+    { start: 62, text: '我們每週整理報表真的要四小時左右', spk: 'C' },
+    { start: 130, text: '好', spk: 'C' },
+    { start: 1938, text: '其實報表不難，最花時間的是跟各部門要資料', spk: 'C' },
+    { start: 2010, text: '主管最在意的是數字有沒有錯，錯一次就不敢用', spk: 'C' },
+  ];
+
+  it('selects only customer lines as candidates, in time order', () => {
+    const routes = normalizeDemoGuide({ routes: ROUTES }).routes;
+    const c = selectQuoteCandidates(SEGS, routes);
+    expect(c.map((x) => x.start)).toEqual([62, 1938, 2010]);
+    expect(c.map((x) => x.id)).toEqual(['L1', 'L2', 'L3']);
+    expect(c.every((x) => SEGS[x.index].spk === 'C')).toBe(true);
+    expect(selectQuoteCandidates(SEGS, routes, { max: 2 })).toHaveLength(2);
+    const prompt = buildQuoteMatchPrompt({ routes, candidates: c });
+    expect(prompt).toContain('route_1｜週報流程｜主要問題是資料彙整');
+    expect(prompt).toContain('L2｜其實報表不難');
+    expect(prompt).not.toContain('今天幫您看看');
+    const schema = quoteMatchSchema(routes, c);
+    expect(schema.properties.judgments.items.properties.line.enum).toEqual(['L1', 'L2', 'L3']);
+    expect(schema.properties.judgments.items.properties.stance.enum).toContain('unrelated');
+  });
+
+  it('keeps only valid choices and uses local transcript text and time', () => {
+    const routes = normalizeDemoGuide({ routes: ROUTES }).routes;
+    const candidates = selectQuoteCandidates(SEGS, routes);
+    const raw = JSON.stringify({
+      judgments: [
+        { route: 'route_1', line: 'L1', stance: 'support', confidence: 'medium', text: '模型亂寫的原話' },
+        { route: 'route_1', line: 'L2', stance: 'revise', confidence: 'high' },
+        { route: 'route_1', line: 'L2', stance: 'support', confidence: 'low' },
+        { route: 'route_2', line: 'L3', stance: 'support', confidence: 'high' },
+        { route: 'route_2', line: 'L1', stance: 'unrelated', confidence: 'high' },
+        { route: 'route_9', line: 'L1', stance: 'support', confidence: 'high' },
+        { route: 'route_2', line: 'L99', stance: 'reject', confidence: 'high' },
+      ],
+    });
+    const out = parseQuoteMatchResponse(raw, { routes, candidates });
+    expect(out.route_1.map((m) => [m.start, m.stance])).toEqual([
+      [1938, 'revise'],
+      [62, 'support'],
+    ]);
+    expect(out.route_1[1].text).toBe('我們每週整理報表真的要四小時左右');
+    expect(out.route_2).toHaveLength(1);
+    expect(out.route_9).toBeUndefined();
+
+    const g = applyQuoteMatches(normalizeDemoGuide({ routes: ROUTES, decision: { internal: { verdict: 'keep' } } }), out, 123);
+    expect(g.matchAt).toBe(123);
+    expect(g.routes[0].matches).toHaveLength(2);
+    expect(g.decision.internal.verdict).toBe('keep');
+    const patched = patchGuideRoute(g, 'route_1', { observedQuote: out.route_1[0].text, quoteAt: out.route_1[0].start });
+    expect(patched.routes[0].matches).toHaveLength(2);
+    expect(normalizeDemoGuide({ routes: [{ ...ROUTES[0], matches: [{ text: 'x', stance: 'maybe', start: 1 }] }] }).routes[0].matches).toEqual([]);
   });
 });
