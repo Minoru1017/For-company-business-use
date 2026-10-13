@@ -157,6 +157,7 @@ button.primary, .btn.primary { border-color:var(--deep); background:var(--deep);
 .browser-worker .bridge-actions { align-items:center; margin:0; }
 .browser-worker .bw-test { margin-left:auto; }
 .browser-worker .bridge-upload-status { margin:12px 0 0; }
+.browser-worker .bridge-token + .bridge-upload-status { margin:0 0 8px; }
 .bw-progress { height:6px; margin:8px 0 0; overflow:hidden; border-radius:99px; background:#e4dfd3; }
 .bw-progress > div { height:100%; width:0; border-radius:99px; background:var(--ink); transition:width .25s var(--ease-out, ease); }
 .bw-progress.indeterminate > div { animation:bw-slide 1.4s var(--ease-in-out, ease-in-out) infinite; }
