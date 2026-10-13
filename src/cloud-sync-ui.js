@@ -227,23 +227,33 @@ export function initCloudSyncUI({ showToast = () => {} } = {}) {
     const home = document.getElementById('cloudHome');
     if (!home) return;
     const st = ui.sync?.status;
-    const show = !!session() && ui.key && (st === 'cloud-ahead' || st === 'conflict' || st === 'local-ahead');
-    home.hidden = !show;
-    if (!show) return;
-    const lead =
-      st === 'cloud-ahead'
-        ? `雲端有「${ui.meta?.device || '其他裝置'}」在 ${formatDate(ui.meta?.updatedAt)} 更新的資料。`
-        : st === 'local-ahead'
-          ? '這台裝置有尚未上傳到雲端的變更。'
-          : '這台裝置和雲端都有變更，需要決定保留哪一份。';
-    const label = st === 'cloud-ahead' ? '下載到這台' : st === 'local-ahead' ? '上傳到雲端' : '查看';
-    home.innerHTML = `<span class="backup-strip-text">${escapeHTML(lead)}</span><button type="button" class="primary" data-cloud-open>${label}</button>`;
+    const s = session();
+    const due = !!s && !!ui.key && (st === 'cloud-ahead' || st === 'conflict' || st === 'local-ahead');
+    let lead = '登入雲端，公司、家裡、手機都能讀到同一份資料。';
+    let label = '登入雲端';
+    if (due) {
+      lead =
+        st === 'cloud-ahead'
+          ? `雲端有「${ui.meta?.device || '其他裝置'}」在 ${formatDate(ui.meta?.updatedAt)} 更新的資料。`
+          : st === 'local-ahead'
+            ? '這台裝置有尚未上傳到雲端的變更。'
+            : '這台裝置和雲端都有變更，需要決定保留哪一份。';
+      label = st === 'cloud-ahead' ? '下載到這台' : st === 'local-ahead' ? '上傳到雲端' : '查看';
+    } else if (s) {
+      lead = st === 'synced' ? `雲端已同步・${s.user.email}` : `已登入雲端・${s.user.email}`;
+      label = '雲端同步';
+    }
+    home.hidden = false;
+    home.classList.toggle('due', due);
+    home.innerHTML = `<span class="backup-strip-text">${escapeHTML(lead)}</span><button type="button" class="${due ? 'primary' : ''}" data-cloud-open>${label}</button>`;
   }
 
   /* ---------- 動作 ---------- */
 
+  let form = {};
   async function run(fn) {
     if (ui.busy) return;
+    form = Object.fromEntries([...body.querySelectorAll('input')].map((i) => [i.id, i.type === 'checkbox' ? i.checked : i.value]));
     ui.busy = true;
     render();
     try {
@@ -258,7 +268,8 @@ export function initCloudSyncUI({ showToast = () => {} } = {}) {
     }
   }
 
-  const val = (id) => body.querySelector(`#${id}`)?.value?.trim() || '';
+  const val = (id) => String(form[id] ?? '').trim();
+  const raw = (id) => String(form[id] ?? '');
 
   const actions = {
     'save-config': () => {
@@ -292,27 +303,27 @@ export function initCloudSyncUI({ showToast = () => {} } = {}) {
       await refreshStatus();
     },
     'set-password': async () => {
-      const pw = body.querySelector('#cloudPw').value;
+      const pw = raw('cloudPw');
       if (pw.length < 8) throw new CloudError('同步密碼至少 8 個字');
-      if (pw !== body.querySelector('#cloudPw2').value) throw new CloudError('兩次輸入的同步密碼不一樣');
+      if (pw !== raw('cloudPw2')) throw new CloudError('兩次輸入的同步密碼不一樣');
       setProgress('產生加密金鑰…');
       const k = await newCloudKey(pw);
       ui.key = k.key;
       ui.keySalt = k.salt;
       ui.keyIterations = k.iterations;
-      if (body.querySelector('#cloudRemember').checked) await rememberKey(storage, k.key, k.salt);
+      if (form.cloudRemember) await rememberKey(storage, k.key, k.salt);
       if (ui.forceNext) return doUpload(true);
       setProgress('同步密碼已設定，接著把這台裝置的資料上傳。');
       await refreshStatus();
     },
     unlock: async () => {
       setProgress('驗證同步密碼…');
-      const k = await keyForMeta(body.querySelector('#cloudPw').value, ui.meta);
+      const k = await keyForMeta(raw('cloudPw'), ui.meta);
       if (!(await verifyKey(k, ui.meta))) throw new CloudError('同步密碼不對');
       ui.key = k;
       ui.keySalt = ui.meta.salt;
       ui.keyIterations = ui.meta.iterations;
-      if (body.querySelector('#cloudRemember').checked) await rememberKey(storage, k, ui.meta.salt);
+      if (form.cloudRemember) await rememberKey(storage, k, ui.meta.salt);
       setProgress('已解鎖');
       await refreshStatus();
     },
@@ -410,7 +421,7 @@ export function initCloudSyncUI({ showToast = () => {} } = {}) {
   };
   document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && backgroundCheck());
   setTimeout(backgroundCheck, 2500);
-  renderSidebar();
+  renderHome();
 
   return { open, refresh: () => refreshStatus({ quiet: true }) };
 }
