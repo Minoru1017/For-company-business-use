@@ -3,8 +3,10 @@
  * 掛在 DEMO 複盤裡，但自己的 DOM 與事件都封裝在本模組。
  */
 import {
+  applyQuoteMatches,
   buildDecisionPrompt,
   buildDemoGuidePrompt,
+  buildQuoteMatchPrompt,
   findQuoteMoments,
   formatClock,
   guideStats,
@@ -12,7 +14,11 @@ import {
   parseDecisionResponse,
   parseClock,
   parseDemoGuideResponse,
+  parseQuoteMatchResponse,
   patchGuideRoute,
+  quoteMatchSchema,
+  selectQuoteCandidates,
+  STANCE_RESULT,
 } from './demo-review-guide.js';
 import { openDemoDecisionCards } from './demo-review-decision-card.js';
 import { callGeminiResilient, describeApiKeyProblem } from './gemini.js';
@@ -24,6 +30,8 @@ const RESULT_LABELS = {
   revise: '需修正',
   rejected: '不適用',
 };
+const STANCE_LABELS = { support: '支持假設', revise: '需修正假設', reject: '推翻假設' };
+const CONFIDENCE_LABELS = { high: '字面明確', medium: '需推論', low: '勉強相關' };
 const FIELD_RESULTS = ['confirmed', 'revise', 'rejected'];
 const REACTION_OPTIONS = [
   ['none', '尚未記錄反應'],
@@ -83,13 +91,14 @@ export function mountDemoGuide(
         </div>
         <div class="dr-decision-result" id="drDecisionResult"></div>
       </div>
-      <label class="dr-consult-consent"><input type="checkbox" id="drGuideConsent"> 我確認將客戶資料、P0 診斷（若有）與現場驗證筆記送到 Google Gemini（建議隱去全名、電話）</label>
+      <label class="dr-consult-consent"><input type="checkbox" id="drGuideConsent"> 我確認將客戶資料、P0 診斷（若有）、現場驗證筆記，以及比對時從逐字稿篩出的客戶候選句（最多 40 句，不含業務發言）送到 Google Gemini（建議隱去全名、電話）</label>
       <div class="dr-consult-key" id="drGuideKeyRow" hidden>
         <input type="password" class="field" id="drGuideKey" placeholder="貼上 Gemini API Key" autocomplete="off">
         <span class="hint" id="drGuideKeyHint"></span>
       </div>
       <div class="dr-guide-actions">
         <button type="button" class="btn primary" id="drGuideGenerate">規劃驗證路線</button>
+        <button type="button" class="btn" id="drGuideMatch" hidden>AI 比對逐字稿原話</button>
         <button type="button" class="btn" id="drGuideDecision" hidden>整理阻力與決策卡</button>
         <button type="button" class="btn" id="drGuideCards" hidden>開啟兩種決策卡</button>
         <span class="dr-consult-status" id="drGuideStatus"></span>
@@ -110,6 +119,7 @@ export function mountDemoGuide(
     key: q('#drGuideKey'),
     keyHint: q('#drGuideKeyHint'),
     generate: q('#drGuideGenerate'),
+    match: q('#drGuideMatch'),
     decision: q('#drGuideDecision'),
     cards: q('#drGuideCards'),
     status: q('#drGuideStatus'),
@@ -144,6 +154,28 @@ export function mountDemoGuide(
           </button>`
       )
       .join('');
+  }
+
+  function matchesHtml(r) {
+    if (!r.matches?.length) {
+      return guide()?.matchAt ? '<p class="dr-match-empty">AI 在逐字稿裡沒找到這個假設的客戶證據——現場可能沒聊到，下次要補問。</p>' : '';
+    }
+    return `<div class="dr-match">
+      <div class="dr-match-head"><b>AI 建議原話</b><span>AI 只做選擇題，原話與時間取自逐字稿；採用前請確認</span></div>
+      ${r.matches
+        .map(
+          (m, i) => `<div class="dr-match-item ${m.stance} ${r.quoteAt === m.start && r.observedQuote === m.text ? 'used' : ''}">
+            <div class="dr-match-meta">
+              <span class="dr-stance ${m.stance}">${STANCE_LABELS[m.stance]}</span>
+              <small>${CONFIDENCE_LABELS[m.confidence]} · 建議按「${RESULT_LABELS[STANCE_RESULT[m.stance]]}」</small>
+              <button type="button" class="dr-quote-time" data-match-play="${i}">▶ ${formatClock(m.start)}</button>
+            </div>
+            <p>${escapeHTML(m.text)}</p>
+            <button type="button" class="dr-match-use" data-match-use="${i}">${r.quoteAt === m.start && r.observedQuote === m.text ? '已採用' : '採用這句'}</button>
+          </div>`
+        )
+        .join('')}
+    </div>`;
   }
 
   function routeCardHtml(r) {
@@ -186,6 +218,7 @@ export function mountDemoGuide(
           <textarea class="field" rows="2" data-route-field="observedQuote" placeholder="只記客戶真的說過的話，不替他下結論">${escapeHTML(r.observedQuote)}</textarea>
           ${picker}
         </div>
+        ${matchesHtml(r)}
       </div>
       <details class="dr-route-more" data-details="prep" ${open('prep')}>
         <summary>展示前提醒：觀察訊號・停損・不要講</summary>
@@ -246,6 +279,9 @@ export function mountDemoGuide(
           : '<b>先填上方客戶資料</b><span>至少需要目標、疑慮或開發紀錄，才能規劃一場有依據的 DEMO。</span>';
     els.generate.disabled = !hasContext || !!state.busy;
     els.generate.textContent = state.busy === 'route' ? '規劃中…' : hasGuide ? '重新規劃路線' : '規劃驗證路線';
+    els.match.hidden = !hasGuide || !transcript();
+    els.match.disabled = !!state.busy;
+    els.match.textContent = state.busy === 'match' ? '比對中…' : g?.matchAt ? '重新比對逐字稿' : 'AI 比對逐字稿原話';
     els.decision.hidden = !hasGuide;
     els.decision.disabled = !stats.tested || !!state.busy;
     els.decision.textContent = state.busy === 'decision' ? '整理中…' : g?.decision ? '重新整理阻力與決策卡' : '整理阻力與決策卡';
@@ -343,6 +379,56 @@ export function mountDemoGuide(
     }
   }
 
+  async function matchTranscript() {
+    const g = guide();
+    const segs = transcript();
+    if (!g || !segs || state.busy) return;
+    const candidates = selectQuoteCandidates(segs, g.routes);
+    if (!candidates.length) {
+      state.status = '逐字稿裡沒有標成「客戶」的句子，請先到 DEMO 轉錄的「標記說話者」確認後再比對。';
+      return render();
+    }
+    if (!canSend()) return;
+    const key = apiKey();
+    if (!key) return;
+    state.busy = 'match';
+    state.status = `本機先篩出 ${candidates.length} 句客戶發言，交給 AI 逐題判斷…`;
+    render();
+    try {
+      const routes = g.routes.map(({ id, title, hypothesis }) => ({ id, title, hypothesis }));
+      const ask = (withSchema) =>
+        callGeminiResilient({
+          apiKey: key,
+          model: getModel?.(),
+          text: buildQuoteMatchPrompt({ routes, candidates }),
+          generationConfig: {
+            temperature: 0,
+            maxOutputTokens: 4096,
+            ...(withSchema ? { responseSchema: quoteMatchSchema(routes, candidates) } : {}),
+          },
+          parse: (raw) => parseQuoteMatchResponse(raw, { routes, candidates }),
+          onRetry: ({ status, delayMs }) => {
+            state.status = `Google 回報 ${status}，${Math.round(delayMs / 1000)} 秒後重試…`;
+            render();
+          },
+        });
+      // 部分舊模型不接受 responseSchema 的 enum，退回只靠 prompt 約束選項
+      const { parsed, usedTokens } = await ask(true).catch((e) => (e?.status === 400 ? ask(false) : Promise.reject(e)));
+      saveGuide(applyQuoteMatches(guide(), parsed));
+      const found = Object.values(parsed).filter((ms) => ms.length).length;
+      state.status = found
+        ? `${found} / ${g.routes.length} 條路線找到客戶證據。請逐條確認後按「採用這句」，再自己按驗證結果。`
+        : 'AI 沒在逐字稿找到能支持或推翻假設的客戶發言，這些假設下次要補問。';
+      els.consent.checked = false;
+      onGeminiUsed?.(usedTokens);
+    } catch (e) {
+      state.status = e?.message || String(e);
+    } finally {
+      state.busy = '';
+      render();
+    }
+  }
+
   async function generateDecision() {
     const r = review();
     const g = guide();
@@ -373,6 +459,7 @@ export function mountDemoGuide(
   }
 
   els.generate.addEventListener('click', generateRoutes);
+  els.match.addEventListener('click', matchTranscript);
   els.decision.addEventListener('click', generateDecision);
   els.cards.addEventListener('click', () => {
     const r = review();
@@ -399,6 +486,20 @@ export function mountDemoGuide(
     if (resultBtn) {
       const result = resultBtn.dataset.result;
       patchRoute({ result: r.result === result ? 'pending' : result });
+      return render();
+    }
+    const matchPlay = e.target.closest('[data-match-play]');
+    if (matchPlay) {
+      const m = r.matches[Number(matchPlay.dataset.matchPlay)];
+      if (m) onPlayAt?.(review()?.analysis?.historyId || '', m.start);
+      return;
+    }
+    const matchUse = e.target.closest('[data-match-use]');
+    if (matchUse) {
+      const m = r.matches[Number(matchUse.dataset.matchUse)];
+      if (!m) return;
+      patchRoute({ observedQuote: m.text, quoteAt: m.start });
+      showToast?.(`已採用 ${formatClock(m.start)} 的原話；驗證結果請自己確認後再按`);
       return render();
     }
     if (e.target.closest('[data-play]')) {
