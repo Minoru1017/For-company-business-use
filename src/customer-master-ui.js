@@ -17,6 +17,7 @@ import {
 } from './customers.js';
 import { REVIEWS_CHANGED_EVENT, loadReviews, outcomeLabel } from './demo-review.js';
 import { escapeHTML } from './utils.js';
+import { BRANDS, customersInBrand, inBrand, otherBrandId } from './brands.js';
 
 const DATALIST_ID = 'ccCustomers';
 
@@ -113,12 +114,18 @@ export function mountCustomerMaster(container, { getInviteItems = () => [], befo
   }
 
   function render() {
-    const customers = loadCustomers();
-    const decks = loadRawDecks();
-    const reviews = loadReviews();
+    const allDecks = loadRawDecks();
+    const allReviews = loadReviews();
+    const all = loadCustomers();
+    const customers = customersInBrand(all, { decks: allDecks, reviews: allReviews });
+    const decks = inBrand(allDecks);
+    const reviews = inBrand(allReviews);
+    const hiddenCount = all.length - customers.length;
     const needle = state.q.trim().toLowerCase();
     const shown = needle ? customers.filter((c) => [c.name, c.phone, c.note].join('\n').toLowerCase().includes(needle)) : customers;
-    els.count.textContent = customers.length ? `${customers.length} 位` : '';
+    els.count.textContent = [customers.length ? `${customers.length} 位` : '', hiddenCount ? `（另有 ${hiddenCount} 位只在${BRANDS[otherBrandId()].name}）` : '']
+      .filter(Boolean)
+      .join(' ');
     els.list.innerHTML = shown.length
       ? shown
           .sort((a, b) => b.updatedAt - a.updatedAt)

@@ -4,6 +4,7 @@
  */
 import { callGeminiResilient, describeApiKeyProblem } from './gemini.js';
 import { listJournalDays } from './reflection-journal.js';
+import { BRANDS, brandOf, brandSwitchHTML, getBrandId, inBrand, onBrandChange, otherBrandCount, otherBrandId } from './brands.js';
 import {
   DECK_STYLES,
   INPUT_FIELDS,
@@ -59,8 +60,10 @@ export function initDemoDeck(
   container.innerHTML = `
     <div class="dk-app">
       <aside class="card dk-sidebar">
+        ${brandSwitchHTML(getBrandId(), 'dk-brand')}
         <div class="dk-side-head"><b>DEMO 簡報</b><button type="button" class="btn slog-mini" id="dkNew">＋ 新簡報</button></div>
         <ul class="dk-deck-list" id="dkList"></ul>
+        <p class="hint dk-brand-other" id="dkBrandOther" hidden></p>
         <p class="hint dk-side-hint">簡報只存在這台電腦。</p>
       </aside>
       <div class="dk-workspace">
@@ -72,7 +75,7 @@ export function initDemoDeck(
           </div>
           <div class="dk-fields" id="dkFields"></div>
           <details class="dk-course">
-            <summary>課程／方案重點 <small>所有簡報共用；貼公司實際教的內容，AI 才不會亂編課程細節</small></summary>
+            <summary>課程／方案重點 <small><b data-brand-name>${BRANDS[getBrandId()].name}</b> 的簡報共用；貼公司實際教的內容，AI 才不會亂編課程細節</small></summary>
             <textarea class="field" id="dkCourse" rows="5" placeholder="例：初階計畫 12 週、每週直播＋作業回饋；第 1 個月工具基礎與第一個作品…"></textarea>
           </details>
           <label class="dk-consent"><input type="checkbox" id="dkConsent"> 我確認把上面的客戶資料送到 Google Gemini 產生簡報（建議隱去全名、電話）</label>
@@ -142,6 +145,7 @@ export function initDemoDeck(
   const q = (sel) => container.querySelector(sel) || win.querySelector(sel);
   const els = {
     list: q('#dkList'),
+    brandOther: q('#dkBrandOther'),
     fields: q('#dkFields'),
     importSel: q('#dkImport'),
     course: q('#dkCourse'),
@@ -176,9 +180,25 @@ export function initDemoDeck(
         : `<textarea class="field" data-input="${f.key}" rows="${f.rows || 2}" placeholder="${escapeHTML(f.placeholder)}"></textarea>`
     }</label>`
   ).join('');
-  els.course.value = loadCourseNotes();
+  const productInput = els.fields.querySelector('[data-input="product"]');
+
+  function applyBrandFields() {
+    els.course.value = loadCourseNotes();
+    if (productInput) productInput.placeholder = BRANDS[getBrandId()].productPlaceholder;
+  }
+  applyBrandFields();
 
   const current = () => state.decks.find((d) => d.id === state.currentId) || null;
+  /** 只顯示目前品牌的簡報；其他品牌的還在 state.decks 裡，存檔時一起寫回 */
+  const visibleDecks = () => inBrand(state.decks);
+  const firstVisibleId = () => {
+    let list = visibleDecks();
+    if (!list.length) {
+      state.decks.unshift(newDeckRecord());
+      list = visibleDecks();
+    }
+    return list[0].id;
+  };
 
   function persistNow() {
     clearTimeout(state.saveT);
@@ -200,7 +220,12 @@ export function initDemoDeck(
   }
 
   function renderList() {
-    els.list.innerHTML = state.decks
+    const others = otherBrandCount(state.decks.filter((d) => d.deck || hasCustomerInput(d.input)));
+    els.brandOther.hidden = !others;
+    els.brandOther.innerHTML = others
+      ? `${escapeHTML(BRANDS[otherBrandId()].name)} 還有 ${others} 份簡報 <button type="button" class="brand-link" data-brand-set="${otherBrandId()}">切換</button>`
+      : '';
+    els.list.innerHTML = visibleDecks()
       .map((rec) => {
         const on = rec.id === state.currentId;
         const meta = deckListMeta(rec);
@@ -272,7 +297,7 @@ export function initDemoDeck(
   }
 
   function renderTabs() {
-    editor.ids = editor.ids.filter((id) => state.decks.some((d) => d.id === id && d.deck));
+    editor.ids = editor.ids.filter((id) => visibleDecks().some((d) => d.id === id && d.deck));
     els.tabs.innerHTML = editor.ids
       .map((id) => {
         const rec = state.decks.find((d) => d.id === id);
@@ -370,8 +395,7 @@ export function initDemoDeck(
   /** 客戶主檔改過名、合併過：簡報在儲存裡已經更新，重新載入畫面上的清單 */
   function reloadDecks() {
     state.decks = loadDecks();
-    if (!state.decks.length) state.decks.unshift(newDeckRecord());
-    if (!state.decks.some((d) => d.id === state.currentId)) state.currentId = state.decks[0].id;
+    if (!visibleDecks().some((d) => d.id === state.currentId)) state.currentId = firstVisibleId();
     render();
     review?.refresh();
   }
@@ -387,13 +411,13 @@ export function initDemoDeck(
   }
 
   function openCustomer({ deckId, reviewId, customerId } = {}) {
-    if (deckId && state.decks.some((d) => d.id === deckId)) {
+    if (deckId && visibleDecks().some((d) => d.id === deckId)) {
       select(deckId);
       if (reviewId) review?.openReview(reviewId);
       return true;
     }
     if (reviewId && review?.openReview(reviewId)) return true;
-    const deck = customerId && state.decks.find((d) => d.customerId === customerId);
+    const deck = customerId && visibleDecks().find((d) => d.customerId === customerId);
     if (deck) {
       select(deck.id);
       return true;
@@ -475,7 +499,7 @@ export function initDemoDeck(
       const { parsed, usedTokens } = await callGeminiResilient({
         apiKey: key,
         model: getModel?.(),
-        text: buildDeckPrompt(rec.input, { courseNotes: els.course.value }),
+        text: buildDeckPrompt(rec.input, { courseNotes: els.course.value, brand: brandOf(rec) }),
         generationConfig: { temperature: 0.6, maxOutputTokens: 16384 },
         parse: (raw) => parseDeckResponse(raw),
         onRetry: ({ attempt, maxAttempts, delayMs, status }) => {
@@ -616,8 +640,8 @@ export function initDemoDeck(
       state.decks = state.decks.filter((d) => d.id !== rec.id);
       persistNow();
       gcImages();
-      if (!state.decks.length) createDeck();
-      else if (state.currentId === rec.id) select(state.decks[0].id);
+      if (!visibleDecks().length) createDeck();
+      else if (state.currentId === rec.id) select(visibleDecks()[0].id);
       else renderList();
       return;
     }
@@ -766,14 +790,27 @@ export function initDemoDeck(
     renderList();
   });
 
+  onBrandChange(() => {
+    if (state.saveT) persistNow();
+    review?.flush();
+    applyBrandFields();
+    if (!visibleDecks().some((d) => d.id === state.currentId)) {
+      state.currentId = firstVisibleId();
+      state.idx = 0;
+      fmtBar?.clear();
+      els.status.textContent = '';
+    }
+    render();
+    review?.refresh();
+  });
+
   window.addEventListener('beforeunload', () => {
     if (state.saveT) persistNow();
   });
 
-  if (!state.decks.length) state.decks.unshift(newDeckRecord());
-  state.currentId = state.decks[0].id;
+  state.currentId = firstVisibleId();
   review = mountDemoReview(q('#dkReview'), {
-    hasDeck: (id) => state.decks.some((d) => d.id === id),
+    hasDeck: (id) => visibleDecks().some((d) => d.id === id),
     onOpenDeck: (id) => select(id),
     onSendVideo,
     hasAnalysis,

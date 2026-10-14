@@ -237,8 +237,9 @@ function add(lines, label, value) {
   if (text) lines.push(`${label}：${text}`);
 }
 
-function reviewContext(review = {}, deckInput = {}, courseNotes = '') {
+function reviewContext(review = {}, deckInput = {}, courseNotes = '', brand = '') {
   const lines = [];
+  add(lines, '品牌', brand);
   add(lines, '客戶', review.customer || deckInput.name);
   add(lines, '背景', deckInput.background);
   add(lines, '原始目標', deckInput.goals);
@@ -255,7 +256,7 @@ function reviewContext(review = {}, deckInput = {}, courseNotes = '') {
   return lines.join('\n');
 }
 
-export function buildDemoGuidePrompt({ review = {}, deckInput = {}, courseNotes = '' } = {}) {
+export function buildDemoGuidePrompt({ review = {}, deckInput = {}, courseNotes = '', brand = '' } = {}) {
   return [
     '你是 AI 落地顧問，請把顧問診斷轉成一場「驗證假設」的 DEMO，不是產品功能導覽。',
     '請產生 1–3 段路線，按重要性排序。每一段只能驗證一個會影響適配或方案設計的假設。',
@@ -270,7 +271,7 @@ export function buildDemoGuidePrompt({ review = {}, deckInput = {}, courseNotes 
     '- 問句不施壓、不製造恐懼；繁體中文、台灣用語、短句。',
     '',
     '【現有資料】',
-    reviewContext(review, deckInput, courseNotes) || '目前資料不足',
+    reviewContext(review, deckInput, courseNotes, brand) || '目前資料不足',
     '',
     '只輸出 JSON，不要 markdown：',
     '{"routes":[{"id":"route_1","title":"短標題","customerQuote":"客戶原話／來源","hypothesis":"這段要驗證的單一假設","demo":"只展示哪個工作場景","beforeQuestion":"展示前的一句問題","signals":["觀察訊號"],"afterQuestion":"展示後的驗收問題","stopCondition":"停止條件","avoid":"不該展示的內容"}]}',
@@ -419,7 +420,7 @@ function routeEvidenceLines(guide) {
   ]);
 }
 
-export function buildDecisionPrompt({ review = {}, guide, deckInput = {}, courseNotes = '' } = {}) {
+export function buildDecisionPrompt({ review = {}, guide, deckInput = {}, courseNotes = '', brand = '' } = {}) {
   const g = normalizeDemoGuide(guide);
   if (!g) throw new Error('尚未產生 DEMO 驗證路線');
   return [
@@ -436,7 +437,7 @@ export function buildDecisionPrompt({ review = {}, guide, deckInput = {}, course
     '- 不杜撰產品功能或成效；繁體中文、短句。',
     '',
     '【原始資料與 P0】',
-    reviewContext(review, deckInput, courseNotes),
+    reviewContext(review, deckInput, courseNotes, brand),
     '',
     '【P1 現場驗證】',
     ...routeEvidenceLines(g),

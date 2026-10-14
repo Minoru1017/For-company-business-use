@@ -2,6 +2,7 @@
  * DEMO 簡報模式裡的「DEMO 後複盤」：上半是目前這位客戶的建檔表單（自動儲存），
  * 下半是所有複盤檔案（統計、篩選、待跟進、匯出 CSV）。
  */
+import { brandInfo, brandOf, getBrandId, inBrand } from './brands.js';
 import {
   FITS,
   OUTCOMES,
@@ -227,7 +228,8 @@ export function mountDemoReview(
     consultStatus: q('#drConsultStatus'),
   };
 
-  const current = () => state.reviews.find((r) => r.id === state.reviewId) || null;
+  const current = () => state.reviews.find((r) => r.id === state.reviewId && brandOf(r) === getBrandId()) || null;
+  const brandReviews = () => inBrand(state.reviews);
   let demoGuideUI = null;
 
   function flush() {
@@ -253,6 +255,7 @@ export function mountDemoReview(
     if (!d) return {};
     return {
       deckId: d.id,
+      brand: brandOf(d),
       customerId: d.customerId || '',
       customer: String(d.input?.name || '').trim() || d.deck?.customer || '',
       demoAt: d.input?.demoAt || '',
@@ -436,7 +439,8 @@ export function mountDemoReview(
   }
 
   function renderArchive() {
-    const stats = reviewStats(state.reviews);
+    const mine = brandReviews();
+    const stats = reviewStats(mine);
     els.count.textContent = stats.total ? `${stats.total} 筆` : '';
     const chip = (label, value, cls = '') => `<div class="dr-chip ${cls}"><b>${value}</b><span>${label}</span></div>`;
     els.stats.innerHTML = stats.total
@@ -449,7 +453,7 @@ export function mountDemoReview(
           chip('資料不完整', stats.incomplete, stats.incomplete ? 'warn' : ''),
         ].join('')
       : '<p class="hint">還沒有複盤檔案。DEMO 結束後，在上面填一下結果與下一步就會建檔。</p>';
-    const rows = filterReviews(state.reviews, state.filter);
+    const rows = filterReviews(mine, state.filter);
     els.list.innerHTML = rows.length
       ? rows
           .map((r) => {
@@ -471,7 +475,7 @@ export function mountDemoReview(
             </li>`;
           })
           .join('')
-      : `<li class="hint">${state.reviews.length ? '沒有符合條件的檔案。' : ''}</li>`;
+      : `<li class="hint">${mine.length ? '沒有符合條件的檔案。' : ''}</li>`;
   }
 
   function patchCurrent(patch) {
@@ -560,6 +564,7 @@ export function mountDemoReview(
           deckInput: state.deck?.input || {},
           courseNotes: getCourseNotes?.() || '',
           today: todayKey(),
+          brand: brandInfo(brandOf(r)).name,
         }),
         generationConfig: { temperature: 0.25, maxOutputTokens: 8192 },
         parse: parseConsultResponse,
@@ -717,8 +722,8 @@ export function mountDemoReview(
   });
 
   q('#drExport').addEventListener('click', () => {
-    if (!state.reviews.length) return toast('還沒有複盤檔案可以匯出');
-    downloadText(reviewFileName(), reviewsToCsv(filterReviews(state.reviews, state.filter)));
+    if (!brandReviews().length) return toast('還沒有複盤檔案可以匯出');
+    downloadText(reviewFileName(), reviewsToCsv(filterReviews(brandReviews(), state.filter)));
   });
 
   q('#drSearch').addEventListener('input', (e) => {
@@ -821,7 +826,7 @@ export function mountDemoReview(
     flush,
     /** 從首頁客戶進度點進來：開啟指定複盤（有對應簡報的由簡報那邊切換） */
     openReview(id) {
-      const r = state.reviews.find((x) => x.id === id);
+      const r = brandReviews().find((x) => x.id === id);
       if (!r) return false;
       flush();
       state.reviewId = r.id;

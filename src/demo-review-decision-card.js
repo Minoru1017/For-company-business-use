@@ -2,6 +2,7 @@
  * P1 決策卡：同一份現場證據，分成「主管內部版」與「客戶共識版」。
  * 兩版欄位白名單不同，避免把 A/B/C、成交風險等內部判斷傳給客戶。
  */
+import { brandInfo, brandOf } from './brands.js';
 import { guideToText, normalizeDemoGuide } from './demo-review-guide.js';
 import { escapeHTML } from './utils.js';
 
@@ -45,7 +46,7 @@ export function decisionCardModel(review, type = 'internal') {
       title: `${customer}・決策共識`,
       subtitle: '只包含雙方已確認內容與待確認條件',
       rows: EXTERNAL_FIELDS.map(([key, label]) => ({ label, text: d.external[key] })).filter((x) => x.text),
-      footer: 'CALL COACH・供雙方確認，不代表正式合約或成效承諾',
+      footer: `${brandInfo(brandOf(review)).name}・供雙方確認，不代表正式合約或成效承諾`,
     };
   }
   const rows = [];
@@ -65,7 +66,7 @@ export function decisionCardModel(review, type = 'internal') {
     title: `${customer}・主管決策卡`,
     subtitle: '內部使用・包含適配、風險與跟進判斷',
     rows,
-    footer: 'CALL COACH・內部機密，請勿直接轉傳客戶',
+    footer: `${brandInfo(brandOf(review)).name}・內部機密，請勿直接轉傳客戶`,
   };
 }
 

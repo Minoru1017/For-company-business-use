@@ -1,6 +1,7 @@
 import { runAnalysis } from './analyze.js';
 import { initBackupUI } from './backup-ui.js';
 import { initCloudSyncUI } from './cloud-sync-ui.js';
+import { initBrandSwitches, onBrandChange } from './brands.js';
 import { drawChart } from './chart.js';
 import {
   buildTranscript,
@@ -1023,6 +1024,11 @@ function init() {
     console.error('customer sync failed', e);
   }
   try {
+    initBrandSwitches();
+  } catch (e) {
+    console.error('brand switch init failed', e);
+  }
+  try {
     customerProgress = mountCustomerProgress($('customerProgressHome'), { onOpen: openCustomerFromHome, dueContainer: $('followUpHome') });
   } catch (e) {
     console.error('customer progress init failed', e);
@@ -1148,6 +1154,7 @@ function init() {
   });
   window.addEventListener(REVIEWS_CHANGED_EVENT, () => customerProgress?.refresh());
   window.addEventListener(CUSTOMERS_CHANGED_EVENT, () => customerProgress?.refresh());
+  onBrandChange(() => customerProgress?.refresh());
 }
 
 init();
