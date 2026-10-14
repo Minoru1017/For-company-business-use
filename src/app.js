@@ -1,6 +1,7 @@
 import { runAnalysis } from './analyze.js';
 import { initBackupUI } from './backup-ui.js';
 import { initCloudSyncUI } from './cloud-sync-ui.js';
+import { takeAuthRedirect } from './cloud-sync.js';
 import { drawChart } from './chart.js';
 import {
   buildTranscript,
@@ -999,6 +1000,9 @@ async function practiceSymptom(symptomKey) {
   showToast(`陪練重點已設定：${focus.label}`);
 }
 
+// 雲端登入信的連結會把 token 放在網址 #；必須在模式路由讀 hash 之前取走
+const cloudAuthRedirect = takeAuthRedirect();
+
 function init() {
   mountHomePhilosophy();
   dayTypeHomeCtrl = initDayTypeHome({
@@ -1047,7 +1051,7 @@ function init() {
     console.error('backup init failed', e);
   }
   try {
-    initCloudSyncUI({ showToast });
+    initCloudSyncUI({ showToast, authRedirect: cloudAuthRedirect });
   } catch (e) {
     console.error('cloud sync init failed', e);
   }
