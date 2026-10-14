@@ -17,6 +17,7 @@ import {
   localFingerprint,
   newCloudKey,
   rememberKey,
+  takeAuthRedirect,
   uploadSnapshot,
   verifyKey,
 } from '../src/cloud-sync.js';
@@ -50,6 +51,7 @@ function fakeSupabase() {
   const objects = new Map();
   const tokens = new Map();
   let n = 0;
+  let lastOtp = null;
   const issue = (email) => {
     n += 1;
     const t = { access_token: `at${n}`, refresh_token: `rt${n}`, expires_in: 3600, user: { id: `uid-${email}`, email } };
@@ -61,7 +63,14 @@ function fakeSupabase() {
   const fetchImpl = async (url, init = {}) => {
     const u = new URL(url);
     const body = init.body;
-    if (u.pathname === '/auth/v1/otp') return json(200, {});
+    if (u.pathname === '/auth/v1/otp') {
+      lastOtp = u.searchParams.get('redirect_to');
+      return json(200, {});
+    }
+    if (u.pathname === '/auth/v1/user') {
+      const user = tokens.get(String(init.headers?.Authorization || '').replace('Bearer ', ''));
+      return user ? json(200, user) : json(401, { msg: 'invalid JWT' });
+    }
     if (u.pathname === '/auth/v1/verify') {
       const b = JSON.parse(body);
       return b.token === '123456' ? json(200, issue(b.email)) : json(403, { error_code: 'otp_expired', msg: 'Token has expired or is invalid' });
@@ -88,7 +97,7 @@ function fakeSupabase() {
     const obj = objects.get(path);
     return obj ? new Response(obj, { status: 200 }) : json(400, { statusCode: '404', error: 'not_found', message: 'Object not found' });
   };
-  return { fetchImpl, objects, tokens };
+  return { fetchImpl, objects, tokens, issue, lastRedirect: () => lastOtp };
 }
 
 /** 只用 localStorage 的資料；IndexedDB 由 databases: [] 排除，讓兩台「裝置」互不干擾 */
@@ -205,5 +214,27 @@ describe('cloud sync', () => {
     await client.signOut();
     expect(s.getItem(CLOUD_SESSION_KEY)).toBeNull();
     expect(s.getItem('callCoachHistory')).toBe('[]');
+  });
+
+  it('takes login-link tokens out of the URL and signs in with them', async () => {
+    const replaced = [];
+    const hist = { replaceState: (_s, _t, url) => replaced.push(url) };
+    const t = api.issue('link@corp.tw');
+    const loc = { hash: `#access_token=${t.access_token}&refresh_token=${t.refresh_token}&expires_in=3600&token_type=bearer&type=magiclink`, pathname: '/For-company-business-use/', search: '' };
+    const got = takeAuthRedirect(loc, hist);
+    expect(got.tokens.access_token).toBe(t.access_token);
+    expect(replaced).toEqual(['/For-company-business-use/']);
+
+    const s = device();
+    const client = createCloudClient({ storage: s, fetchImpl: api.fetchImpl, config: CONFIG });
+    await client.sendCode('link@corp.tw', { redirectTo: 'https://minoru1017.github.io/For-company-business-use/' });
+    expect(api.lastRedirect()).toBe('https://minoru1017.github.io/For-company-business-use/');
+    const session = await client.completeRedirect(got.tokens);
+    expect(session.user.email).toBe('link@corp.tw');
+    expect(await client.getMeta()).toBeNull();
+    await expect(client.completeRedirect({ access_token: 'bogus' })).rejects.toMatchObject({ code: 'otp' });
+
+    expect(takeAuthRedirect({ hash: '#error=access_denied&error_code=otp_expired&error_description=Email+link+is+invalid+or+has+expired', pathname: '/' }, hist).error).toContain('已過期');
+    expect(takeAuthRedirect({ hash: '#deck', pathname: '/' }, hist)).toBeNull();
   });
 });

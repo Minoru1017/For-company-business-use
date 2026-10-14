@@ -53,3 +53,6 @@
 .home-cloud-btn::before { content:"☁ "; }
 .home-cloud-btn.signed-in { background:var(--panel2); color:var(--text); }
 .home-cloud-btn.due::after { content:""; position:absolute; top:6px; right:8px; width:7px; height:7px; border-radius:50%; background:var(--warn); }
+.cloud-sent { display:flex; flex-direction:column; gap:4px; margin:8px 0; padding:10px 12px; border-left:3px solid var(--ok); border-radius:0 8px 8px 0; background:var(--panel2); font-size:.8rem; line-height:1.55; }
+.cloud-code-alt { margin:4px 0 8px; font-size:.76rem; }
+.cloud-code-alt > summary { cursor:pointer; color:var(--muted); }

@@ -1,6 +1,8 @@
 # 雲端同步設定（Supabase）
 
-Call Coach 的「登入雲端」使用 Supabase 的 Auth（Email 驗證碼）與 Storage。資料在瀏覽器裡用使用者自己的「同步密碼」加密後才上傳，Supabase 與管理者都只看得到密文。
+Call Coach 的「登入雲端」使用 Supabase 的 Auth（Email 登入信）與 Storage。
+
+> 公司專案 `tgmpwiuavzuzsqjcftrj` 已設定完成，連線設定也已內建在網站裡（`src/cloud-sync.js`）。以下步驟只在換新專案時需要；有具寫入權限的 Access Token 時，可以直接執行 `SUPABASE_ACCESS_TOKEN=sbp_… node scripts/supabase-setup.mjs <project-ref>` 一次完成。資料在瀏覽器裡用使用者自己的「同步密碼」加密後才上傳，Supabase 與管理者都只看得到密文。
 
 只需要做一次，免費方案即可。
 
@@ -40,17 +42,23 @@ create policy "callcoach sync delete own"
   using (bucket_id = 'callcoach-sync' and (storage.foldername(name))[1] = auth.uid()::text);
 ```
 
-## 3. 讓登入信寄「數字驗證碼」
+## 3. 登入信設定
 
-**Authentication → Emails → Templates**，把 **Confirm signup**（第一次登入的人會收到這封）與 **Magic Link**（之後每次登入）兩個範本都改成包含 `{{ .Token }}`，例如：
+**Authentication → URL Configuration**：
+- Site URL：`https://minoru1017.github.io/For-company-business-use/`
+- Redirect URLs：加入 `https://minoru1017.github.io/For-company-business-use/**`
+
+登入信裡的連結會回到網站並自動完成登入（請在要登入的那台裝置打開信）。
+
+免費方案使用內建寄信時不能修改信件範本，所以信裡只有連結。設定自訂 SMTP 後，可以在 **Authentication → Emails → Templates** 的 **Confirm signup** 與 **Magic Link** 加上 `{{ .Token }}`，網站的「信裡是數字驗證碼？」欄位就能用：
 
 ```html
 <h2>Call Coach 登入驗證碼</h2>
 <p>你的驗證碼是：<b style="font-size:20px">{{ .Token }}</b></p>
-<p>幾分鐘內有效；如果不是你本人操作，請忽略這封信。</p>
+<p>或直接點 <a href="{{ .ConfirmationURL }}">這個連結</a> 登入。</p>
 ```
 
-> Supabase 內建寄信每小時只能寄少量信件，正式給多人使用時建議在 **Authentication → Emails → SMTP Settings** 設定公司的 SMTP。
+> Supabase 內建寄信每小時只能寄 2 封，正式給多人使用時建議在 **Authentication → Emails → SMTP Settings** 設定公司的 SMTP。
 
 ### 只讓特定人登入（選用）
 

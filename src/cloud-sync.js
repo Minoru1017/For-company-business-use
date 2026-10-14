@@ -220,6 +220,37 @@ export function compareSync({ meta, state, fingerprint, hasLocalData = true }) {
   return dirty ? { status: 'conflict', reason: 'both-changed' } : { status: 'cloud-ahead' };
 }
 
+/* ---------- 登入信連結回到網站 ---------- */
+
+/**
+ * Supabase 登入連結會回到網站並在網址 # 後面帶 access_token（或 error）。
+ * 要在 App 讀 hash 決定模式之前取走，並把網址清乾淨，避免 token 留在網址列與瀏覽紀錄。
+ * @returns {null | {tokens: object} | {error: string}}
+ */
+export function takeAuthRedirect(loc = typeof location !== 'undefined' ? location : null, hist = typeof history !== 'undefined' ? history : null) {
+  const hash = String(loc?.hash || '').replace(/^#/, '');
+  if (!/(^|&)(access_token|error_description|error_code)=/.test(hash)) return null;
+  const p = new URLSearchParams(hash);
+  try {
+    hist?.replaceState(null, '', `${loc.pathname}${loc.search || ''}`);
+  } catch {
+    /* 無法改網址就算了 */
+  }
+  if (p.get('access_token')) {
+    return {
+      tokens: {
+        access_token: p.get('access_token'),
+        refresh_token: p.get('refresh_token') || '',
+        expires_in: Number(p.get('expires_in')) || 3600,
+        expires_at: Number(p.get('expires_at')) || 0,
+      },
+    };
+  }
+  const code = p.get('error_code') || '';
+  const desc = p.get('error_description') || '';
+  return { error: /expired|invalid/i.test(`${code} ${desc}`) ? '登入連結已過期或已使用過，請重新寄送登入信' : `登入失敗：${desc || code}` };
+}
+
 /* ---------- Supabase 用戶端 ---------- */
 
 export function createCloudClient({ storage, fetchImpl = (...a) => fetch(...a), config = cloudConfig(storage), now = () => Date.now() }) {
@@ -267,10 +298,32 @@ export function createCloudClient({ storage, fetchImpl = (...a) => fetch(...a), 
     return session;
   }
 
-  async function sendCode(email) {
+  /** 寄登入信：信裡有登入連結（回到 redirectTo），自訂信件範本時也可以附數字驗證碼 */
+  async function sendCode(email, { redirectTo = '' } = {}) {
     const e = String(email || '').trim();
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(e)) throw new CloudError('Email 格式不對', 'email');
-    await authPost('otp', { email: e, create_user: true }, '寄送驗證碼失敗');
+    const q = redirectTo ? `?redirect_to=${encodeURIComponent(redirectTo)}` : '';
+    try {
+      await authPost(`otp${q}`, { email: e, create_user: true }, '寄送登入信失敗');
+    } catch (err) {
+      if (err.status === 429 || /rate limit/i.test(err.message)) {
+        throw new CloudError('寄信次數已達上限（每小時只能寄幾封），請稍後再試，或使用最近一封登入信', 'rate-limit', err.status);
+      }
+      throw err;
+    }
+  }
+
+  /** 登入信連結回到網站時，用網址帶回的 token 建立登入狀態 */
+  async function completeRedirect({ access_token, refresh_token, expires_in, expires_at }) {
+    let res;
+    try {
+      res = await fetchImpl(`${base}/auth/v1/user`, { headers: headers({ Authorization: `Bearer ${access_token}` }) });
+    } catch {
+      throw new CloudError('連不上雲端服務，請確認網路', 'network');
+    }
+    if (!res.ok) throw new CloudError('登入連結已失效，請重新寄送登入信', 'otp', res.status);
+    const user = await res.json();
+    return saveSession({ access_token, refresh_token, expires_in, expires_at: Number(expires_at) || 0, user });
   }
 
   async function verifyCode(email, code) {
@@ -381,7 +434,7 @@ export function createCloudClient({ storage, fetchImpl = (...a) => fetch(...a), 
     [CLOUD_SESSION_KEY, CLOUD_CRYPTO_KEY, CLOUD_STATE_KEY].forEach((k) => storage.removeItem(k));
   }
 
-  return { config, getSession, sendCode, verifyCode, refresh, signOut, getMeta, getObject, putObject, removeObject };
+  return { config, getSession, sendCode, verifyCode, completeRedirect, refresh, signOut, getMeta, getObject, putObject, removeObject };
 }
 
 /* ---------- 上傳／下載 ---------- */
