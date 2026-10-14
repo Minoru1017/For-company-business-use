@@ -7,9 +7,10 @@ Call Coach 的「登入雲端」使用 Supabase 的 Auth（Email 驗證碼）與
 ## 1. 建立專案
 
 1. 到 <https://supabase.com> 建立專案（Region 建議選 Tokyo 或 Singapore）。
-2. **Project Settings → API**，記下：
-   - Project URL（例：`https://abcd1234.supabase.co`）
-   - `anon` `public` key
+2. **Project Settings → API Keys**，記下：
+   - Project URL（例：`https://abcd1234.supabase.co`，專案首頁也看得到）
+   - `anon` `public` key（新版介面在「Legacy API Keys」分頁；也可以用 `sb_publishable_…` 開頭的 Publishable key）
+   - **不要**使用 `service_role` 或 `sb_secret_…`，那是管理者金鑰，不能放進網站
 
 ## 2. 建立 Storage bucket 與權限
 
@@ -41,7 +42,7 @@ create policy "callcoach sync delete own"
 
 ## 3. 讓登入信寄「數字驗證碼」
 
-**Authentication → Emails → Templates → Magic Link**，把內容改成包含 `{{ .Token }}`，例如：
+**Authentication → Emails → Templates**，把 **Confirm signup**（第一次登入的人會收到這封）與 **Magic Link**（之後每次登入）兩個範本都改成包含 `{{ .Token }}`，例如：
 
 ```html
 <h2>Call Coach 登入驗證碼</h2>
