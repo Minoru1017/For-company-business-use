@@ -93,7 +93,7 @@ describe('customer progress: reading storage', () => {
   it('reads decks without loading the deck module and tolerates bad data', () => {
     expect(loadDeckBriefs()).toEqual([]);
     localStorage.setItem('call_coach_demo_decks_v1', JSON.stringify([{ id: 'd1', input: { name: '涵小姐' }, deck: { slides: [{}] }, updatedAt: 4 }, null, { nope: 1 }]));
-    expect(loadDeckBriefs()).toEqual([{ id: 'd1', customerId: '', updatedAt: 4, name: '涵小姐', filled: true, generated: true }]);
+    expect(loadDeckBriefs()).toEqual([{ id: 'd1', brand: 'aifa', customerId: '', updatedAt: 4, name: '涵小姐', filled: true, generated: true }]);
     localStorage.setItem('call_coach_demo_decks_v1', '{bad');
     expect(loadDeckBriefs()).toEqual([]);
   });

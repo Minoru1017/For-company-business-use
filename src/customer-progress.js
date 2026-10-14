@@ -3,6 +3,7 @@
  * 只讀 localStorage 裡已存的資料，不依賴簡報／複盤的畫面模組（首頁不必先載入它們）。
  */
 import { DECKS_STORAGE_KEY } from './demo-deck.js';
+import { brandOf, customersInBrand, getBrandId, inBrand } from './brands.js';
 import { loadCustomers } from './customers.js';
 import { followUpStatus, loadReviews, outcomeLabel, reviewHasContent, reviewMissing, todayKey } from './demo-review.js';
 
@@ -22,6 +23,7 @@ export function loadDeckBriefs() {
       .filter((d) => d && typeof d === 'object' && d.id)
       .map((d) => ({
         id: String(d.id),
+        brand: brandOf(d),
         customerId: String(d.customerId || ''),
         updatedAt: Number(d.updatedAt) || 0,
         name: String(d.input?.name || '').trim() || String(d.deck?.customer || '').trim(),
@@ -145,6 +147,9 @@ export function buildCustomerProgress(decks, reviews, today = todayKey(), custom
   return out.sort((a, b) => rank(a) - rank(b) || b.updatedAt - a.updatedAt);
 }
 
-export function loadCustomerProgress(today = todayKey()) {
-  return buildCustomerProgress(loadDeckBriefs(), loadReviews(), today, loadCustomers());
+export function loadCustomerProgress(today = todayKey(), brand = getBrandId()) {
+  const decks = loadDeckBriefs();
+  const reviews = loadReviews();
+  const customers = customersInBrand(loadCustomers(), { decks, reviews }, brand);
+  return buildCustomerProgress(inBrand(decks, brand), inBrand(reviews, brand), today, customers);
 }

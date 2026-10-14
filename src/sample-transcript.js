@@ -7,7 +7,7 @@ export const SAMPLE_TRANSCRIPT_NAME = '範例-AI課程DEMO電訪.srt';
 
 export const SAMPLE_TRANSCRIPT_SRT = `1
 00:00:00,000 --> 00:00:04,200
-[SPEAKER_00] 您好，我是學院的顧問小陳，請問是王經理嗎？現在方便說話嗎？
+[SPEAKER_00] 您好，我是 NOVA 超星計劃的顧問小陳，請問是王經理嗎？現在方便說話嗎？
 
 2
 00:00:04,400 --> 00:00:07,100

@@ -211,6 +211,15 @@ kbd { background:var(--panel2); border:1px solid var(--border) !important; borde
 .day-type-btn:hover { background:transparent; color:var(--ink); }
 .day-type-btn.active { background:var(--ink); color:var(--brand); }
 .day-type-hint { display:none; }
+.brand-switch { display:flex; gap:4px; padding:4px; border-radius:999px; background:var(--panel2); flex-wrap:nowrap; }
+.brand-switch-btn { font-family:var(--sans); font-size:.82rem; font-weight:700; padding:8px 16px; border:none; border-radius:999px; background:transparent; color:var(--muted); white-space:nowrap; cursor:pointer; }
+.brand-switch-btn:hover { background:transparent; color:var(--ink); }
+.brand-switch-btn.on { background:var(--ink); color:var(--brand); }
+.home-brand-switch { margin-right:auto; }
+.dk-brand { margin:0 0 12px; }
+.dk-brand .brand-switch-btn { flex:1; padding:7px 8px; font-size:.78rem; }
+.dk-brand-other { margin:8px 0 0; }
+.brand-link { padding:0; border:none; background:none; color:var(--ink); font:inherit; font-weight:700; text-decoration:underline; cursor:pointer; }
 
 .home-grid { display:grid; grid-template-columns:minmax(0,1fr) 360px; gap:16px; align-items:start; }
 .home-main, .home-side { display:flex; flex-direction:column; gap:16px; min-width:0; }

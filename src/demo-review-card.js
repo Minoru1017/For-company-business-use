@@ -4,6 +4,7 @@
  */
 import { REVIEW_TEXT_FIELDS, OUTCOMES, formatAnalysisSummary, outcomeLabel, reviewToText, tierLabel, todayKey } from './demo-review.js';
 import { escapeHTML } from './utils.js';
+import { brandInfo, brandOf } from './brands.js';
 
 /* 與 tone.css 同一組色票（canvas 讀不到 CSS 變數，這裡寫死） */
 const C = {
@@ -50,6 +51,7 @@ export function reviewCardModel(r, now = Date.now()) {
   const o = OUTCOMES.find((x) => x.key === r.outcome);
   const tier = r.tier ? tierLabel(r.tier) : '';
   return {
+    brand: brandInfo(brandOf(r)).name,
     customer: String(r.customer || '').trim() || '未命名客戶',
     demoAt: String(r.demoAt || '').trim(),
     outcome: { label: outcomeLabel(r.outcome), tone: o?.tone || 'muted', set: !!o },
@@ -263,7 +265,7 @@ function paint(ctx, m, { draw }) {
   if (draw) {
     font(ctx, 10.5, 700);
     ctx.fillStyle = C.muted;
-    ctx.fillText('CALL COACH', PAD, y + 14);
+    ctx.fillText(m.brand || 'CALL COACH', PAD, y + 14);
     font(ctx, 10.5, 500);
     const tail = '業務自填複盤・僅供內部討論';
     ctx.fillText(tail, W - PAD - ctx.measureText(tail).width, y + 14);

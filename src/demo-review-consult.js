@@ -161,7 +161,7 @@ function analysisSummary(s) {
 /**
  * 只送使用者已填內容與分析數字，不會把影片或完整逐字稿送出。
  */
-export function buildConsultPrompt({ review = {}, deckInput = {}, courseNotes = '', today = '' } = {}) {
+export function buildConsultPrompt({ review = {}, deckInput = {}, courseNotes = '', today = '', brand = '' } = {}) {
   const lines = [
     '你是 AI 落地顧問兼顧問式銷售教練。你的角色是第二意見，不是替業務腦補答案。',
     '請根據「業務自填 DEMO 複盤」與「DEMO 前客戶資料」，完成四件事：',
@@ -183,6 +183,7 @@ export function buildConsultPrompt({ review = {}, deckInput = {}, courseNotes = 
     '【DEMO 前客戶資料】',
   ];
 
+  add(lines, '品牌', brand);
   add(lines, '姓名', deckInput.name);
   add(lines, '背景', deckInput.background);
   add(lines, '有興趣的方案／領域', deckInput.product);

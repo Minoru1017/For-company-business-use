@@ -4,9 +4,10 @@
  * 版型參考資深同事的簡報：深藍章節頁、淺底卡片頁、流程作品頁、月份學習路徑頁。
  * 資料只存本機 localStorage。
  */
+import { BRANDS, LEGACY_BRAND, brandInfo, getBrandId, normalizeBrandId } from './brands.js';
 
 export const DECKS_STORAGE_KEY = 'call_coach_demo_decks_v1';
-export const COURSE_NOTES_STORAGE_KEY = 'call_coach_demo_deck_course_v1';
+export const COURSE_NOTES_STORAGE_KEY = BRANDS.aifa.courseNotesKey;
 
 export const SLIDE_TYPES = ['cover', 'section', 'cards', 'grid', 'flow', 'plan', 'quote', 'qa', 'closing'];
 
@@ -294,13 +295,16 @@ const SKELETON = `第一部分「為什麼現在開始」（副標：先弄清�
 → 每個作品一頁：常見情況（chips）→ 可以怎麼做（3–4 步流程，最後一步是成果）→ 累積什麼能力 → 可以對應的方向
 → 學習路徑「第 1 個月｜轉職準備期」：學習重點（chips）、這個月的目標、同時開始`;
 
-export function buildDeckPrompt(input = {}, { courseNotes = '' } = {}) {
+export function buildDeckPrompt(input = {}, { courseNotes = '', brand = getBrandId() } = {}) {
   const course = str(courseNotes, 6000);
-  return `你是資深 AI 學院課程顧問，要幫業務把「有邀約的開發紀錄」做成 DEMO 時給客戶看的簡報。
+  const brandName = brandInfo(brand).name;
+  return `你是「${brandName}」的資深課程顧問，要幫業務把「有邀約的開發紀錄」做成 DEMO 時給客戶看的簡報。
 這份簡報唯一的標準：每一頁都是這位客戶「喜歡的」或「想知道的」事——從他自己說過的話出發，不是公司的產品型錄。
 
 【客戶資料（業務的開發紀錄）】
 ${formatInputForPrompt(input)}
+
+【品牌】${brandName}（簡報裡提到公司、課程時一律用這個名稱，不要寫成其他品牌）
 
 【公司實際教的課程／方案重點】
 ${course || '（未提供——課程細節只能寫通用描述，不可編造課名、堂數、價格、師資或保證；並在 notes 提醒業務「請對照實際課綱」）'}
@@ -492,9 +496,9 @@ export function emptyInput() {
   return Object.fromEntries(INPUT_FIELDS.map((f) => [f.key, '']));
 }
 
-export function newDeckRecord() {
+export function newDeckRecord({ brand = getBrandId() } = {}) {
   const now = Date.now();
-  return { id: rid('deck'), createdAt: now, updatedAt: now, input: emptyInput(), deck: null, source: '' };
+  return { id: rid('deck'), brand: normalizeBrandId(brand), createdAt: now, updatedAt: now, input: emptyInput(), deck: null, source: '' };
 }
 
 export function loadDecks() {
@@ -509,7 +513,7 @@ export function loadDecks() {
         } catch {
           deck = null;
         }
-        return { ...newDeckRecord(), ...r, input: { ...emptyInput(), ...(r.input || {}) }, deck };
+        return { ...newDeckRecord(), ...r, brand: normalizeBrandId(r.brand, LEGACY_BRAND), input: { ...emptyInput(), ...(r.input || {}) }, deck };
       })
       .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0));
   } catch {
@@ -521,17 +525,22 @@ export function saveDecks(list) {
   localStorage.setItem(DECKS_STORAGE_KEY, JSON.stringify(list || []));
 }
 
-export function loadCourseNotes() {
+/** 課程重點分品牌存；AI未來學院沿用原本的 key，舊資料不用搬 */
+export function courseNotesKey(brand = getBrandId()) {
+  return brandInfo(brand).courseNotesKey;
+}
+
+export function loadCourseNotes(brand = getBrandId()) {
   try {
-    return localStorage.getItem(COURSE_NOTES_STORAGE_KEY) || '';
+    return localStorage.getItem(courseNotesKey(brand)) || '';
   } catch {
     return '';
   }
 }
 
-export function saveCourseNotes(text) {
+export function saveCourseNotes(text, brand = getBrandId()) {
   try {
-    localStorage.setItem(COURSE_NOTES_STORAGE_KEY, String(text || ''));
+    localStorage.setItem(courseNotesKey(brand), String(text || ''));
   } catch {
     /* ignore */
   }

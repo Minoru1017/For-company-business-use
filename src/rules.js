@@ -6,7 +6,7 @@ export const RULES = {
       key: 'connect',
       name: '1 連結 Connect',
       time: '建立安全感',
-      re: /您好|你好|我是.{0,8}(顧問|學院|老師)|請問是|方便(說話|聊|嗎)|耽誤|打擾|感謝(你|您)接/,
+      re: /您好|你好|我是.{0,8}(顧問|學院|計劃|計畫|老師)|請問是|方便(說話|聊|嗎)|耽誤|打擾|感謝(你|您)接/,
       who: 'S',
     },
     { key: 'discovery', name: '2 挖掘 Discovery', time: '現況目標問題動機限制', re: null, who: 'S' },

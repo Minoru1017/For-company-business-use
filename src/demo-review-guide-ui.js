@@ -2,6 +2,7 @@
  * 顧問式 DEMO P1 UI：路線規劃 → 現場驗證 → 阻力診斷 → 兩種決策卡。
  * 掛在 DEMO 複盤裡，但自己的 DOM 與事件都封裝在本模組。
  */
+import { brandInfo, brandOf } from './brands.js';
 import {
   applyQuoteMatches,
   buildDecisionPrompt,
@@ -357,7 +358,7 @@ export function mountDemoGuide(
       const { parsed, usedTokens, modelUsed } = await callGeminiResilient({
         apiKey: key,
         model: getModel?.(),
-        text: buildDemoGuidePrompt({ review: r, deckInput: input, courseNotes: getCourseNotes?.() || '' }),
+        text: buildDemoGuidePrompt({ review: r, deckInput: input, courseNotes: getCourseNotes?.() || '', brand: brandInfo(brandOf(r)).name }),
         generationConfig: { temperature: 0.25, maxOutputTokens: 6144 },
         parse: parseDemoGuideResponse,
         onRetry: ({ status, delayMs }) => {
@@ -442,7 +443,7 @@ export function mountDemoGuide(
       const { parsed, usedTokens, modelUsed } = await callGeminiResilient({
         apiKey: key,
         model: getModel?.(),
-        text: buildDecisionPrompt({ review: r, guide: g, deckInput: getDeck?.()?.input || {}, courseNotes: getCourseNotes?.() || '' }),
+        text: buildDecisionPrompt({ review: r, guide: g, deckInput: getDeck?.()?.input || {}, courseNotes: getCourseNotes?.() || '', brand: brandInfo(brandOf(r)).name }),
         generationConfig: { temperature: 0.2, maxOutputTokens: 6144 },
         parse: parseDecisionResponse,
       });

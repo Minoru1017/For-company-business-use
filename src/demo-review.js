@@ -5,6 +5,7 @@
 import { PURPOSE_TYPES } from './purpose-types.js';
 import { consultToText, normalizeConsult } from './demo-review-consult.js';
 import { guideToText, normalizeDemoGuide } from './demo-review-guide.js';
+import { LEGACY_BRAND, getBrandId, normalizeBrandId } from './brands.js';
 
 export const REVIEWS_STORAGE_KEY = 'call_coach_demo_reviews_v1';
 
@@ -59,10 +60,11 @@ function validDate(v) {
   return d.getMonth() === Number(m[2]) - 1 && d.getDate() === Number(m[3]) ? s : '';
 }
 
-export function emptyReview({ deckId = '', customerId = '', customer = '', demoAt = '' } = {}) {
+export function emptyReview({ deckId = '', customerId = '', customer = '', demoAt = '', brand = getBrandId() } = {}) {
   const now = Date.now();
   return {
     id: rid(),
+    brand: normalizeBrandId(brand),
     deckId,
     customerId: clip(customerId, 60),
     createdAt: now,
@@ -125,6 +127,7 @@ export function normalizeReview(r = {}) {
   const base = emptyReview();
   const out = { ...base, ...r };
   out.id = clip(r.id, 60) || base.id;
+  out.brand = normalizeBrandId(r.brand, LEGACY_BRAND);
   out.deckId = clip(r.deckId, 60);
   out.customerId = clip(r.customerId, 60);
   out.customer = clip(out.customer, SHORT_LIMIT);
