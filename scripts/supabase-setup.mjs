@@ -48,7 +48,7 @@ const MAIL = `<h2>Call Coach 登入驗證碼</h2>
 <p>幾分鐘內有效；如果不是你本人操作，請忽略這封信。</p>`;
 
 console.log('1/3 建立 Storage bucket 與權限…');
-await call('/database/query', { method: 'POST', body: JSON.stringify({ query: SQL }) });
+await call('/database/query', { method: 'POST', body: JSON.stringify({ query: SQL, read_only: false }) });
 const check = await call('/database/query', {
   method: 'POST',
   body: JSON.stringify({ query: "select policyname from pg_policies where schemaname = 'storage' and policyname like 'callcoach sync%' order by 1" }),

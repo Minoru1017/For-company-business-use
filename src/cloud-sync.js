@@ -42,7 +42,13 @@ function env(name) {
   }
 }
 
-/** 建置時的 VITE_SUPABASE_URL／VITE_SUPABASE_ANON_KEY，或這台裝置手動填的設定（anon key 本來就是公開的） */
+/** 公司的 Supabase 專案；anon key 是設計給瀏覽器用的公開金鑰，資料權限由 Storage policy 控管 */
+const BUILT_IN_CLOUD = {
+  url: 'https://tgmpwiuavzuzsqjcftrj.supabase.co',
+  anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRnbXB3aXVhdnp1enNxamNmdHJqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE5NDM5MDIsImV4cCI6MjEwNzUxOTkwMn0.CK7B4_N-IfV9aOPxhJOs0xzHgQWBMlebisBiEwTk1JE',
+};
+
+/** 優先序：這台裝置手動填的設定 → 建置時的 VITE_SUPABASE_URL／VITE_SUPABASE_ANON_KEY → 內建專案 */
 export function cloudConfig(storage) {
   let saved = {};
   try {
@@ -50,8 +56,8 @@ export function cloudConfig(storage) {
   } catch {
     saved = {};
   }
-  const url = String(saved.url || env('VITE_SUPABASE_URL') || '').trim().replace(/\/+$/, '');
-  const anonKey = String(saved.anonKey || env('VITE_SUPABASE_ANON_KEY') || '').trim();
+  const url = String(saved.url || env('VITE_SUPABASE_URL') || BUILT_IN_CLOUD.url).trim().replace(/\/+$/, '');
+  const anonKey = String(saved.anonKey || env('VITE_SUPABASE_ANON_KEY') || BUILT_IN_CLOUD.anonKey).trim();
   return { url, anonKey, configured: /^https:\/\/\S+$/i.test(url) && anonKey.length > 20, custom: !!saved.url };
 }
 

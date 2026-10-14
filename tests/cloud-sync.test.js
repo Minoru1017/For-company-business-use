@@ -114,10 +114,10 @@ describe('cloud sync', () => {
     expect(isAppKey('callCoachHistory')).toBe(true);
   });
 
-  it('reads config from saved values and rejects incomplete config', () => {
+  it('prefers saved config and falls back to the built-in project', () => {
     const s = device({ callCoachCloudConfig: JSON.stringify({ url: 'https://x.supabase.co/', anonKey: 'k'.repeat(30) }) });
     expect(cloudConfig(s)).toMatchObject({ url: 'https://x.supabase.co', configured: true, custom: true });
-    expect(cloudConfig(device()).configured).toBe(false);
+    expect(cloudConfig(device())).toMatchObject({ url: 'https://tgmpwiuavzuzsqjcftrj.supabase.co', configured: true, custom: false });
   });
 
   it('encrypts with the sync password and refuses a wrong one', async () => {
