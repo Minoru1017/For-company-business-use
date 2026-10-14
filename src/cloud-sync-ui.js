@@ -213,12 +213,20 @@ export function initCloudSyncUI({ showToast = () => {} } = {}) {
   }
 
   function renderSidebar() {
-    const btn = document.getElementById('sidebarCloud');
-    if (!btn) return;
     const s = session();
     const st = ui.sync?.status;
+    const due = st === 'cloud-ahead' || st === 'conflict' || st === 'local-ahead';
+    const top = document.getElementById('homeCloudBtn');
+    if (top) {
+      top.textContent = s ? s.user.email.split('@')[0] : '登入';
+      top.classList.toggle('signed-in', !!s);
+      top.classList.toggle('due', !!s && due);
+      top.title = s ? `雲端同步・已登入 ${s.user.email}` : '登入雲端，在每台裝置讀到同一份資料';
+    }
+    const btn = document.getElementById('sidebarCloud');
+    if (!btn) return;
     btn.textContent = s ? '雲端同步' : '登入雲端';
-    btn.classList.toggle('due', st === 'cloud-ahead' || st === 'conflict' || st === 'local-ahead');
+    btn.classList.toggle('due', due);
     btn.title = s ? `已登入 ${s.user.email}${st ? `・${STATUS_TEXT[st] || ''}` : ''}` : '登入後可在每台裝置讀到同一份資料';
   }
 
@@ -410,7 +418,7 @@ export function initCloudSyncUI({ showToast = () => {} } = {}) {
   modal.addEventListener('click', (e) => e.target === modal && close());
   document.addEventListener('keydown', (e) => e.key === 'Escape' && !modal.hidden && close());
   document.addEventListener('click', (e) => {
-    if (e.target.closest('#sidebarCloud, [data-cloud-open]')) open();
+    if (e.target.closest('#sidebarCloud, #homeCloudBtn, [data-cloud-open]')) open();
   });
 
   let lastCheck = 0;
