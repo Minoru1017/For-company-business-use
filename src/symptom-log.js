@@ -107,6 +107,9 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
   const monthLabel = q('#slMonthLabel');
   const dayEl = q('#slDay');
   const listEl = q('#slList');
+  const stageEl = q('#slStage');
+  const stagePlayerEl = q('#slPlayer');
+  const stageEmptyEl = q('#slStageEmpty');
   const statusEl = q('#slStatus');
   const keyEl = q('#slKey');
   const keyHintEl = q('#slKeyHint');
@@ -458,10 +461,38 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
   function destroyPlayer() {
     state.playerCtrl?.destroy();
     state.playerCtrl = null;
+    state.stageId = null;
+  }
+
+  function markerTagHtml(c) {
+    const n = (c.devMarkers || []).length;
+    return n ? `<span class="slog-tag ctp-count" title="開發複盤話點">${n} 話點</span>` : '';
+  }
+
+  function refreshMarkerTag(c) {
+    const tags = listEl.querySelector(`.slog-item[data-id="${c.id}"] .slog-item-tags`);
+    if (!tags) return;
+    tags.querySelector('.ctp-count')?.remove();
+    const durTag = tags.querySelector('.slog-tag.bad, .slog-tag.warn, .slog-tag.ok');
+    const html = markerTagHtml(c);
+    if (!html) return;
+    if (durTag) durTag.insertAdjacentHTML('afterend', html);
+    else tags.insertAdjacentHTML('afterbegin', html);
+  }
+
+  /** 播放器住在右側固定欄：只有換了要播的那一通才重掛，清單重畫不會打斷播放 */
+  function syncStage() {
+    const wanted = state.playingId && state.playingUrl ? state.playingId : null;
+    if (wanted !== state.stageId) {
+      destroyPlayer();
+      if (wanted) mountPlayer(wanted, state.playingUrl);
+    }
+    stagePlayerEl.hidden = !state.stageId;
+    stageEmptyEl.hidden = !!state.stageId;
+    stageEl.classList.toggle('active', !!state.stageId);
   }
 
   function renderCalls() {
-    destroyPlayer();
     const visible = callsForFilter();
     const total = state.calls.length;
     q('#slCallCount').textContent = total
@@ -469,6 +500,7 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
         ? `${total} 通`
         : `顯示 ${visible.length}/${total} 通`
       : '';
+    q('#slJumpCalls').textContent = total ? ` ${total}` : '';
     container.querySelectorAll('[data-call-filter]').forEach((b) => b.classList.toggle('on', b.dataset.callFilter === state.callFilter));
     if (!total) {
       listEl.innerHTML = '<li class="slog-empty">這天還沒有錄音。按「匯入錄音檔」或把檔案拖到上面。</li>';
@@ -490,28 +522,30 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
           const checked = state.selection.has(c.id) ? 'checked' : '';
           const playing = state.playingId === c.id;
           const top = c.symptoms?.keys?.slice(0, 3).map((k) => `<span class="slog-tag">${escapeHTML(SYMPTOM_DEFS[k]?.label || k)}</span>`).join('') || '';
-          const markerN = (c.devMarkers || []).length;
-          const markerTag = markerN ? `<span class="slog-tag ctp-count" title="開發複盤話點">${markerN} 話點</span>` : '';
+          const markerTag = markerTagHtml(c);
           return `<li class="slog-item ${playing ? 'playing' : ''}" data-id="${c.id}">
-            <label class="slog-item-check"><input type="checkbox" data-select="${c.id}" ${checked}></label>
-            <button type="button" class="slog-item-name" data-play="${c.id}" title="點擊播放／暫停">
+            <label class="slog-item-check"><input type="checkbox" data-select="${c.id}" ${checked} aria-label="選取 ${escapeHTML(c.name)}"></label>
+            <button type="button" class="slog-item-name" data-play="${c.id}" title="${escapeHTML(c.name)} · 點擊播放／停止" aria-pressed="${playing}">
               <span class="slog-item-time">${escapeHTML(c.startTime || '--:--')}</span>
               <span class="slog-item-file">${playing ? '▮▮ ' : '▶ '}${escapeHTML(c.name)}</span>
-              <span class="slog-item-dur">${c.durationSec ? formatDuration(c.durationSec) : ''}${c.size ? ` · ${describeSize(c.size)}` : ''}</span>
+              <span class="slog-item-dur">${c.durationSec ? formatDuration(c.durationSec) : ''}</span>
             </button>
-            <span class="slog-item-status ${st.cls}">${st.text}</span>
             <span class="slog-item-tags">${durTag}${markerTag}${top}</span>
-            <span class="slog-item-actions">
-              ${c.transcript?.length ? `<button type="button" class="btn slog-mini" data-open="${c.id}" title="載入逐字稿並跑完整分析">完整分析</button>` : ''}
-              ${c.hasAudio === false ? '' : `<button type="button" class="btn slog-mini" data-del-audio="${c.id}" title="只刪錄音，保留逐字稿與分析">刪錄音</button>`}
-              <button type="button" class="btn slog-mini danger" data-del="${c.id}" title="整筆刪除">刪除</button>
-            </span>
-            <div class="slog-player" data-player="${c.id}" ${playing ? '' : 'hidden'}></div>
+            <span class="slog-item-status ${st.cls}">${st.text}</span>
+            <details class="slog-item-more">
+              <summary aria-label="更多動作" title="更多動作">⋯</summary>
+              <span class="slog-item-actions">
+                ${c.transcript?.length ? `<button type="button" class="btn slog-mini" data-open="${c.id}" title="載入逐字稿並跑完整分析">完整分析</button>` : ''}
+                ${c.hasAudio === false ? '' : `<button type="button" class="btn slog-mini" data-del-audio="${c.id}" title="只刪錄音，保留逐字稿與分析">刪錄音</button>`}
+                <button type="button" class="btn slog-mini danger" data-del="${c.id}" title="整筆刪除">刪除</button>
+                ${c.size ? `<span class="slog-item-size">${describeSize(c.size)}</span>` : ''}
+              </span>
+            </details>
           </li>`;
         })
         .join('');
-      if (state.playingId && state.playingUrl) mountPlayer(state.playingId, state.playingUrl);
     }
+    syncStage();
     refreshBatchButton();
     state.mindmap?.refresh();
   }
@@ -527,7 +561,7 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
     };
     if (audio.readyState >= 1) seek();
     else audio.addEventListener('loadedmetadata', seek, { once: true });
-    listEl.querySelector(`[data-player="${callId}"]`)?.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' });
+    stageEl.scrollIntoView?.({ behavior: 'smooth', block: 'nearest' });
   }
 
   state.mindmap = mountMarkerMindmap(q('#slMindmap'), {
@@ -538,6 +572,7 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
       const c = state.calls.find((x) => x.id === callId);
       if (!c) return;
       c.devMarkers = markers;
+      refreshMarkerTag(c);
       if (state.playingId === callId) state.playerCtrl?.setMarkers?.(markers);
       try {
         await putCall(c);
@@ -558,9 +593,7 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
   });
 
   function mountPlayer(id, url) {
-    const slot = listEl.querySelector(`[data-player="${id}"]`);
-    if (!slot) return;
-    slot.hidden = false;
+    const slot = stagePlayerEl;
     const call = state.calls.find((x) => x.id === id);
     state.playerCtrl = mountTimelinePlayer(slot, {
       src: url,
@@ -575,6 +608,7 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
         const known = new Set((c.devMarkers || []).map((m) => m.id));
         const added = markers.find((m) => !known.has(m.id));
         c.devMarkers = markers;
+        refreshMarkerTag(c);
         if (added) state.mindmap?.showMarker(id, added.id);
         else state.mindmap?.refresh();
         try {
@@ -586,9 +620,7 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
     });
     const audio = state.playerCtrl.getAudio();
     audio.autoplay = true;
-    audio.addEventListener('ended', () => {
-      slot.closest('.slog-item')?.classList.remove('playing');
-    });
+    state.stageId = id;
   }
 
   function stopPlayback() {
@@ -673,6 +705,12 @@ export function initSymptomLog(container, { getApiKey, setApiKey, getModel, onGe
         showDbError(err);
       }
     }
+  });
+
+  q('.slog-jump').addEventListener('click', (e) => {
+    const btn = e.target.closest('[data-jump-to]');
+    if (!btn) return;
+    q(`.slog-day ${btn.dataset.jumpTo}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   });
 
   listEl.addEventListener('change', (e) => {
