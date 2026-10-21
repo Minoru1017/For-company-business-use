@@ -49,7 +49,7 @@
 .cloud-status dl > div { display:grid; grid-template-columns:72px 1fr; gap:8px; font-size:.74rem; }
 .cloud-status dt { color:var(--muted); }
 .cloud-status dd { margin:0; font-family:var(--mono); }
-.home-cloud-btn { position:relative; flex-shrink:0; max-width:180px; padding:8px 16px; overflow:hidden; border:none; border-radius:999px; background:var(--ink); color:var(--brand, #f5c518); font-size:.78rem; font-weight:700; text-overflow:ellipsis; white-space:nowrap; }
+.home-cloud-btn { position:relative; flex-shrink:0; max-width:180px; padding:8px 16px; overflow:hidden; border:none; border-radius:999px; background:var(--deep); color:var(--brand, #f5c518); font-size:.78rem; font-weight:700; text-overflow:ellipsis; white-space:nowrap; }
 .home-cloud-btn::before { content:"☁ "; }
 .home-cloud-btn.signed-in { background:var(--panel2); color:var(--text); }
 .home-cloud-btn.due::after { content:""; position:absolute; top:6px; right:8px; width:7px; height:7px; border-radius:50%; background:var(--warn); }

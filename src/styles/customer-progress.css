@@ -5,7 +5,7 @@
 .cp-head h3 small { margin-left:6px; font-family:var(--sans); font-size:.74rem; font-weight:400; color:var(--muted); }
 .cp-head h3 em { font-style:normal; color:var(--warn); }
 .cp-list { list-style:none; margin:0; padding:0; display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:10px; }
-.cp-item { width:100%; display:flex; flex-direction:column; gap:7px; padding:12px 14px; text-align:left; border:1px solid var(--border); border-radius:8px; background:#fff; color:var(--text); font-family:var(--sans); letter-spacing:0; box-shadow:none; cursor:pointer; transition:border-color .15s, transform .15s; }
+.cp-item { width:100%; display:flex; flex-direction:column; gap:7px; padding:12px 14px; text-align:left; border:1px solid var(--border); border-radius:8px; background:var(--surface); color:var(--text); font-family:var(--sans); letter-spacing:0; box-shadow:none; cursor:pointer; transition:border-color .15s, transform .15s; }
 .cp-item:hover, .cp-item:focus-visible { border-color:var(--accent); transform:translateY(-1px); box-shadow:none; outline:none; }
 .cp-item.complete { border-color:rgba(76,175,120,.5); }
 .cp-top { display:flex; flex-wrap:wrap; align-items:center; gap:4px 8px; }
@@ -50,7 +50,7 @@
 .cm-tools { display:flex; flex-wrap:wrap; gap:8px; }
 .cm-tools input[type="search"] { flex:1; min-width:180px; }
 .cm-list { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:6px; max-height:360px; overflow:auto; }
-.cm-item { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:6px 12px; padding:8px 10px; border:1px solid var(--border); border-radius:6px; background:#fff; }
+.cm-item { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:6px 12px; padding:8px 10px; border:1px solid var(--border); border-radius:6px; background:var(--surface); }
 .cm-item.editing { border-color:var(--accent); }
 .cm-main { min-width:0; display:flex; flex-wrap:wrap; align-items:center; gap:4px 10px; flex:1 1 260px; }
 .cm-main b { font-size:.9rem; }

@@ -50,7 +50,7 @@
 .brief-rec-btn:hover { border-color:var(--accent); }
 .brief-rec-dot { width:12px; height:12px; border-radius:50%; background:var(--accent); box-shadow:0 0 0 0 rgba(255,95,69,.5); transition:transform .2s; }
 .brief-rec-btn.on { background:var(--accent); border-color:var(--accent); color:#fff; }
-.brief-rec-btn.on .brief-rec-dot { background:#fff; animation:briefPulse 1.4s ease-out infinite; }
+.brief-rec-btn.on .brief-rec-dot { background:var(--surface); animation:briefPulse 1.4s ease-out infinite; }
 @keyframes briefPulse { 0% { box-shadow:0 0 0 0 rgba(255,255,255,.55); } 100% { box-shadow:0 0 0 12px rgba(255,255,255,0); } }
 .brief-timer { font-family:var(--mono); font-size:1.15rem; letter-spacing:.12em; color:var(--text); min-width:5ch; }
 .brief-save-state { padding:4px 8px; border:1px solid var(--border); border-radius:999px; font-family:var(--mono); font-size:.58rem; letter-spacing:.06em; color:var(--muted); white-space:nowrap; }
