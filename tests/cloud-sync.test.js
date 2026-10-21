@@ -3,6 +3,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import JSZip from 'jszip';
 import { isAppKey } from '../src/backup.js';
 import {
+  BUILT_IN_CLOUD,
   CLOUD_SESSION_KEY,
   CLOUD_STATE_KEY,
   CloudError,
@@ -126,7 +127,9 @@ describe('cloud sync', () => {
   it('prefers saved config and falls back to the built-in project', () => {
     const s = device({ callCoachCloudConfig: JSON.stringify({ url: 'https://x.supabase.co/', anonKey: 'k'.repeat(30) }) });
     expect(cloudConfig(s)).toMatchObject({ url: 'https://x.supabase.co', configured: true, custom: true });
-    expect(cloudConfig(device())).toMatchObject({ url: 'https://tgmpwiuavzuzsqjcftrj.supabase.co', configured: true, custom: false });
+    // 公開版的內建專案是空白，此時要回到「尚未設定」而不是壞掉的網址
+    expect(BUILT_IN_CLOUD.url).toMatch(/^(https:\/\/[a-z0-9]+\.supabase\.co)?$/);
+    expect(cloudConfig(device())).toMatchObject({ url: BUILT_IN_CLOUD.url, configured: !!BUILT_IN_CLOUD.url, custom: false });
   });
 
   it('encrypts with the sync password and refuses a wrong one', async () => {

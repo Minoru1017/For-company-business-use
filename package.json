@@ -11,6 +11,10 @@
     "test:watch": "vitest",
     "lint": "eslint .",
     "smoke": "vite build && node scripts/smoke.mjs",
+    "build:public": "vite build --mode public",
+    "dev:public": "vite --mode public",
+    "check:public": "vite build --mode public && node scripts/check-deidentified.mjs dist-public && node scripts/smoke.mjs dist-public",
+    "export:public": "node scripts/export-public.mjs",
     "check": "npm run lint && npm test && npm run smoke"
   },
   "devDependencies": {
