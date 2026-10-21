@@ -1,0 +1,133 @@
+/* 話點心智圖：整理（清單＋步驟卡）／全貌（整張圖＋抽屜）兩種檢視、精簡工具列、顏色只留在圓點與徽章 */
+
+.mm { position:relative; border-color:var(--hairline); background:var(--panel); }
+.mm-body { position:relative; height:min(68vh, 640px); min-height:420px; }
+.mm.max .mm-body { height:auto; }
+.mm.view-list .mm-body { grid-template-columns:minmax(200px, 260px) minmax(0,1fr); }
+.mm.view-list .mm-stage, .mm.view-list .mm-canvas-tools { display:none; }
+.mm.view-map .mm-body { grid-template-columns:minmax(0,1fr); }
+.mm.view-map .mm-explorer { display:none; }
+.mm.max.view-list .mm-body { grid-template-columns:300px minmax(0,1fr); }
+
+/* ---- 標題列：分頁＋檢視切換＋下一個待補＋最大化 ---- */
+.mm-titlebar { align-items:center; gap:10px; padding:6px 8px; border-bottom-color:var(--hairline); background:var(--panel); }
+.mm-tabs { align-items:center; gap:2px; overflow:hidden; }
+.mm-tab, .mm-tab:hover { position:relative; margin:0; padding:6px 10px 9px; border:0; border-radius:var(--r-field); background:transparent; color:var(--muted); font-size:.76rem; }
+.mm-tab:hover { color:var(--text); background:rgba(239,236,230,.05); }
+.mm-tab.active { color:var(--text); background:rgba(239,236,230,.08); border:0; }
+.mm-tab.active::before { display:none; }
+.mm-tab[hidden] { display:none; }
+.mm-tab-n { font-family:var(--num); font-size:.62rem; color:var(--faint); }
+.mm-tab.active .mm-tab-n { color:var(--text-2); }
+.mm-tab-meter { position:absolute; left:10px; right:10px; bottom:3px; height:2px; border-radius:1px; background:var(--hairline-2); overflow:hidden; }
+.mm-tab-meter i { display:block; height:100%; background:var(--text-2); }
+.mm-tab.active .mm-tab-meter i { background:var(--paper); }
+.mm-tab-more { position:relative; flex:0 0 auto; }
+.mm-tab-more[hidden] { display:none; }
+.mm-tab-more > summary { list-style:none; cursor:pointer; }
+.mm-tab-more > summary::-webkit-details-marker { display:none; }
+.mm-tab-menu { position:absolute; top:calc(100% + 4px); left:0; z-index:20; display:flex; flex-direction:column; gap:2px; min-width:180px; padding:4px;
+  background:var(--panel2); border:1px solid var(--hairline-2); border-radius:var(--r-field); box-shadow:0 12px 28px rgba(0,0,0,.45); }
+.mm-tab-menu .mm-tab { justify-content:space-between; width:100%; }
+.mm-toolbar-actions { flex:0 0 auto; flex-wrap:nowrap; gap:8px; padding:0; }
+.mm-view { display:inline-flex; padding:2px; border:1px solid var(--hairline-2); border-radius:var(--r-field); }
+.mm-view button { padding:4px 10px; border:0; border-radius:2px; background:transparent; color:var(--muted); font-size:.74rem; font-weight:600; box-shadow:none; cursor:pointer; }
+.mm-view button:hover { color:var(--text); transform:none; box-shadow:none; }
+.mm-view button[aria-pressed="true"] { background:var(--paper); color:var(--on-deep); }
+.mm-next b { color:var(--text); }
+.mm-icon-btn { display:inline-grid; place-items:center; width:28px; height:28px; padding:0; border:1px solid transparent; border-radius:var(--r-field); background:transparent;
+  color:var(--muted); font-size:1rem; line-height:1; box-shadow:none; cursor:pointer; }
+.mm-icon-btn:hover { color:var(--text); background:rgba(239,236,230,.07); transform:none; box-shadow:none; }
+
+/* ---- 左側話點清單 ---- */
+.mm-explorer { border-right-color:var(--hairline); background:transparent; }
+.mm-explorer-head { border-bottom-color:var(--hairline); }
+.mm-outline-item { border:0; border-radius:2px; }
+.mm-outline-item:hover { background:rgba(239,236,230,.04); }
+.mm-outline-item.sel { background:rgba(239,236,230,.07); border:0; box-shadow:inset 2px 0 0 var(--paper); }
+.mm-outline-time { color:var(--muted); }
+.mm-outline-ev { border-color:var(--hairline-2); }
+
+/* ---- 畫布：中性色，選中的話點才加亮 ---- */
+.mm-stage { background:linear-gradient(rgba(239,236,230,.035) 1px, transparent 1px) 0 0 / 24px 24px, linear-gradient(90deg, rgba(239,236,230,.035) 1px, transparent 1px) 0 0 / 24px 24px, var(--bg); }
+.mm-edge { stroke:rgba(239,236,230,.2); stroke-width:1.25; }
+.mm-node { border:1px solid var(--hairline-2); border-radius:var(--r-card); background:var(--panel2); box-shadow:none; }
+.mm-node:hover { border-color:rgba(239,236,230,.32); }
+.mm-node.sel { border-color:var(--paper); box-shadow:0 0 0 1px var(--paper); }
+.mm-marker, .mm-surface, .mm-intent { border-left:1px solid var(--hairline-2); }
+.mm-marker.sel, .mm-surface.sel, .mm-intent.sel { border-left-color:var(--paper); }
+.mm-marker.focus { background:var(--surface); }
+.mm-marker .mm-node-sub > span { display:inline-flex; align-items:center; }
+.mm-root { border-color:var(--hairline-2); background:var(--surface); }
+.mm-call { border-color:var(--hairline-2); background:var(--surface); }
+.mm-evidence { background:var(--surface); }
+.mm-jump { color:var(--text-2); }
+.mm-more { font-family:var(--num); font-size:.62rem; letter-spacing:0; color:var(--muted); padding:0 5px; border:1px solid var(--hairline-2); border-radius:8px; }
+.mm-adds { display:flex; flex-wrap:wrap; gap:4px; margin-top:2px; }
+.mm-add-chip { padding:2px 8px; border:1px dashed var(--hairline-2); border-radius:999px; background:transparent; color:var(--text-2); font-size:.68rem; font-weight:600; box-shadow:none; cursor:pointer; }
+.mm-add-chip:hover { border-style:solid; border-color:var(--paper); color:var(--text); transform:none; box-shadow:none; }
+.mm-empty { left:24px; }
+.mm-canvas-tools { position:absolute; left:10px; bottom:10px; z-index:5; display:flex; gap:2px; padding:3px;
+  background:var(--panel); border:1px solid var(--hairline-2); border-radius:var(--r-field); }
+.mm-canvas-tools button { padding:4px 9px; border:0; border-radius:2px; background:transparent; color:var(--text-2); font-size:.72rem; box-shadow:none; cursor:pointer; }
+.mm-canvas-tools button:hover { background:rgba(239,236,230,.08); color:var(--text); transform:none; box-shadow:none; }
+.mm-canvas-tools [hidden] { display:none; }
+
+/* ---- 編輯面板：整理檢視是右欄；全貌檢視是抽屜，最大化時變成固定右欄 ---- */
+.mm-panel { gap:12px; padding:14px 18px; border-left:1px solid var(--hairline); background:var(--panel); }
+.mm-panel > * { width:100%; max-width:720px; }
+.mm.view-map .mm-panel { position:absolute; top:0; right:0; bottom:0; z-index:6; width:min(340px, 62%); padding:12px 14px; border-left-color:var(--hairline-2); box-shadow:-16px 0 32px rgba(0,0,0,.35); }
+.mm.view-map:not(.has-sel) .mm-panel { display:none; }
+.mm.max.view-map.has-sel .mm-body { grid-template-columns:minmax(0,1fr) 400px; }
+.mm.max.view-map .mm-panel { position:static; width:auto; box-shadow:none; }
+.mm.view-list .mm-panel-close { display:none; }
+.mm-panel-head { display:grid; grid-template-columns:minmax(0,1fr) auto auto; align-items:center; gap:8px; }
+.mm-panel-call { overflow:hidden; white-space:nowrap; text-overflow:ellipsis; color:var(--text-2); font-weight:600; font-size:.78rem; }
+.mm-panel .ctp-jump { color:var(--text-2); }
+.mm-panel .ctp-jump:hover { color:var(--text); }
+.mm-strength, .mm-strength.s-solid, .mm-strength.s-weak, .mm-strength.s-none, .mm-strength.s-empty { flex-direction:row; align-items:center; gap:8px; padding:0; border:0; background:transparent; cursor:help; }
+.mm-strength b { font-size:.8rem; }
+.mm-strength .mm-dot { margin:0; }
+
+.mm-steps { list-style:none; margin:0; padding:0; border-top:1px solid var(--hairline); }
+.mm-step { border-bottom:1px solid var(--hairline); }
+.mm-step-head { display:grid; grid-template-columns:22px auto minmax(0,1fr); align-items:center; gap:10px; width:100%; padding:10px 2px; border:0; border-radius:0;
+  background:transparent; color:var(--text); font-size:.8rem; text-align:left; box-shadow:none; cursor:pointer; }
+.mm-step-head:hover { background:rgba(239,236,230,.03); transform:none; box-shadow:none; }
+.mm-step-n { display:grid; place-items:center; width:20px; height:20px; border:1px solid var(--hairline-2); border-radius:50%; font-family:var(--num); font-size:.64rem; color:var(--muted); }
+.mm-step.open .mm-step-n { background:var(--paper); border-color:var(--paper); color:var(--on-deep); }
+.mm-step-title { font-weight:600; white-space:nowrap; }
+.mm-step-sum { min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; color:var(--text-2); font-size:.76rem; }
+.mm-step-sum.empty { color:var(--faint); }
+.mm-step.open .mm-step-sum { display:none; }
+.mm-step-body { display:none; padding:0 2px 14px 32px; }
+.mm-step.open .mm-step-body { display:block; }
+.mm-step-body textarea { width:100%; min-height:4.5em; font-size:.8rem; resize:vertical; }
+.mm-ev-list { margin:0; }
+.mm-ev { border-color:var(--hairline-2); background:transparent; }
+.mm-ev-del { grid-column:4; width:22px; height:22px; padding:0; border:0; border-radius:2px; background:transparent; color:var(--muted); font-size:.9rem; box-shadow:none; cursor:pointer; }
+.mm-ev-del:hover { color:var(--bad); background:rgba(239,236,230,.06); transform:none; box-shadow:none; }
+.mm-ev-none { padding:2px 0; font-size:.76rem; line-height:1.6; }
+.mm-sugg-box { margin-top:10px; }
+.mm-sugg-box > summary { cursor:pointer; color:var(--text-2); font-size:.76rem; font-weight:600; }
+.mm-sugg-box > summary:hover { color:var(--text); }
+.mm-sugg-box .hint { margin:6px 0 0; font-size:.74rem; }
+.mm-sugg { border-color:var(--hairline-2); }
+.mm-sugg:hover { border-color:var(--paper); }
+.mm-sugg.cust { border-left:2px solid var(--text-2); }
+.mm-sugg-time { color:var(--text-2); }
+.mm-add { display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin-top:10px; }
+.mm-add [data-add="text"] { flex:1 1 160px; min-width:0; }
+.mm-add button { justify-self:auto; }
+
+/* ---- 狀態列：一行統計，圖例與快捷鍵收進小視窗 ---- */
+.mm-statusbar { position:relative; flex-wrap:nowrap; padding:6px 10px; border-top-color:var(--hairline); background:var(--panel); }
+.mm-status-help { display:inline-flex; gap:12px; }
+.mm-link { padding:0; border:0; background:transparent; color:var(--muted); font-size:.68rem; box-shadow:none; cursor:pointer; }
+.mm-link:hover, .mm-link[aria-expanded="true"] { color:var(--text); transform:none; box-shadow:none; }
+.mm-link kbd, .mm-keys kbd { font-family:var(--num); padding:0 4px; border:1px solid var(--hairline-2); border-radius:3px; font-size:.6rem; margin:0 1px; }
+.mm-pop { position:absolute; right:10px; bottom:calc(100% + 6px); z-index:30; padding:10px 12px; min-width:240px;
+  background:var(--panel2); border:1px solid var(--hairline-2); border-radius:var(--r-field); box-shadow:0 12px 28px rgba(0,0,0,.45); }
+.mm-pop[hidden] { display:none; }
+.mm-legend, .mm-keys { list-style:none; margin:0; padding:0; display:flex; flex-direction:column; gap:6px; font-size:.74rem; color:var(--text-2); }
+.mm-legend li, .mm-keys li { display:flex; align-items:center; gap:6px; }
