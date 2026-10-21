@@ -18,7 +18,7 @@ import {
   startSession,
   timeoutTurn,
 } from '../src/drill-engine.js';
-import { DRILL_COMMON, DRILL_OPENING, getPersona } from '../src/drill-personas.js';
+import { DRILL_COMMON, DRILL_COMMON_QUESTIONS, DRILL_OPENING, getPersona } from '../src/drill-personas.js';
 import { applyBuiltinSpeakerLabels, enrichSegments, parse } from '../src/parser.js';
 import { labeledRatio } from '../src/speaker-labels.js';
 
@@ -191,6 +191,26 @@ describe('drill engine: session flow', () => {
     expect(missed.replies[0].text).toBe(DRILL_COMMON.objectionMissed);
     expect(s.objectionsHandled).toBe(1);
     expect(DIFFICULTIES.hard.every).toBeLessThan(DIFFICULTIES.gentle.every);
+  });
+
+  it('mixes common prospect questions into objections and coaches the missed ones', () => {
+    const s = newSession({ persona: getPersona('wang'), difficulty: 'normal', limitSec: 30, rand });
+    startSession(s);
+    connect(s);
+    respond(s, '你現在大概是什麼狀況？', 1000);
+    respond(s, '現在最困擾你的是什麼？', 1000); // objection #1：劇本自己的
+    respond(s, '這個問題很合理，你會這樣問是比較在意預算嗎？', 1500);
+    respond(s, '如果一直這樣下去，對你影響最大的是什麼？', 1000);
+    const r6 = respond(s, '為什麼這件事現在對你這麼重要？', 1000); // objection #2：常見問題
+    expect(r6.replies.at(-1)).toMatchObject({ kind: 'objection', text: '阿你們主要在做什麼的？' });
+    const missed = respond(s, '我們的課程非常適合您。', 1000);
+    expect(missed.classification.flags).toContain('missedObjection');
+    expect(s.missedObjections).toEqual(['阿你們主要在做什麼的？']);
+
+    const coaching = buildCoaching(s, sessionStats(s));
+    const tip = coaching.bad.find((b) => b.includes('阿你們主要在做什麼的？'));
+    expect(tip).toContain(DRILL_COMMON_QUESTIONS[0].hint);
+    expect(coaching.bad.some((b) => b.includes('跟其他AI課程'))).toBe(false);
   });
 
   it('closing: decision accepted only after enough info and an explicit diagnosis', () => {
