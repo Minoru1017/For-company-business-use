@@ -42,7 +42,7 @@ function formatDate(iso) {
 
 const sizeText = (n) => (n >= 1024 * 1024 ? `${(n / 1024 / 1024).toFixed(1)} MB` : `${Math.max(1, Math.round(n / 1024))} KB`);
 
-export function initCloudSyncUI({ showToast = () => {} } = {}) {
+export function initCloudSyncUI({ showToast = () => {}, authRedirect = null } = {}) {
   const storage = localStorage;
   const modal = document.createElement('div');
   modal.id = 'cloudModal';
@@ -130,15 +130,22 @@ export function initCloudSyncUI({ showToast = () => {} } = {}) {
 
   function viewSignIn() {
     return `
-      <p class="hint">用 Email 登入，不用記密碼：每次登入會寄一組數字驗證碼到你的信箱。</p>
+      <p class="hint">用 Email 登入，不用記密碼：每次登入會寄一封登入信到你的信箱。</p>
       <section class="backup-sec">
         <h3>登入</h3>
         <label class="cloud-field">Email<input class="field" id="cloudEmail" type="email" autocomplete="email" placeholder="you@company.com" value="${escapeHTML(ui.email)}" ${ui.codeSent ? 'readonly' : ''}></label>
         ${
           ui.codeSent
-            ? `<label class="cloud-field">驗證碼<input class="field cloud-code" id="cloudCode" inputmode="numeric" autocomplete="one-time-code" placeholder="信裡的數字"></label>
-               <div class="btns"><button type="button" class="primary" data-cloud="verify">登入</button><button type="button" data-cloud="resend">重新寄送</button><button type="button" data-cloud="change-email">改用其他 Email</button></div>`
-            : `<div class="btns"><button type="button" class="primary" data-cloud="send">寄送驗證碼</button></div>`
+            ? `<div class="cloud-sent">
+                 <b>登入信已寄到 ${escapeHTML(ui.email)}</b>
+                 <span>請<b>在這台裝置</b>打開信，按「Sign in」或「Confirm email address」連結，就會回到 Call Coach 並完成登入。沒收到請看垃圾信件匣。</span>
+               </div>
+               <details class="cloud-code-alt"><summary>信裡是數字驗證碼？</summary>
+                 <label class="cloud-field">驗證碼<input class="field cloud-code" id="cloudCode" inputmode="numeric" autocomplete="one-time-code" placeholder="信裡的數字"></label>
+                 <div class="btns"><button type="button" class="primary" data-cloud="verify">登入</button></div>
+               </details>
+               <div class="btns"><button type="button" data-cloud="resend">重新寄送</button><button type="button" data-cloud="change-email">改用其他 Email</button></div>`
+            : `<div class="btns"><button type="button" class="primary" data-cloud="send">寄送登入信</button></div>`
         }
       </section>
       ${config().custom ? '<p class="hint cloud-small"><button type="button" class="cloud-link" data-cloud="edit-config">修改連線設定</button></p>' : ''}`;
@@ -276,6 +283,7 @@ export function initCloudSyncUI({ showToast = () => {} } = {}) {
     }
   }
 
+  const redirectUrl = () => `${location.origin}${location.pathname}`;
   const val = (id) => String(form[id] ?? '').trim();
   const raw = (id) => String(form[id] ?? '');
 
@@ -291,13 +299,13 @@ export function initCloudSyncUI({ showToast = () => {} } = {}) {
     },
     send: async () => {
       ui.email = val('cloudEmail');
-      await getClient().sendCode(ui.email);
+      await getClient().sendCode(ui.email, { redirectTo: redirectUrl() });
       ui.codeSent = true;
-      setProgress(`驗證碼已寄到 ${ui.email}，幾分鐘內有效；沒收到請看垃圾信件匣。`);
+      setProgress('');
     },
     resend: async () => {
-      await getClient().sendCode(ui.email);
-      setProgress('已重新寄送驗證碼');
+      await getClient().sendCode(ui.email, { redirectTo: redirectUrl() });
+      setProgress('已重新寄送登入信；請打開最新的那一封');
     },
     'change-email': () => {
       ui.codeSent = false;
@@ -430,6 +438,22 @@ export function initCloudSyncUI({ showToast = () => {} } = {}) {
   document.addEventListener('visibilitychange', () => document.visibilityState === 'visible' && backgroundCheck());
   setTimeout(backgroundCheck, 2500);
   renderHome();
+
+  if (authRedirect?.tokens && getClient()) {
+    modal.hidden = false;
+    run(async () => {
+      setProgress('完成登入中…');
+      await getClient().completeRedirect(authRedirect.tokens);
+      ui.codeSent = false;
+      setProgress('登入成功');
+      showToast('已登入雲端');
+      await refreshStatus();
+    });
+  } else if (authRedirect?.error) {
+    modal.hidden = false;
+    setProgress(authRedirect.error);
+    render();
+  }
 
   return { open, refresh: () => refreshStatus({ quiet: true }) };
 }

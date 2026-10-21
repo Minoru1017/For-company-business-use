@@ -2,6 +2,7 @@ import { runAnalysis } from './analyze.js';
 import { initBackupUI } from './backup-ui.js';
 import { initCloudSyncUI } from './cloud-sync-ui.js';
 import { initBrandSwitches, onBrandChange } from './brands.js';
+import { takeAuthRedirect } from './cloud-sync.js';
 import { drawChart } from './chart.js';
 import {
   buildTranscript,
@@ -77,6 +78,8 @@ import { REVIEWS_CHANGED_EVENT, linkAnalysisToReview, linkTranscriptToReview } f
 import { SAMPLE_TRANSCRIPT_NAME, SAMPLE_TRANSCRIPT_SRT } from './sample-transcript.js';
 import { autoGuess } from './speaker.js';
 import { animateStats, bindUI, renderAnalysisUI, showQuotaModal, showToast } from './ui.js';
+import { renderCallScorecard } from './call-scorecard.js';
+import { mountTodayPanel } from './today-panel.js';
 import { $, escapeHTML, fmt } from './utils.js';
 
 let segs = [];
@@ -284,6 +287,7 @@ function bindLabels() {
     lastResult = result;
     aiSummary = '';
     renderAnalysisUI(result);
+    renderCallScorecard($('callScorecard'), result, segs);
     drawChart(segs, result.keyMoments);
     $('result').hidden = false;
     const entry = saveHistory({
@@ -345,6 +349,7 @@ function reflectionGateForDev() {
 
 let reflectionJournalCtrl = null;
 let dayTypeHomeCtrl = null;
+let todayPanel = null;
 
 function refreshReflectionGateUI() {
   const lockEl = $('aiReflectionLock');
@@ -1000,11 +1005,17 @@ async function practiceSymptom(symptomKey) {
   showToast(`陪練重點已設定：${focus.label}`);
 }
 
+// 雲端登入信的連結會把 token 放在網址 #；必須在模式路由讀 hash 之前取走
+const cloudAuthRedirect = takeAuthRedirect();
+
 function init() {
   mountHomePhilosophy();
   dayTypeHomeCtrl = initDayTypeHome({
     showToast,
-    onDayTypeChange: () => dayTypeHomeCtrl?.refresh?.(),
+    onDayTypeChange: () => {
+      dayTypeHomeCtrl?.refresh?.();
+      todayPanel?.refresh();
+    },
   });
   // 首頁模式入口最先綁定，避免後續模組初始化失敗時四顆按鈕全失效
   initModeChooser({
@@ -1018,6 +1029,20 @@ function init() {
     onModeChange: handleModeChange,
   });
   updateHeroPhilosophyBar(resolveMode());
+  try {
+    todayPanel = mountTodayPanel($('todayPanel'), {
+      onAction: (action) => {
+        if (!dayTypeHomeCtrl?.canEnterWorkModes?.()) {
+          showToast('非上班日請先完成 AI 趨勢＋銷售技巧影片心得，或改選「上班日」');
+          return;
+        }
+        switchMode(action === 'log' ? 'log' : 'dev');
+        if (action === 'reflect') reflectionJournalCtrl?.openModal?.();
+      },
+    });
+  } catch (e) {
+    console.error('today panel init failed', e);
+  }
   try {
     syncCustomers();
   } catch (e) {
@@ -1053,7 +1078,7 @@ function init() {
     console.error('backup init failed', e);
   }
   try {
-    initCloudSyncUI({ showToast });
+    initCloudSyncUI({ showToast, authRedirect: cloudAuthRedirect });
   } catch (e) {
     console.error('cloud sync init failed', e);
   }
@@ -1062,7 +1087,10 @@ function init() {
       showToast,
       getLinkedSource: () => sourceName,
       getLinkedReflection: (source) => findCallBySourceName(source),
-      onChange: () => refreshReflectionGateUI(),
+      onChange: () => {
+        refreshReflectionGateUI();
+        todayPanel?.refresh();
+      },
     });
     refreshReflectionGateUI();
   } catch (e) {
@@ -1150,7 +1178,10 @@ function init() {
   window.addEventListener('hashchange', () => {
     const mode = resolveMode();
     if (MODE_LOADERS[mode] && !modeLoads[mode]) activateMode(mode);
-    if (!mode) customerProgress?.refresh();
+    if (!mode) {
+      customerProgress?.refresh();
+      todayPanel?.refresh();
+    }
   });
   window.addEventListener(REVIEWS_CHANGED_EVENT, () => customerProgress?.refresh());
   window.addEventListener(CUSTOMERS_CHANGED_EVENT, () => customerProgress?.refresh());

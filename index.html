@@ -51,49 +51,46 @@
     </header>
     <div class="home-grid">
       <div class="home-main">
-        <div class="home-hero">
-          <p class="mode-chooser-kicker">CALL COACH</p>
-          <h2 class="mode-chooser-title">選擇工作流程</h2>
-          <p class="mode-chooser-lead">同一套工具，圍繞<b>做 → 聽自己 → 找問題 → 再做</b>——不是用 AI 代替你想。</p>
-        </div>
+        <section class="home-hero today-panel" id="todayPanel" aria-label="今天"></section>
         <div id="learningOffDayPanel" class="learning-off-wrap" hidden></div>
+        <p class="home-section-label">工作模式</p>
         <div class="mode-cards">
-          <button type="button" class="mode-card" data-mode="dev" data-code="CODE_001 // DRIFT">
+          <button type="button" class="mode-card" data-mode="dev">
             <span class="mode-card-icon"><svg class="ic" aria-hidden="true"><use href="#i-dev"/></svg></span>
             <span class="mode-card-tag">開發 · 電訪</span>
             <h3>電訪逐字稿</h3>
             <p><b>找問題</b>：規則分析本機隨時可用；三通自寫複盤後，AI 只做交叉對照。</p>
             <span class="mode-card-cta">上傳分析 →</span>
           </button>
-          <button type="button" class="mode-card accent" data-mode="demo" data-code="CODE_002 // SIGNAL">
+          <button type="button" class="mode-card accent" data-mode="demo">
             <span class="mode-card-icon"><svg class="ic" aria-hidden="true"><use href="#i-demo"/></svg></span>
             <span class="mode-card-tag">DEMO · 錄影</span>
             <h3>錄影轉逐字稿</h3>
             <p><b>輸入＋回放</b>：MP4 本機轉錄；要變強仍得回到自己打、自己講。</p>
             <span class="mode-card-cta">本機轉錄 →</span>
           </button>
-          <button type="button" class="mode-card drill" data-mode="drill" data-code="CODE_003 // SPAR">
+          <button type="button" class="mode-card drill" data-mode="drill">
             <span class="mode-card-icon"><svg class="ic" aria-hidden="true"><use href="#i-drill"/></svg></span>
             <span class="mode-card-tag">開發 · 陪練</span>
             <h3>臨場反應陪練</h3>
             <p><b>下水練</b>：你主動問、限時接話——被反駁與被掛斷，聽再多分享也替代不了。</p>
             <span class="mode-card-cta">開始撥號 →</span>
           </button>
-          <button type="button" class="mode-card log" data-mode="log" data-code="CODE_004 // PULSE">
+          <button type="button" class="mode-card log" data-mode="log">
             <span class="mode-card-icon"><svg class="ic" aria-hidden="true"><use href="#i-log"/></svg></span>
             <span class="mode-card-tag">開發 · 症狀</span>
             <h3>開發症狀紀錄</h3>
             <p><b>聽自己</b>：漏斗證明有在動 → 批次分析 → 改善筆記只改一件事 → 再去做。</p>
             <span class="mode-card-cta">開始記錄 →</span>
           </button>
-          <button type="button" class="mode-card brief" data-mode="brief" data-code="CODE_005 // BRIEF">
+          <button type="button" class="mode-card brief" data-mode="brief">
             <span class="mode-card-icon"><svg class="ic" aria-hidden="true"><use href="#i-brief"/></svg></span>
             <span class="mode-card-tag">主管 · 早會</span>
             <h3>主管早會語音紀錄</h3>
             <p><b>聽指示、定方向</b>：按錄音即時轉文字 → 萃取重點 → 你確認後套用成專案方向。</p>
             <span class="mode-card-cta">開始錄音 →</span>
           </button>
-          <button type="button" class="mode-card deck" data-mode="deck" data-code="CODE_006 // DECK">
+          <button type="button" class="mode-card deck" data-mode="deck">
             <span class="mode-card-icon"><svg class="ic" aria-hidden="true"><use href="#i-deck"/></svg></span>
             <span class="mode-card-tag">邀約 · DEMO</span>
             <h3>DEMO 簡報</h3>
@@ -244,6 +241,10 @@
   </section>
 
   <div id="result" hidden>
+    <section class="sec cs-sec" aria-label="這一通的計分卡">
+      <div id="callScorecard" class="call-scorecard"></div>
+    </section>
+
     <section class="sec">
       <div class="sec-head"><span class="num">03</span><h2>通話總覽</h2><span class="tag">Overview</span></div>
       <div class="stats" id="stats"></div>
@@ -270,7 +271,7 @@
     </section>
 
     <section class="sec">
-      <div class="sec-head"><span class="num">07</span><h2>對話節奏圖</h2><span class="tag">黑=業務 ・ 黃=客戶 ・ 框線=關鍵話點</span></div>
+      <div class="sec-head"><span class="num">07</span><h2>對話節奏圖</h2><span class="tag">淺=業務 ・ 紅=客戶 ・ 框線=關鍵話點</span></div>
       <div class="card">
         <div class="chart-box"><canvas id="chart"></canvas></div>
         <div class="key-moments-legend" id="keyMomentsLegend"></div>
