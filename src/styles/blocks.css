@@ -60,7 +60,7 @@ section.sec:not(.history-sec)::after {
 
 /* 坐進缺角的徽章（圓）與膠囊 */
 .blk-badge { position:absolute; top:4px; display:grid; place-items:center; width:36px; height:36px; border-radius:50%;
-  background:#fff; color:var(--ink); border:1px solid var(--hairline-2); z-index:1; }
+  background:var(--surface); color:var(--ink); border:1px solid var(--hairline-2); z-index:1; }
 .blk-badge .ic { width:1.05rem; height:1.05rem; stroke-width:1.8; }
 .blk-badge.deep { background:var(--deep); color:var(--brand); border-color:var(--deep); }
 .blk-badge.brand { background:var(--brand); color:var(--ink); border-color:var(--brand); }
@@ -79,7 +79,7 @@ section.sec > .sec-head, .sec:nth-of-type(n) > .sec-head { position:static; min-
 
 /* ---- 首頁模式卡：箭頭圓鈕坐進右上缺角 ---- */
 .mode-card, .mode-card.accent, .mode-card.log, .mode-card.brief, .mode-card.deck, .mode-card.drill { --blk-bg:var(--panel); --nw:62px; --nh:58px; --nr:16px; }
-.mode-card::after { top:9px; right:9px; width:40px; height:40px; background-color:#fff; border:1px solid var(--hairline-2); z-index:1; box-shadow:0 1px 2px rgba(40,34,20,.08); }
+.mode-card::after { top:9px; right:9px; width:40px; height:40px; background-color:var(--surface); border:1px solid var(--hairline-2); z-index:1; box-shadow:0 1px 2px rgba(40,34,20,.08); }
 .mode-card:hover::after { background-color:var(--brand); border-color:var(--brand); }
 
 /* ---- 症狀紀錄：日曆卡「今天」膠囊扣進右上缺角 ---- */
@@ -89,7 +89,7 @@ section.sec > .sec-head, .sec:nth-of-type(n) > .sec-head { position:static; min-
 .slog-cal .slog-today:hover { background:var(--deep-2); color:var(--brand); }
 
 /* ---- 日曆格：有邀約成效的日子，右上缺一小角，缺角裡坐一枚純色方塊（綠＝同意 ≥2、紅＝同意 0） ---- */
-.slog-cell.blk, .slog-cell.blk.selected, .slog-cell.blk:hover { --blk-bg:#fff; --nw:22px; --nh:22px; --nr:6px; background:transparent; border-color:transparent; box-shadow:none; }
+.slog-cell.blk, .slog-cell.blk.selected, .slog-cell.blk:hover { --blk-bg:var(--surface); --nw:22px; --nh:22px; --nr:6px; background:transparent; border-color:transparent; box-shadow:none; }
 .slog-cell.blk.selected { --blk-bg:var(--deep); }
 .slog-cell.blk::before { box-shadow:inset 0 0 0 1px var(--hairline); }
 .slog-cell.blk:hover::before { box-shadow:inset 0 0 0 1px var(--hairline-2); }
@@ -105,10 +105,10 @@ section.sec > .sec-head, .sec:nth-of-type(n) > .sec-head { position:static; min-
 .slog-funnel-head .slog-count { margin-right:auto; }
 
 /* ---- 漏斗步驟：圖示徽章坐進右上缺角；最後一步（結果 KPI）反白 ---- */
-.slog-step { --blk-bg:#fff; --nw:46px; --nh:42px; --nr:12px; padding:12px 14px; }
+.slog-step { --blk-bg:var(--surface); --nw:46px; --nh:42px; --nr:12px; padding:12px 14px; }
 .slog-step > .slog-step-n { padding-right:40px; }
 .slog-step-ic { display:none; }
-.slog-step > .blk-badge { top:3px; right:3px; width:34px; height:34px; background:#fff; color:var(--text-2); }
+.slog-step > .blk-badge { top:3px; right:3px; width:34px; height:34px; background:var(--surface); color:var(--text-2); }
 .slog-step > .blk-badge .ic { width:1rem; height:1rem; }
 .slog-step:last-child { --blk-bg:var(--deep); }
 .slog-step:last-child .blk-badge { background:var(--brand); color:var(--ink); border-color:var(--brand); }
@@ -133,11 +133,11 @@ section.sec > .sec-head, .sec:nth-of-type(n) > .sec-head { position:static; min-
 /* ---- 分析報告：五字口訣堆疊——一列積木，點哪張哪張浮起並扣進下方細節卡 ---- */
 .purpose-stack { display:grid; grid-template-columns:repeat(5, minmax(0,1fr)); gap:6px; margin:0 0 10px; }
 .purpose-tab { position:relative; display:flex; flex-direction:column; align-items:flex-start; justify-content:flex-start; gap:4px; min-height:60px; padding:10px 24px 8px 10px;
-  border-radius:14px; border:1px solid var(--hairline); background:#fff; color:var(--ink);
+  border-radius:14px; border:1px solid var(--hairline); background:var(--surface); color:var(--ink);
   font-family:var(--disp); font-weight:700; font-size:.9rem; letter-spacing:0; line-height:1.3; text-align:left; cursor:pointer;
   transition:transform .4s var(--ease-spring, ease), background-color .2s, color .2s, border-color .2s, box-shadow .3s; }
 .purpose-tab.miss { background:var(--panel2); color:var(--text-2); border-color:transparent; }
-.purpose-tab:hover { transform:translateY(-2px); background:#fff; border-color:var(--hairline-2); color:var(--ink); }
+.purpose-tab:hover { transform:translateY(-2px); background:var(--surface); border-color:var(--hairline-2); color:var(--ink); }
 .purpose-tab.on, .purpose-tab.on:hover { background:var(--deep); color:var(--on-deep); border-color:var(--deep); transform:translateY(-4px); box-shadow:0 12px 22px -14px rgba(23,21,15,.55); }
 .purpose-tab.on::after { content:""; position:absolute; left:50%; bottom:-6px; width:12px; height:12px; border-radius:2px; background:var(--deep); transform:translateX(-50%) rotate(45deg); }
 .purpose-tab .purpose-badge { margin:0; padding:1px 7px; border-radius:999px; font-family:var(--sans); font-size:.6rem; font-weight:600; letter-spacing:0; background:var(--brand-soft); color:#6b5200; }
@@ -148,7 +148,7 @@ section.sec > .sec-head, .sec:nth-of-type(n) > .sec-head { position:static; min-
 .purpose-tab.miss .purpose-dot { background:transparent; box-shadow:inset 0 0 0 1.5px var(--hairline-2); }
 .purpose-tab.on .purpose-dot { box-shadow:none; }
 .purpose-tab.on.miss .purpose-dot { box-shadow:inset 0 0 0 1.5px rgba(255,255,255,.35); }
-.purpose-detail { --blk-bg:#fff; --nw:132px; --nh:44px; --nr:14px; margin:0 0 14px; padding:52px 16px 14px; border-radius:16px; font-size:.84rem; line-height:1.65; text-align:left; }
+.purpose-detail { --blk-bg:var(--surface); --nw:132px; --nh:44px; --nr:14px; margin:0 0 14px; padding:52px 16px 14px; border-radius:16px; font-size:.84rem; line-height:1.65; text-align:left; }
 .purpose-detail > .blk-pill { left:4px; top:4px; gap:8px; }
 .purpose-pill-role { font-family:var(--sans); font-size:.62rem; font-weight:600; color:var(--brand); }
 .purpose-detail .purpose-desc { margin:0 0 8px; color:var(--text-2); font-size:.8rem; }

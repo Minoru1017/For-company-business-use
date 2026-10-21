@@ -112,7 +112,7 @@ body.sidebar-collapsed .app-sidebar-toggle:hover { transform:rotate(180deg); }
   .app-shell { grid-template-columns:minmax(0,1fr); }
   body.sidebar-collapsed .app-shell { grid-template-columns:minmax(0,1fr); }
   .app-topbar { position:sticky; top:0; z-index:40; display:grid; grid-template-columns:auto minmax(0,1fr) auto; align-items:center; gap:var(--s2);
-    height:var(--topbar-h); padding:0 var(--s2); background:#fff; backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);
+    height:var(--topbar-h); padding:0 var(--s2); background:var(--surface); backdrop-filter:blur(12px); -webkit-backdrop-filter:blur(12px);
     border-bottom:1px solid var(--border); }
   .app-topbar-btn { width:40px; height:40px; padding:0; border:none; border-radius:4px; background:transparent; color:var(--text); font-size:1.15rem; box-shadow:none; }
   .app-topbar-btn:hover { background:rgba(27,27,26,0.048); transform:none; box-shadow:none; }
