@@ -16,11 +16,11 @@ function deidentifyPlugin() {
   };
 }
 
-export default defineConfig(({ command, mode }) => {
+export default defineConfig(({ mode }) => {
   const isPublic = mode === 'public';
   return {
-    // GitHub Pages: /For-company-business-use/  |  本機開 dist/ 與公開版: ./
-    base: command === 'build' && process.env.GITHUB_ACTIONS && !isPublic ? '/For-company-business-use/' : './',
+    // 一律用相對路徑，dist/ 可直接開、vite preview 也能跑；GitHub Pages 在 deploy-pages.yml 以 --base=/For-company-business-use/ 指定
+    base: './',
     plugins: isPublic ? [deidentifyPlugin()] : [],
     build: {
       outDir: isPublic ? 'dist-public' : 'dist',
