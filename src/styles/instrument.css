@@ -166,7 +166,7 @@ select option { background:var(--panel2); color:var(--text); }
 .rule-verdict.fail, .rule-card.fail .rule-verdict { color:var(--bad); }
 
 /* ---- 單通計分卡：一件事 → 四個數字 → 六步驟 → 說話者時間軸 ---- */
-section.sec.cs-sec { border-top:0; padding-top:8px; }
+section.sec.cs-sec { margin-top:24px; padding-top:32px; }
 .cs-kicker { margin:0; font-size:.85rem; color:var(--muted); }
 .cs-change { margin:8px 0 0; max-width:24em; font-size:clamp(1.3rem,2.3vw,1.75rem); font-weight:700; line-height:1.45; color:var(--text); }
 .cs-why { margin:10px 0 0; max-width:40em; font-size:.88rem; line-height:1.65; color:var(--muted); }
