@@ -57,12 +57,13 @@ describe('onboarding steps', () => {
   it('opens with a centred welcome and ends on the replay button', () => {
     expect(TOURS.home[0].target).toBeUndefined();
     expect(TOURS.home.at(-1).target).toBe('#onboardingHomeBtn');
-    expect(TOURS.workspace.at(-1).target).toBe('#onboardingSidebarBtn');
+    expect(TOURS.workspace.at(-1).target).toEqual(['#onboardingSidebarBtn', '#sidebarMenu']);
   });
 
   it('tailors the workspace steps to the current mode', () => {
     const sections = TOURS.workspace.find((s) => s.id === 'sections');
-    expect(resolveStep(sections, 'drill').target).toBe('#drillSection .sec-head');
+    expect(resolveStep(sections, 'drill').targets).toEqual(['#drillSection .sec-head']);
+    expect(resolveStep(TOURS.home[0]).targets).toEqual([]);
     const tip = TOURS.workspace.find((s) => s.id === 'mode-tip');
     expect(resolveStep(tip, 'log').body).toContain('心智圖');
     expect(resolveStep(tip, 'deck').body).toContain('PPTX');

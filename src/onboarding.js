@@ -87,9 +87,9 @@ export const TOURS = {
   workspace: [
     {
       id: 'mode-bar',
-      target: '#modeBar',
+      target: ['#modeBar', '#sidebarMenu'],
       title: '左側切換模式',
-      body: '<p>六個工作模式都在這裡，隨時切換，不必回首頁。按最上方的 CALL COACH 可以回到首頁。</p>',
+      body: '<p>六個工作模式都在側欄，隨時切換，不必回首頁；按最上方的 CALL COACH 回到首頁。手機上側欄收在左上角的 ☰ 選單裡。</p>',
     },
     {
       id: 'mode-tip',
@@ -105,21 +105,21 @@ export const TOURS = {
     },
     {
       id: 'recent',
-      target: '.app-sidebar-recent',
+      target: ['.app-sidebar-recent', '#sidebarMenu'],
       title: '最近項目',
       body: '<p>分析過的逐字稿會留在這裡，可以搜尋、點一下重新打開；「新增逐字稿」會清空目前畫面重新開始。</p>',
     },
     {
       id: 'backup',
-      target: '.app-sidebar-foot',
+      target: ['.app-sidebar-foot', '#sidebarMenu'],
       title: '備份、雲端與清空',
       body: '<p>資料只存在這台瀏覽器。定期「備份／還原」匯出一份檔案；「清空紀錄」會刪除這台裝置上的資料，按之前請先備份。</p>',
     },
     {
       id: 'replay',
-      target: '#onboardingSidebarBtn',
+      target: ['#onboardingSidebarBtn', '#sidebarMenu'],
       title: '隨時可以重看',
-      body: '<p>按「新手教學」可以重看這段說明。祝今天的電話順利！</p>',
+      body: '<p>側欄底部的「新手教學」可以重看這段說明。祝今天的電話順利！</p>',
     },
   ],
 };
@@ -165,10 +165,20 @@ export function resetTours(storage = defaultStorage()) {
   }
 }
 
-/** 步驟裡可以是字串或依目前模式產生的函式 */
+/** 步驟欄位可以是字串或依目前模式產生的函式；target 可給多個，依序取第一個看得到的 */
 export function resolveStep(step, mode = '') {
   const v = (x) => (typeof x === 'function' ? x(mode) : x);
-  return { id: step.id, target: v(step.target) || '', title: v(step.title) || '', body: v(step.body) || '' };
+  const target = v(step.target) || [];
+  return { id: step.id, targets: Array.isArray(target) ? target : [target], title: v(step.title) || '', body: v(step.body) || '' };
+}
+
+function findTarget(selectors) {
+  for (const sel of selectors) {
+    const el = document.querySelector(sel);
+    const rect = usableRect(el);
+    if (rect) return { el, rect };
+  }
+  return { el: null, rect: null };
 }
 
 /* ---------- 位置 ---------- */
@@ -245,9 +255,7 @@ export function startTour(id, { mode = '', storage = defaultStorage(), onClose }
   let raf = 0;
 
   const position = () => {
-    const step = resolveStep(steps[state.index], mode);
-    const el = step.target ? document.querySelector(step.target) : null;
-    const rect = usableRect(el);
+    const { rect } = findTarget(resolveStep(steps[state.index], mode).targets);
     root.classList.toggle('ob-centered', !rect);
     if (rect) {
       const pad = 6;
@@ -281,9 +289,8 @@ export function startTour(id, { mode = '', storage = defaultStorage(), onClose }
     root.querySelectorAll('.ob-dots i').forEach((d, i) => d.classList.toggle('on', i <= state.index));
     root.querySelector('[data-ob="prev"]').hidden = state.index === 0;
     root.querySelector('[data-ob="skip"]').hidden = last;
-    root.querySelector('[data-ob="next"]').textContent = last ? '完成' : state.index === 0 ? '開始導覽' : '下一步';
-    const el = step.target ? document.querySelector(step.target) : null;
-    const rect = usableRect(el);
+    root.querySelector('[data-ob="next"]').textContent = last ? '完成' : step.targets.length ? '下一步' : '開始導覽';
+    const { el, rect } = findTarget(step.targets);
     if (rect && (rect.top < 0 || rect.top + Math.min(rect.height, 160) > window.innerHeight)) {
       el.scrollIntoView({ block: rect.fullHeight ? 'start' : 'center' });
     }
