@@ -33,14 +33,14 @@ body::after  { background:radial-gradient(circle at 40% 40%, rgba(132,147,168,.1
 
 /* ---- 玻璃面板改霧藍 ---- */
 .card, .report-shell, #drop, #labelList, .quota-box, .stats {
-  background:#fff;
+  background:var(--surface);
   border:1px solid rgba(27,27,26,0.072);
 }
-.stat { background:#fff; }
+.stat { background:var(--surface); }
 .step, .layer, .rule-card, .purpose-card, .purpose-playbook, .bridge-mode-panel,
 .bridge-log-panel, .bridge-wait-progress, .demo-offline, .field, .bridge-token, .bridge-file,
 .bridge-advanced, .bridge-team, .bridge-team-text {
-  background:#fff; border-color:var(--border);
+  background:var(--surface); border-color:var(--border);
 }
 .bridge-log, .bridge-path, .demo-guide-tree { background:#141a22; }
 
@@ -132,7 +132,7 @@ button.primary { background:linear-gradient(180deg,#f3efe4,#d9d2c1); color:var(-
 button.primary:hover { background:linear-gradient(180deg,#ffffff,#e6e0d1);
   box-shadow: inset 0 1px 0 #fff, 0 14px 28px -10px rgba(220,213,196,.45); }
 .demo-guide-btn { border-radius:4px; background:var(--tab-paper); color:var(--ink); }
-.demo-guide-btn:hover { background:#fff; }
+.demo-guide-btn:hover { background:var(--surface); }
 
 /* ---- 說話者標籤：業務=紙色、客戶=朱紅 ---- */
 .seg.s .who .b-s { background:var(--tab-paper); color:var(--ink); border-color:var(--tab-paper); box-shadow:none; }
@@ -166,4 +166,4 @@ button.primary:hover { background:linear-gradient(180deg,#ffffff,#e6e0d1);
 .sec-head .num { color:var(--ink); }
 
 /* Toast */
-#toast { border-radius:4px; background:#fff; border-color:rgba(27,27,26,0.128); }
+#toast { border-radius:4px; background:var(--surface); border-color:rgba(27,27,26,0.128); }

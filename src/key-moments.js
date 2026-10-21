@@ -11,15 +11,15 @@ const EXTENDED_PROBES = [
 ];
 
 const MOMENT_COLORS = {
-  l1: 'rgba(90, 160, 120, 0.18)',
-  l2: 'rgba(90, 160, 120, 0.22)',
-  l3: 'rgba(100, 175, 130, 0.26)',
-  l4: 'rgba(110, 185, 140, 0.30)',
-  l5: 'rgba(120, 195, 150, 0.34)',
-  converge: 'rgba(80, 150, 220, 0.28)',
-  amplify: 'rgba(255, 170, 60, 0.28)',
-  discovery: 'rgba(90, 160, 120, 0.20)',
-  trust: 'rgba(200, 120, 220, 0.30)',
+  l1: 'rgba(143, 191, 150, 0.08)',
+  l2: 'rgba(143, 191, 150, 0.10)',
+  l3: 'rgba(143, 191, 150, 0.12)',
+  l4: 'rgba(143, 191, 150, 0.14)',
+  l5: 'rgba(143, 191, 150, 0.16)',
+  converge: 'rgba(214, 181, 106, 0.12)',
+  amplify: 'rgba(214, 181, 106, 0.12)',
+  discovery: 'rgba(143, 191, 150, 0.10)',
+  trust: 'rgba(143, 191, 150, 0.22)',
 };
 
 const TRUST_DETAIL = '信任突破：客戶第一次說出私人／動機層資訊——前一句就是打開他的問法';
@@ -135,5 +135,5 @@ export function momentBarHighlight(segs, moments) {
     highlighted.add(m.startIdx);
     highlighted.add(m.endIdx);
   });
-  return segs.map((_, i) => (highlighted.has(i) ? 'rgba(255, 210, 80, 0.95)' : 'transparent'));
+  return segs.map((_, i) => (highlighted.has(i) ? 'rgba(239, 236, 230, 0.9)' : 'transparent'));
 }

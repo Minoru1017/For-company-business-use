@@ -17,7 +17,7 @@
   --accent:#b9901c;
   --ok:#2f7d5b; --warn:#9a6b12; --bad:#bb3a24;
   --tint-ok:#eef3ef; --line-ok:#cfdcd2; --tint-warn:#f5f0e3; --line-warn:#e3d6b7; --tint-alert:#f6efe6; --line-alert:#e7d4bf; --tint-bad:#f6ecea; --line-bad:#e6c5bf;
-  --tab-paper:var(--ink);
+  --tab-paper:var(--ink); --surface:#fff;
   --soft-shadow:0 1px 0 rgba(255,255,255,.9) inset, 0 1px 2px rgba(40,34,20,.04), 0 14px 34px -24px rgba(40,34,20,.32);
 }
 
@@ -39,7 +39,7 @@
 
 /* ---- 資料視覺：主要量用墨色，軌道用髮絲灰 ---- */
 .slog-step-bar, .slog-storage-bar, .slog-sym-bar, .bridge-progress, .wait-bar, .cp-bar i { background:var(--hairline); }
-.slog-step-bar i, .slog-storage-bar i, .slog-sym-bar div, .bridge-progress div { background:var(--ink); }
+.slog-step-bar i, .slog-storage-bar i, .slog-sym-bar div, .bridge-progress div { background:var(--deep); }
 .slog-step-ic, .slog-week-k .ic, .slog-storage .ic, .slog-ice-stats > .ic { color:var(--muted); }
 .slog-drill-spark polyline { stroke:var(--ink); }
 .slog-drill-spark circle { fill:var(--ink); }
@@ -54,14 +54,14 @@
 .slog-step:last-child .slog-step-bar i { background:var(--brand); }
 
 /* ---- 日曆：選取＝墨色；今天＝黃色短底線；邀約成效＝缺角裡一枚純色方塊（見 blocks.css） ---- */
-.slog-cell { background:#fff; }
+.slog-cell { background:var(--surface); }
 .slog-cell.today .slog-cell-d { color:var(--ink); font-weight:800; box-shadow:inset 0 -3px 0 var(--brand); }
 .slog-cell.selected, .slog-cell.invite-good.selected, .slog-cell.invite-zero.selected { background:var(--deep); border-color:var(--deep); color:var(--on-deep); box-shadow:none; }
 .slog-cell.selected .slog-cell-d, .slog-cell.selected .slog-cell-n, .slog-cell.selected .slog-cell-inv,
 .slog-cell.invite-good.selected .slog-cell-d, .slog-cell.invite-good.selected .slog-cell-inv, .slog-cell.invite-good.selected .slog-cell-n,
 .slog-cell.invite-zero.selected .slog-cell-d, .slog-cell.invite-zero.selected .slog-cell-n { color:var(--on-deep); }
 .slog-cell.selected.today .slog-cell-d { color:var(--brand); box-shadow:none; }
-.slog-cell.invite-good, .slog-cell.invite-zero { background:#fff; border-color:var(--hairline); box-shadow:none; }
+.slog-cell.invite-good, .slog-cell.invite-zero { background:var(--surface); border-color:var(--hairline); box-shadow:none; }
 .slog-cell.invite-good .slog-cell-d, .slog-cell.invite-good .slog-cell-inv { color:var(--ink); }
 .slog-cell.invite-zero .slog-cell-d { color:var(--ink); }
 .slog-cell.start, .slog-cell-start { border-color:var(--hairline-2); color:var(--muted); }
@@ -72,9 +72,9 @@
 
 /* ---- 選取狀態：白底＋墨色外框，不用黃底 ---- */
 .dev-audio-engine.active, .bridge-file.on, .drill-opt.on, .drill-persona.on, .drill-choices button.on, .slog-self-item.on {
-  background:#fff; border-color:var(--ink); box-shadow:inset 0 0 0 1px var(--ink);
+  background:var(--surface); border-color:var(--ink); box-shadow:inset 0 0 0 1px var(--ink);
 }
-.slog-filter.on { border-color:var(--ink); color:var(--ink); background:#fff; box-shadow:inset 0 0 0 1px var(--ink); }
+.slog-filter.on { border-color:var(--ink); color:var(--ink); background:var(--surface); box-shadow:inset 0 0 0 1px var(--ink); }
 .slog-follow-opt.on { border-color:var(--ink); color:var(--ink); box-shadow:inset 0 0 0 1px var(--ink); }
 .app-sidebar-item.current, .cp-due, .backup-strip { background:var(--panel2); }
 .brief-theme, .coach-directives { background:var(--panel2); border-left-color:var(--brand); }
@@ -99,7 +99,7 @@
 .slog-sym-streak { background:transparent; }
 
 /* ---- 作戰儀表板：裝飾線改墨色；序號用淡墨 ---- */
-.slog-plan::before { background:var(--ink); }
+.slog-plan::before { background:var(--deep); }
 .slog-plan-kicker { color:var(--muted); }
 .slog-plan-subhead > span { color:var(--hairline-2); -webkit-text-stroke:1px var(--text-2); }
 .slog-plan-state.met { border-color:var(--ok); color:var(--ok); }
@@ -112,7 +112,7 @@
 
 /* ---- 心智圖根節點：去掉紅底 ---- */
 .mm-root { border-color:var(--ink); background:var(--panel2); }
-.mm-tab.active::before { background:var(--ink); }
+.mm-tab.active::before { background:var(--deep); }
 .slog-sym.common { border-color:var(--ink); box-shadow:inset 0 0 0 1px var(--ink); }
 
 /* ---- 主要按鈕保持墨底黃字；次要按鈕白底髮絲線；<a class="btn"> 與 <button> 同尺寸、不帶底線 ---- */
@@ -129,7 +129,7 @@ button.primary, .btn.primary { border-color:var(--deep); background:var(--deep);
 @keyframes wiz-pulse { 0%, 100% { opacity:1; transform:scale(1); } 50% { opacity:.3; transform:scale(.7); } }
 .demo-offline > .hint { margin:6px 0 0; }
 .setup-wizard-steps { list-style:none; margin:14px 0 0; padding:0; display:flex; flex-direction:column; gap:12px; counter-reset:wiz; }
-.setup-wizard-steps > li.wiz-step { position:relative; margin:0; padding:16px 18px 16px 56px; background:#fff; border:1px solid var(--hairline); border-radius:var(--r-field); }
+.setup-wizard-steps > li.wiz-step { position:relative; margin:0; padding:16px 18px 16px 56px; background:var(--surface); border:1px solid var(--hairline); border-radius:var(--r-field); }
 .wiz-step::before { counter-increment:wiz; content:counter(wiz); position:absolute; top:14px; left:16px; width:26px; height:26px; display:grid; place-items:center;
   border-radius:50%; background:var(--panel2); color:var(--text-2); font-family:var(--mono); font-size:.72rem; font-weight:700; }
 .wiz-primary::before { background:var(--deep); color:var(--brand); }
@@ -159,7 +159,7 @@ button.primary, .btn.primary { border-color:var(--deep); background:var(--deep);
 .browser-worker .bridge-upload-status { margin:12px 0 0; }
 .browser-worker .bridge-token + .bridge-upload-status { margin:0 0 8px; }
 .bw-progress { height:6px; margin:8px 0 0; overflow:hidden; border-radius:99px; background:#e4dfd3; }
-.bw-progress > div { height:100%; width:0; border-radius:99px; background:var(--ink); transition:width .25s var(--ease-out, ease); }
+.bw-progress > div { height:100%; width:0; border-radius:99px; background:var(--deep); transition:width .25s var(--ease-out, ease); }
 .bw-progress.indeterminate > div { animation:bw-slide 1.4s var(--ease-in-out, ease-in-out) infinite; }
 @keyframes bw-slide { from { transform:translateX(-100%); } to { transform:translateX(260%); } }
 .bw-log { margin:10px 0 0; padding:10px 12px; max-height:160px; overflow:auto; white-space:pre-wrap; word-break:break-all;
@@ -181,11 +181,11 @@ button.primary, .btn.primary { border-color:var(--deep); background:var(--deep);
 .drill-who em { margin-top:1px; font-family:var(--mono); font-size:.62rem; color:var(--text-2); font-variant-numeric:tabular-nums; }
 .drill-text { padding:10px 14px 9px; font-size:.92rem; line-height:1.65; letter-spacing:.005em; }
 .drill-log .drill-msg.s .drill-text { background:var(--deep); color:var(--on-deep); border:none; border-radius:18px 18px 4px 18px; }
-.drill-log .drill-msg.c .drill-text { background:#fff; color:var(--ink); border:1px solid var(--hairline); border-radius:18px 18px 18px 4px; }
+.drill-log .drill-msg.c .drill-text { background:var(--surface); color:var(--ink); border:1px solid var(--hairline); border-radius:18px 18px 18px 4px; }
 .drill-log .drill-msg.c.k-objection .drill-text, .drill-log .drill-msg.c.k-pressure .drill-text, .drill-log .drill-msg.c.k-pushback .drill-text,
 .drill-log .drill-msg.c.k-deflect .drill-text, .drill-log .drill-msg.c.k-repeat .drill-text, .drill-log .drill-msg.c.k-vague .drill-text {
-  background:#fff; color:var(--ink); border-color:var(--hairline); box-shadow:inset 3px 0 0 var(--warn); }
-.drill-log .drill-msg.c.k-hangup .drill-text { background:#fff; color:var(--ink); border-color:var(--hairline); box-shadow:inset 3px 0 0 var(--bad); }
+  background:var(--surface); color:var(--ink); border-color:var(--hairline); box-shadow:inset 3px 0 0 var(--warn); }
+.drill-log .drill-msg.c.k-hangup .drill-text { background:var(--surface); color:var(--ink); border-color:var(--hairline); box-shadow:inset 3px 0 0 var(--bad); }
 .drill-log .drill-msg.s.blank .drill-text { background:transparent; color:var(--bad); border:1px dashed var(--line-bad); font-style:normal; }
 .drill-flags { gap:6px; margin-top:8px; }
 .drill-flag { padding:2px 8px; border:none; border-radius:999px; font-family:var(--sans); font-size:.66rem; font-weight:600; letter-spacing:0; background:var(--panel2); color:var(--text-2); }

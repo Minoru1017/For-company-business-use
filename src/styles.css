@@ -17,3 +17,4 @@
 @import './styles/tone.css'; /* 色調層級：墨／次／註三階文字、表面三階、品牌黃只做優先訊號、狀態色降飽和 */
 @import './styles/blocks.css'; /* 積木版面：缺角放徽章／膠囊、章節序號與模式卡箭頭坐進缺角、近 7 天列扣合（最後載入） */
 @import './styles/motion.css'; /* 動態層：進場編排、懸停／按壓微互動、選取回饋、尊重 reduced-motion（最後載入） */
+@import './styles/instrument.css'; /* 儀表層：近黑畫布、平面表面、三種語意色（綠做到／琥珀部分／紅沒做到）、等寬數字（最後載入） */

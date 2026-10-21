@@ -70,15 +70,15 @@ body::after { width:420px; height:420px; bottom:-120px; left:-120px;
   background:radial-gradient(circle at 40% 40%, rgba(90,85,80,.13), rgba(30,30,30,.04) 60%, transparent 75%); }
 
 .card, .report-shell, #drop, #labelList, .quota-box, .stats {
-  background:#fff;
+  background:var(--surface);
   backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px);
   border:1px solid rgba(27,27,26,0.056);
   box-shadow: inset 0 1px 0 rgba(255,255,255,.06),
               inset 0 -1px 0 rgba(0,0,0,.4),
               0 24px 48px -24px rgba(0,0,0,.75);
 }
-.stat { background:#fff; }
-.step, .layer { background:#fff;
+.stat { background:var(--surface); }
+.step, .layer { background:var(--surface);
   backdrop-filter:blur(10px); -webkit-backdrop-filter:blur(10px);
   box-shadow: inset 0 1px 0 rgba(255,255,255,.05), 0 10px 22px -14px rgba(0,0,0,.7);
   transition:transform .18s ease, box-shadow .18s ease, border-color .18s; }
@@ -104,7 +104,7 @@ button.primary { background:linear-gradient(180deg, #ff5f45, #e63d26);
 button.primary:hover { background:linear-gradient(180deg, #ff6c52, #f04830);
   box-shadow: inset 0 1px 0 rgba(255,255,255,.3), 0 12px 26px -8px rgba(255,75,51,.65); }
 .rtab, .rnav-btn, .rtab:hover, .rnav-btn:hover { background:transparent; box-shadow:none; transform:none; }
-.rtab.active { background:#fff; box-shadow: inset 0 1px 0 rgba(255,255,255,.05); }
+.rtab.active { background:var(--surface); box-shadow: inset 0 1px 0 rgba(255,255,255,.05); }
 .seg.s .who .b-s { background:var(--text); box-shadow:0 2px 8px -2px rgba(255,255,255,.25); }
 .seg.c .who .b-c { background:linear-gradient(180deg,#ff5f45,#e63d26);
   box-shadow:0 2px 8px -2px rgba(255,75,51,.5); }
@@ -127,7 +127,7 @@ button.primary:hover { background:linear-gradient(180deg, #ff6c52, #f04830);
 
 /* Toast 回饋 */
 #toast { position:fixed; left:50%; bottom:34px; transform:translateX(-50%) translateY(20px);
-  background:#fff; backdrop-filter:blur(12px);
+  background:var(--surface); backdrop-filter:blur(12px);
   border:1px solid rgba(27,27,26,0.096); color:var(--text);
   border-radius:99px; padding:11px 24px; font-size:.85rem; letter-spacing:.05em;
   opacity:0; pointer-events:none; transition:.28s ease; z-index:200;

@@ -1,7 +1,7 @@
 /* ---- 把結果帶走：匯出列 ---- */
 .export-bar { display:flex; flex-direction:column; gap:12px; }
 .export-group { display:flex; flex-wrap:wrap; align-items:center; gap:8px; padding:12px 14px;
-  background:#fff; border:1px solid var(--border); border-radius:6px; }
+  background:var(--surface); border:1px solid var(--border); border-radius:6px; }
 .export-group[hidden] { display:none; }
 .export-label { font-family:var(--mono); font-size:.62rem; letter-spacing:.2em; color:var(--muted); min-width:110px; text-transform:uppercase; }
 .export-group button { font-size:.8rem; padding:8px 16px; }
@@ -153,7 +153,7 @@
 .history-hint { margin:0 0 0 auto; }
 .history-list { list-style:none; margin:12px 0 0; padding:0; display:flex; flex-direction:column; gap:6px; }
 .history-item { display:flex; align-items:center; gap:12px; flex-wrap:wrap; padding:10px 12px;
-  background:#fff; border:1px solid var(--border); border-radius:6px; font-size:.82rem; }
+  background:var(--surface); border:1px solid var(--border); border-radius:6px; font-size:.82rem; }
 .history-item.current { border-color:var(--warn); }
 .history-main { display:flex; flex-direction:column; gap:2px; flex:1; min-width:200px; }
 .history-src { color:var(--text); font-weight:600; word-break:break-all; }
