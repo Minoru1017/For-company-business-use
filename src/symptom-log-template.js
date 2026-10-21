@@ -108,6 +108,13 @@ export function symptomLogTemplate() {
     </details>
 
     <div class="slog-day" id="slDay" hidden>
+      <nav class="slog-jump" aria-label="當天區塊">
+        <button type="button" data-jump-to=".slog-funnel">漏斗</button>
+        <button type="button" data-jump-to=".slog-calls">錄音<span class="slog-jump-n" id="slJumpCalls"></span></button>
+        <button type="button" data-jump-to=".slog-mindmap">心智圖</button>
+        <button type="button" data-jump-to=".slog-agg">共同病症</button>
+        <button type="button" data-jump-to=".slog-note">改善筆記</button>
+      </nav>
       <div class="card slog-funnel blk blk-tl">
         <h2 class="blk-pill" id="slDayTitle"></h2>
         <div class="slog-funnel-head"><span class="slog-count">當日漏斗</span>${info('<b>留存率</b>＝超過 N 分通 ÷ 接通（破冰留客）。<b>邀約率</b>＝進邀約（客戶同意時間）÷ 超過 N 分通。Demo 與承攬會帶入本月作戰儀表板。', '公式')}</div>
@@ -229,6 +236,14 @@ export function symptomLogTemplate() {
         <textarea data-note="free" rows="4" placeholder="其他觀察、當天心情、同事給的回饋……"></textarea>
         <div class="hint" id="slNoteSaved"></div>
       </div>
+
+      <aside class="slog-stage" id="slStage" aria-label="正在播放">
+        <div class="slog-stage-empty" id="slStageEmpty">
+          <p class="slog-stage-title">還沒選錄音</p>
+          <p class="hint">點左邊任一通錄音開始播放。播放中按 <kbd>M</kbd> 標記話點，播放器會一直留在這裡，往下寫筆記也能邊聽邊記。</p>
+        </div>
+        <div class="slog-stage-player" id="slPlayer" hidden></div>
+      </aside>
     </div>
   </div>
   `;

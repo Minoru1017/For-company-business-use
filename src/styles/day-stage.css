@@ -1,0 +1,94 @@
+/* =====================================================================
+   症狀紀錄「當天」：左欄放所有卡片，右欄固定放播放器＋話點（list-detail）。
+   錄音清單一通一列、話點一筆一列，高度只跟錄音通數有關，不跟話點數量長。
+   頂端跳轉列固定在畫面上方；右欄的 top 要讓出跳轉列的高度。
+   ===================================================================== */
+.slog-day { --jump-h:44px; --stage-w:380px; display:grid; grid-template-columns:minmax(0,1fr) var(--stage-w); column-gap:20px; align-items:start; }
+.slog-day[hidden] { display:none; }
+.slog-day > * { grid-column:1; min-width:0; }
+.slog-day > .card { scroll-margin-top:calc(var(--jump-h) + 12px); }
+
+/* ---- 跳轉列 ---- */
+.slog-jump { grid-column:1 / -1; position:sticky; top:0; z-index:5; display:flex; gap:4px; height:var(--jump-h); align-items:center;
+  margin:0 0 12px; padding:0 2px; background:var(--bg); border-bottom:1px solid var(--hairline); }
+.slog-jump button { padding:6px 12px; border:0; border-radius:4px; background:transparent; color:var(--muted); font-size:.82rem; font-weight:500; }
+.slog-jump button:hover { background:rgba(239,236,230,.06); color:var(--text); }
+.slog-jump-n { margin-left:2px; font-family:var(--num); font-size:.75rem; color:var(--faint); }
+
+/* ---- 右欄：固定在跳轉列下方，自己捲動 ---- */
+.slog-stage { grid-column:2; grid-row:2 / span 20; position:sticky; top:calc(var(--jump-h) + 12px); align-self:start;
+  max-height:calc(100vh - var(--jump-h) - 24px); overflow:auto; overscroll-behavior:contain;
+  padding:16px; background:var(--panel); border:1px solid var(--hairline); border-radius:var(--r-card); }
+.slog-stage.active { border-color:var(--hairline-2); }
+.slog-stage-title { margin:0 0 6px; font-size:.95rem; font-weight:700; color:var(--text); }
+.slog-stage-empty .hint { margin:0; line-height:1.7; }
+.slog-stage .ctp-bar { grid-template-columns:minmax(0,1fr) auto; grid-template-areas:"now tools" "main main"; padding:0 0 12px; border:0; border-bottom:1px solid var(--hairline); border-radius:0; background:transparent; }
+.slog-stage .ctp-now { grid-area:now; }
+.slog-stage .ctp-main { grid-area:main; }
+.slog-stage .ctp-tools { grid-area:tools; }
+.slog-stage .ctp-hint { margin:0; font-size:.72rem; color:var(--faint); }
+
+/* ---- 錄音清單：一通一列 ---- */
+.slog-list { gap:0; border-top:1px solid var(--hairline); }
+.slog-item, .slog-item.playing { grid-template-columns:auto minmax(0,1fr) auto auto auto; grid-template-areas:"check name tags status more";
+  gap:0 12px; min-height:44px; padding:6px 8px; background:transparent; border:0; border-bottom:1px solid var(--hairline); border-radius:0; box-shadow:none; }
+.slog-item:hover { background:rgba(239,236,230,.03); }
+.slog-item.playing { background:rgba(239,236,230,.05); box-shadow:inset 2px 0 0 var(--paper); }
+.slog-item-name { flex-wrap:nowrap; overflow:hidden; }
+.slog-item-file { min-width:0; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; word-break:normal; }
+.slog-item-time, .slog-item-dur { flex:0 0 auto; }
+.slog-item.playing .slog-item-file { color:var(--paper); }
+.slog-item-tags { flex-wrap:nowrap; overflow:hidden; max-width:220px; }
+.slog-item-tags .slog-tag { flex:0 0 auto; }
+.slog-item-status { font-family:var(--sans); letter-spacing:0; }
+.slog-item-more { grid-area:more; position:relative; }
+.slog-item-more > summary { list-style:none; width:28px; height:28px; display:grid; place-items:center; border-radius:4px; color:var(--muted); cursor:pointer; }
+.slog-item-more > summary::-webkit-details-marker { display:none; }
+.slog-item-more > summary:hover, .slog-item-more[open] > summary { background:rgba(239,236,230,.08); color:var(--text); }
+.slog-item-more > .slog-item-actions { position:absolute; right:0; top:32px; z-index:6; display:flex; flex-direction:column; align-items:stretch; gap:4px; min-width:132px;
+  padding:6px; background:var(--panel2); border:1px solid var(--hairline-2); border-radius:var(--r-field); animation:none; }
+.slog-item-more .slog-item-actions .btn { justify-content:flex-start; text-align:left; }
+.slog-item-size { padding:2px 6px; font-family:var(--num); font-size:.7rem; color:var(--faint); }
+
+/* ---- 話點：一筆一列，點了才編輯；超過上限就限高 ---- */
+.ctp-notes-head { display:flex; justify-content:space-between; align-items:center; min-height:24px; margin-top:4px; }
+.ctp-notes-count { font-size:.8rem; color:var(--muted); }
+.ctp-notes-toggle { padding:2px 8px; border:0; background:transparent; color:var(--text-2); font-size:.78rem; }
+.ctp-notes-toggle:hover { background:rgba(239,236,230,.06); }
+.ctp-notes { position:relative; gap:0; }
+.ctp-notes.capped { max-height:calc(6 * 38px); overflow:auto; overscroll-behavior:contain;
+  -webkit-mask:linear-gradient(#000 calc(100% - 18px), transparent); mask:linear-gradient(#000 calc(100% - 18px), transparent); }
+.ctp-notes.capped:has(.editing) { -webkit-mask:none; mask:none; }
+.ctp-note { flex-shrink:0; display:grid; grid-template-columns:44px minmax(0,1fr) auto; align-items:center; gap:6px; min-height:38px; padding:2px 0 2px 6px;
+  background:transparent; border:0; border-left:2px solid transparent; border-radius:0; }
+.ctp-note.sel { border-left-color:transparent; background:rgba(239,236,230,.04); }
+.ctp-note.now { border-left-color:var(--ok); }
+.ctp-note.now .ctp-jump { color:var(--ok); }
+.ctp-jump { padding:2px 0; border:0; background:none; font-family:var(--num); font-size:.75rem; color:var(--faint); text-align:left; }
+.ctp-jump:hover { background:none; color:var(--text); }
+.ctp-note-text { min-width:0; padding:6px 4px; border:0; border-radius:2px; background:transparent; color:var(--text); font-size:.85rem; font-weight:400;
+  text-align:left; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; cursor:text; }
+.ctp-note-text:hover { background:rgba(239,236,230,.05); }
+.ctp-note-text.empty { color:var(--faint); font-style:normal; }
+.ctp-del { width:26px; height:26px; padding:0; border:0; background:transparent; color:var(--faint); font-size:1rem; line-height:1; opacity:0; }
+.ctp-note:hover .ctp-del, .ctp-del:focus-visible { opacity:1; }
+.ctp-del:hover { background:var(--tint-bad); color:var(--bad); }
+.ctp-note.editing { grid-template-columns:44px minmax(0,1fr); align-items:start; padding:6px 0 8px 6px; border-left-color:var(--paper); background:rgba(239,236,230,.05); }
+.ctp-note.editing .ctp-jump { padding-top:8px; }
+.ctp-note.editing .ctp-text { min-height:60px; font-size:.85rem; resize:vertical; }
+.ctp-note.editing .ctp-done { grid-column:2; justify-self:end; margin-top:4px; }
+.ctp-empty { padding:8px 0; }
+.ctp-dot.now { background:var(--ok); }
+
+/* ---- 窄畫面：回到單欄，播放器排在錄音清單之後 ---- */
+@media (max-width:1180px) {
+  .slog-day { display:flex; flex-direction:column; }
+  .slog-day > * { order:3; width:100%; }
+  .slog-jump { order:0; }
+  .slog-day > .slog-funnel { order:1; }
+  .slog-day > .slog-self { order:1; }
+  .slog-day > .slog-calls { order:2; }
+  .slog-stage { order:2; position:static; max-height:none; margin-bottom:14px; }
+  .slog-item, .slog-item.playing { grid-template-columns:auto minmax(0,1fr) auto; grid-template-areas:"check name more" "check tags status"; }
+  .slog-item-tags { max-width:none; }
+}
