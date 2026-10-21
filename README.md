@@ -91,6 +91,30 @@ npm run smoke    # 建置後用瀏覽器開六個模式，確認無白屏／cons
 npm run check    # lint + test + smoke
 ```
 
+## 新手教學
+
+第一次打開網站會自動播放**首頁導覽**（品牌、上班日、今天面板、六個模式、資料與備份），第一次進入任一工作模式會播放**工作區導覽**（左側模式、該模式怎麼用、編號區塊、最近項目、備份）。可以略過，← → 換步、Esc 結束；之後按首頁右上或側欄底部的「新手教學」重看。是否看過存在這台瀏覽器的 `callCoachOnboarding`。
+
+## 去識別公開版
+
+要把專案給外部看時，用公開版：品牌、地點、帳號與網址都換成通用名稱，不內建任何雲端專案或試算表。
+
+| 原本 | 公開版 |
+| --- | --- |
+| 兩個品牌 | 甲品牌／乙品牌（代號 `branda`／`brandb`） |
+| GPU 主機所在地 | 遠端 GPU／GPU 主機（檔名改為 `gpuhost`） |
+| GitHub 帳號與 repo | `example-org/sales-call-coach` |
+| 內建 Supabase 專案與金鑰、預設 Google 試算表 | 空白，使用者在畫面上自行設定 |
+
+```bash
+npm run dev:public     # 用公開版文字開開發伺服器
+npm run build:public   # 建置網站到 dist-public/（首頁會標「公開版」）
+npm run check:public   # 建置 → 掃描 dist-public 有沒有識別資訊 → 冒煙測試
+npm run export:public  # 把整份原始碼去識別後輸出到 public-export/，並做同樣的掃描
+```
+
+所有替換規則與檢查清單都在 `scripts/deidentify-rules.mjs`（全專案唯一允許寫原始識別字的檔案；匯出時會換成空規則）。已列管的識別字若出現在規則替換不到的寫法，`tests/deidentify.test.js` 會失敗；要列管新的識別字（例如新品牌），在 `RULES` 加替換、在 `FORBIDDEN` 加檢查。PDF 等二進位檔無法逐字改寫，匯出時直接排除。CI 每個 PR 都會跑公開版檢查，並附上 `call-coach-public-site`、`call-coach-public-source` 兩個可下載的成品。
+
 ## 功能
 
 - 模式選擇：電訪分析 / DEMO 本機轉錄 / 臨場陪練
