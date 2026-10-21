@@ -203,7 +203,7 @@ export function symptomLogTemplate() {
       </div>
 
       <div class="card slog-mindmap">
-        <h2>話點心智圖 <span class="slog-count">表層 → 真意 → 證據</span>${info('資料來自播放器的 <kbd>M</kbd> 標記。每個話點拆成「客戶字面上說的」和「他真正想傳達的」；真意是推論，<strong>沒有原句或行為證據就只是「我覺得」</strong>，不能寫進複盤。每通錄音一個分頁、「總覽」看全天；節點可拖曳，位置會記住；點時間可回放該段。')}</h2>
+        <h2>話點心智圖 <span class="slog-count">表層 → 真意 → 證據</span>${info('資料來自播放器的 <kbd>M</kbd> 標記。每個話點拆成「客戶字面上說的」和「他真正想傳達的」；真意是推論，<strong>沒有原句或行為證據就只是「我覺得」</strong>，不能寫進複盤。「整理」一次處理一個話點（四個步驟），「全貌」看整張圖、只展開選中的話點；每通錄音一個分頁、「總覽」看全天；節點可拖曳，位置會記住；點時間可回放該段。')}</h2>
         <div id="slMindmap"></div>
       </div>
 

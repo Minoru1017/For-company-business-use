@@ -8,6 +8,10 @@ import {
   stepMarker,
   buildMindmap,
   evidenceStrength,
+  firstOpenStep,
+  markerKey,
+  missingSteps,
+  overflowTabs,
   normalizeEvidence,
   normalizeMarkerAnalysis,
   parseTimeInput,
@@ -130,7 +134,7 @@ describe('parseTimeInput', () => {
 });
 
 describe('buildMindmap', () => {
-  it('expands each marker into surface + intent + evidence branches, sorted by time', () => {
+  it('expands each marker into filled surface / intent branches only, sorted by time', () => {
     const g = buildMindmap([call()], { dayLabel: '10/02' });
     const types = g.nodes.map((n) => n.type);
     expect(g.nodes[0]).toMatchObject({ id: 'root', label: '10/02' });
@@ -140,9 +144,27 @@ describe('buildMindmap', () => {
     expect(markers.map((n) => n.sec)).toEqual([30, 95]);
     const intent = g.nodes.find((n) => n.id === 'in:c1:m2');
     expect(intent).toMatchObject({ parent: 'mk:c1:m2', label: '還不信任我', strength: { level: 'none' } });
-    expect(g.nodes.find((n) => n.id === 'nv:c1:m2')).toMatchObject({ type: 'noevidence', parent: 'in:c1:m2' });
-    expect(g.nodes.find((n) => n.id === 'sf:c1:m1')).toMatchObject({ empty: true, parent: 'mk:c1:m1' });
+    expect(g.nodes.find((n) => n.id === 'sf:c1:m2')).toMatchObject({ label: '我再考慮看看', parent: 'mk:c1:m2' });
+    expect(types).not.toContain('noevidence');
+    expect(g.nodes.some((n) => n.id === 'sf:c1:m1' || n.id === 'in:c1:m1')).toBe(false);
+    expect(g.nodes.find((n) => n.id === 'mk:c1:m1')).toMatchObject({ missing: ['surface', 'intent', 'evidence'], level: 'empty', expanded: true });
+    expect(g.nodes.find((n) => n.id === 'mk:c1:m2')).toMatchObject({ missing: ['evidence'], level: 'none' });
     expect(g.edges.every((e) => g.nodes.some((n) => n.id === e.from) && g.nodes.some((n) => n.id === e.to))).toBe(true);
+  });
+
+  it('only expands the focused marker and counts what the others hide', () => {
+    const g = buildMindmap([call()], { focus: markerKey('c1', 'm1') });
+    expect(g.nodes.find((n) => n.id === 'mk:c1:m1')).toMatchObject({ expanded: true, hiddenCount: 0 });
+    expect(g.nodes.find((n) => n.id === 'mk:c1:m2')).toMatchObject({ expanded: false, hiddenCount: 2 });
+    expect(g.nodes.some((n) => n.callId === 'c1' && n.markerId === 'm2' && n.type !== 'marker')).toBe(false);
+    const none = buildMindmap([call()], { focus: null });
+    expect(none.nodes.filter((n) => n.type === 'surface' || n.type === 'intent')).toHaveLength(0);
+  });
+
+  it('hangs evidence on the marker when the intent is still empty', () => {
+    const c = call({ devMarkers: [{ id: 'm1', sec: 30, text: 't', evidence: [{ id: 'e1', text: '我再考慮', sec: 31 }] }] });
+    const ev = buildMindmap([c]).nodes.find((n) => n.type === 'evidence');
+    expect(ev).toMatchObject({ parent: 'mk:c1:m1', depth: 3 });
   });
 
   it('renders evidence nodes with time and speaker', () => {
@@ -172,23 +194,31 @@ describe('autoLayout', () => {
     expect(positions.root.x).toBe(0);
     expect(positions['call:c1'].x).toBe(100);
     expect(positions['mk:c1:m1'].x).toBe(200);
-    expect(positions['sf:c1:m1'].x).toBe(300);
-    expect(positions['nv:c1:m2'].x).toBe(400);
+    expect(positions['sf:c1:m2'].x).toBe(300);
+    expect(positions['in:c1:m2'].x).toBe(300);
     const leafYs = g.nodes.filter((n) => !g.edges.some((e) => e.from === n.id)).map((n) => positions[n.id].y);
     expect(new Set(leafYs).size).toBe(leafYs.length);
-    const mk = positions['mk:c1:m1'];
-    const kids = [positions['sf:c1:m1'].y, positions['in:c1:m1'].y];
+    const mk = positions['mk:c1:m2'];
+    const kids = [positions['sf:c1:m2'].y, positions['in:c1:m2'].y];
     expect(mk.y).toBeGreaterThanOrEqual(Math.min(...kids));
     expect(mk.y).toBeLessThanOrEqual(Math.max(...kids));
-    expect(width).toBeGreaterThan(400);
+    expect(width).toBeGreaterThan(300);
     expect(height).toBeGreaterThan(Math.max(...leafYs));
+  });
+
+  it('gives a focused marker with ＋ chips two rows so it does not overlap the next one', () => {
+    const c = call({ devMarkers: [{ id: 'a', sec: 1, text: 'x' }, { id: 'b', sec: 2, text: 'y' }] });
+    const g = buildMindmap([c], { single: true, focus: markerKey('c1', 'a') });
+    expect(g.nodes.find((n) => n.id === 'mk:c1:a').rows).toBe(2);
+    const { positions } = autoLayout(g, {}, { rowH: 10, padY: 0 });
+    expect(positions['mk:c1:b'].y - positions['mk:c1:a'].y).toBe(20);
   });
 
   it('keeps saved (dragged) positions and ignores junk', () => {
     const g = buildMindmap([call()]);
-    const { positions } = autoLayout(g, { 'mk:c1:m1': { x: 999, y: 5 }, 'sf:c1:m1': { x: 'nope' }, root: { x: -40, y: -10 } });
+    const { positions } = autoLayout(g, { 'mk:c1:m1': { x: 999, y: 5 }, 'sf:c1:m2': { x: 'nope' }, root: { x: -40, y: -10 } });
     expect(positions['mk:c1:m1']).toEqual({ x: 999, y: 5 });
-    expect(positions['sf:c1:m1'].x).not.toBeNaN();
+    expect(positions['sf:c1:m2'].x).not.toBeNaN();
     expect(positions.root).toEqual({ x: 0, y: 0 });
   });
 
@@ -198,7 +228,7 @@ describe('autoLayout', () => {
     const only = positionsForCall(g, positions, 'c2');
     expect(Object.keys(only).every((k) => k.includes(':c2'))).toBe(true);
     expect(only.root).toBeUndefined();
-    expect(Object.keys(only).length).toBeGreaterThan(5);
+    expect(Object.keys(only).length).toBeGreaterThanOrEqual(5);
   });
 });
 
@@ -250,5 +280,26 @@ describe('tabbed window helpers', () => {
     expect(nextTodoMarker(o, { callId: 'c1', markerId: 'n' }).markerId).toBe('e');
     expect(nextTodoMarker(o, { callId: 'c3', markerId: 'w' }).markerId).toBe('n');
     expect(nextTodoMarker(markerOutline([{ id: 'x', devMarkers: [solid] }]), null)).toBeNull();
+  });
+});
+
+describe('editing steps', () => {
+  it('lists unfilled steps in order and opens the first one', () => {
+    expect(missingSteps({ text: '' })).toEqual(['text', 'surface', 'intent', 'evidence']);
+    expect(missingSteps({ text: 'a', surface: 'b' })).toEqual(['intent', 'evidence']);
+    expect(firstOpenStep({ text: 'a', surface: 'b' })).toBe('intent');
+    expect(firstOpenStep({ text: 'a', surface: 'b', intent: 'c', evidence: [{ text: 'q' }] })).toBe('evidence');
+  });
+});
+
+describe('overflowTabs', () => {
+  it('keeps everything when it fits', () => {
+    expect(overflowTabs([60, 80, 80], 300, 70, 1)).toEqual([]);
+  });
+
+  it('keeps the overview and the active tab, hides the rest from the first one that does not fit', () => {
+    expect(overflowTabs([60, 80, 80, 80, 80], 300, 70, 1)).toEqual([3, 4]);
+    expect(overflowTabs([60, 80, 80, 80, 80], 300, 70, 4)).toEqual([2, 3]);
+    expect(overflowTabs([60, 80, 80, 80, 80], 370, 70, 0)).toEqual([4]);
   });
 });
