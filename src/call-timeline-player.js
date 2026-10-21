@@ -20,6 +20,19 @@ export function normalizeMarkers(markers, durationSec = Infinity) {
     .sort((a, b) => a.sec - b.sec || a.createdAt - b.createdAt);
 }
 
+/** 話點超過這個數量時，清單限高、跟著播放位置捲動 */
+export const NOTES_CAP = 6;
+
+/** 目前播放位置落在哪個話點：最後一個「已經播過」的話點；還沒到第一個就回 -1 */
+export function activeMarkerIndex(markers, sec) {
+  const t = (Number(sec) || 0) + 0.25;
+  let idx = -1;
+  (markers || []).forEach((m, i) => {
+    if (m.sec <= t) idx = i;
+  });
+  return idx;
+}
+
 const ICON_PLAY =
   '<svg class="ctp-icon" viewBox="0 0 24 24" aria-hidden="true"><path fill="currentColor" d="M8 5.14v14.72a1 1 0 0 0 1.5.86l11.04-7.36a1 1 0 0 0 0-1.72L9.5 4.28a1 1 0 0 0-1.5.86z"/></svg>';
 const ICON_PAUSE =
@@ -76,6 +89,9 @@ export function mountTimelinePlayer(container, opts) {
   const { src, onChange, title = '錄音', subtitle = '開發複盤 · M 標記話點' } = opts;
   let markers = normalizeMarkers(opts.markers);
   let selectedId = markers.length ? markers[markers.length - 1].id : null;
+  let editingId = null;
+  let nowId = null;
+  let notesExpanded = false;
   let duration = 0;
   let rate = loadRate();
 
@@ -121,7 +137,8 @@ export function mountTimelinePlayer(container, opts) {
         <button type="button" class="ctp-m-btn" title="在目前位置標記（快捷鍵 M）">${ICON_MARK}<span class="ctp-m-label">M</span></button>
       </div>
     </div>
-    <p class="hint ctp-hint">播放中按 <kbd>M</kbd> 或右側標記鈕，在下方寫該句複盤筆記；<kbd>←</kbd> <kbd>→</kbd> 倒退／快轉 ${SKIP_SEC} 秒；<kbd>&lt;</kbd> <kbd>&gt;</kbd> 調整倍速。標記會出現在下方「話點心智圖」，可拆表層／真意／證據。</p>
+    <p class="hint ctp-hint"><kbd>M</kbd> 標記話點 · <kbd>←</kbd> <kbd>→</kbd> ${SKIP_SEC} 秒 · <kbd>&lt;</kbd> <kbd>&gt;</kbd> 倍速 · 點話點文字編輯，<kbd>Enter</kbd> 完成</p>
+    <div class="ctp-notes-head"><span class="ctp-notes-count"></span><button type="button" class="ctp-notes-toggle" hidden></button></div>
     <ul class="ctp-notes"></ul>
   `;
   container.appendChild(root);
@@ -133,6 +150,8 @@ export function mountTimelinePlayer(container, opts) {
   const head = root.querySelector('.ctp-head');
   const markersEl = root.querySelector('.ctp-markers');
   const notesEl = root.querySelector('.ctp-notes');
+  const notesCountEl = root.querySelector('.ctp-notes-count');
+  const notesToggle = root.querySelector('.ctp-notes-toggle');
   const curEl = root.querySelector('.ctp-cur');
   const durEl = root.querySelector('.ctp-dur');
   const mBtn = root.querySelector('.ctp-m-btn');
@@ -201,19 +220,92 @@ export function mountTimelinePlayer(container, opts) {
     });
   }
 
+  function noteHtml(m) {
+    const cls = `ctp-note${m.id === selectedId ? ' sel' : ''}${m.id === nowId ? ' now' : ''}`;
+    const jump = `<button type="button" class="ctp-jump" data-jump="${m.sec}" title="跳到這裡">${formatDuration(m.sec)}</button>`;
+    if (m.id === editingId) {
+      return `<li class="${cls} editing" data-id="${escapeHTML(m.id)}">${jump}
+        <textarea class="field ctp-text" rows="2" aria-label="${formatDuration(m.sec)} 話點筆記" placeholder="這一句發生什麼？你的語氣／客戶可能在想…">${escapeHTML(m.text)}</textarea>
+        <button type="button" class="btn slog-mini ctp-done" data-done>完成</button></li>`;
+    }
+    const text = m.text.trim();
+    return `<li class="${cls}" data-id="${escapeHTML(m.id)}">${jump}
+      <button type="button" class="ctp-note-text${text ? '' : ' empty'}" data-edit="${escapeHTML(m.id)}" title="點一下編輯">${text ? escapeHTML(text) : '還沒寫——點一下補上'}</button>
+      <button type="button" class="ctp-del" data-del="${escapeHTML(m.id)}" aria-label="刪除 ${formatDuration(m.sec)} 的話點" title="刪除">×</button></li>`;
+  }
+
+  function renderNotesHead() {
+    const n = markers.length;
+    notesCountEl.textContent = n ? `話點 ${n}` : '';
+    notesToggle.hidden = n <= NOTES_CAP;
+    notesToggle.textContent = notesExpanded ? '收合' : `展開全部 ${n} 筆`;
+    notesEl.classList.toggle('capped', n > NOTES_CAP && !notesExpanded);
+  }
+
   function renderNotesList() {
+    renderNotesHead();
     notesEl.innerHTML =
-      markers.length === 0
-        ? '<li class="hint ctp-empty">尚無標記——播放後按 M</li>'
-        : markers
-            .map(
-              (m) => `<li class="ctp-note ${m.id === selectedId ? 'sel' : ''}" data-id="${escapeHTML(m.id)}">
-        <div class="ctp-note-head"><button type="button" class="ctp-jump" data-jump="${m.sec}">${formatDuration(m.sec)}</button>
-        <button type="button" class="btn slog-mini ctp-del" data-del="${escapeHTML(m.id)}">刪除</button></div>
-        <textarea class="field ctp-text" rows="2" placeholder="這一句發生什麼？你的語氣／客戶可能在想…">${escapeHTML(m.text)}</textarea>
-      </li>`
-            )
-            .join('');
+      markers.length === 0 ? '<li class="hint ctp-empty">尚無標記——播放後按 M</li>' : markers.map(noteHtml).join('');
+  }
+
+  /** 只換掉一列，其他列的 DOM 不動，點別列時 click 不會因為重畫而遺失 */
+  function replaceNote(id) {
+    const li = notesEl.querySelector(`.ctp-note[data-id="${CSS.escape(id)}"]`);
+    const m = markers.find((x) => x.id === id);
+    if (li && m) li.outerHTML = noteHtml(m);
+  }
+
+  /** 限高時只捲清單本身，不動整頁 */
+  function revealNote(id, { center = false } = {}) {
+    if (!notesEl.classList.contains('capped')) return;
+    const li = notesEl.querySelector(`.ctp-note[data-id="${CSS.escape(id)}"]`);
+    if (!li) return;
+    const top = li.offsetTop;
+    const bottom = top + li.offsetHeight;
+    if (center || top < notesEl.scrollTop || bottom > notesEl.scrollTop + notesEl.clientHeight) {
+      notesEl.scrollTop = Math.max(0, top - notesEl.clientHeight / 3);
+    }
+  }
+
+  function flushSave() {
+    if (!notesEl._saveT) return;
+    clearTimeout(notesEl._saveT);
+    notesEl._saveT = null;
+    emit();
+  }
+
+  function openEditor(id) {
+    const prev = editingId;
+    editingId = id;
+    selectedId = id;
+    if (prev && prev !== id) replaceNote(prev);
+    replaceNote(id);
+    updateSelection();
+    revealNote(id);
+    const ta = notesEl.querySelector(`.ctp-note[data-id="${CSS.escape(id)}"] textarea`);
+    if (ta) {
+      ta.focus();
+      ta.setSelectionRange(ta.value.length, ta.value.length);
+    }
+  }
+
+  function closeEditor({ focusRow = false } = {}) {
+    if (!editingId) return;
+    const id = editingId;
+    flushSave();
+    editingId = null;
+    replaceNote(id);
+    if (focusRow) notesEl.querySelector(`.ctp-note[data-id="${CSS.escape(id)}"] .ctp-note-text`)?.focus();
+  }
+
+  function updateNow() {
+    const idx = activeMarkerIndex(markers, audio.currentTime || 0);
+    const id = idx >= 0 ? markers[idx].id : null;
+    if (id === nowId) return;
+    nowId = id;
+    notesEl.querySelectorAll('.ctp-note').forEach((li) => li.classList.toggle('now', li.dataset.id === id));
+    markersEl.querySelectorAll('.ctp-dot').forEach((dot) => dot.classList.toggle('now', dot.dataset.id === id));
+    if (id && !editingId && !audio.paused) revealNote(id);
   }
 
   function renderMarkers() {
@@ -229,16 +321,18 @@ export function mountTimelinePlayer(container, opts) {
       fill.style.width = `${pct}%`;
       head.style.left = `${pct}%`;
     }
+    updateNow();
   }
 
   function addMarkerAt(sec) {
     const id = `m_${Date.now()}`;
     markers = normalizeMarkers([...markers, { id, sec, text: '', createdAt: Date.now() }], duration);
     selectedId = id;
+    flushSave();
+    editingId = null;
     renderMarkers();
     emit();
-    const ta = notesEl.querySelector(`[data-id="${id}"] textarea`);
-    ta?.focus();
+    openEditor(id);
   }
 
   function onKeyDown(e) {
@@ -326,18 +420,36 @@ export function mountTimelinePlayer(container, opts) {
   notesEl.addEventListener('click', (e) => {
     const jump = e.target.closest('[data-jump]');
     if (jump) {
+      if (editingId && !jump.closest('.ctp-note.editing')) closeEditor();
       audio.currentTime = Number(jump.dataset.jump) || 0;
       updateProgress();
+      return;
+    }
+    const edit = e.target.closest('[data-edit]');
+    if (edit) {
+      openEditor(edit.dataset.edit);
+      return;
+    }
+    if (e.target.closest('[data-done]')) {
+      closeEditor({ focusRow: true });
       return;
     }
     const del = e.target.closest('[data-del]');
     if (del) {
       const id = del.dataset.del;
+      flushSave();
       markers = markers.filter((x) => x.id !== id);
+      editingId = null;
       if (selectedId === id) selectedId = markers[0]?.id || null;
       renderMarkers();
       emit();
     }
+  });
+
+  notesToggle.addEventListener('click', () => {
+    notesExpanded = !notesExpanded;
+    renderNotesHead();
+    if (!notesExpanded && (editingId || nowId)) revealNote(editingId || nowId, { center: true });
   });
 
   notesEl.addEventListener('input', (e) => {
@@ -347,14 +459,26 @@ export function mountTimelinePlayer(container, opts) {
     markers = markers.map((m) => (m.id === id ? { ...m, text: e.target.value } : m));
     selectedId = id;
     clearTimeout(notesEl._saveT);
-    notesEl._saveT = setTimeout(() => emit(), 350);
+    notesEl._saveT = setTimeout(() => {
+      notesEl._saveT = null;
+      emit();
+    }, 350);
   });
 
-  notesEl.addEventListener('focusin', (e) => {
-    const li = e.target.closest('.ctp-note');
-    if (!li || li.dataset.id === selectedId) return;
-    selectedId = li.dataset.id;
-    updateSelection();
+  notesEl.addEventListener('keydown', (e) => {
+    if (!e.target.classList?.contains('ctp-text')) return;
+    if ((e.key === 'Enter' && !e.shiftKey && !e.isComposing) || e.key === 'Escape') {
+      e.preventDefault();
+      closeEditor({ focusRow: true });
+    }
+  });
+
+  notesEl.addEventListener('focusout', (e) => {
+    const li = e.target.closest?.('.ctp-note.editing');
+    if (!li || li.contains(e.relatedTarget)) return;
+    // Collapsing on mousedown shifts the rows, so the click would land on a different row.
+    if (notesEl.contains(e.relatedTarget)) return;
+    if (li.dataset.id === editingId) closeEditor();
   });
 
   window.addEventListener('keydown', onKeyDown);
@@ -364,6 +488,7 @@ export function mountTimelinePlayer(container, opts) {
 
   return {
     destroy() {
+      flushSave();
       window.removeEventListener('keydown', onKeyDown);
       document.removeEventListener('pointerdown', onDocPointerDown);
       audio.pause();
@@ -377,6 +502,7 @@ export function mountTimelinePlayer(container, opts) {
     setMarkers(next) {
       markers = normalizeMarkers(next, duration);
       if (selectedId && !markers.some((m) => m.id === selectedId)) selectedId = markers[0]?.id || null;
+      if (editingId && !markers.some((m) => m.id === editingId)) editingId = null;
       renderMarkers();
     },
   };

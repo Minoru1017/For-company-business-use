@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { PLAYBACK_RATES, formatRate, normalizeMarkers, normalizeRate, stepRate } from '../src/call-timeline-player.js';
+import { NOTES_CAP, PLAYBACK_RATES, activeMarkerIndex, formatRate, normalizeMarkers, normalizeRate, stepRate } from '../src/call-timeline-player.js';
 
 describe('call-timeline-player', () => {
   it('normalizes and sorts markers', () => {
@@ -47,5 +47,19 @@ describe('playback rate', () => {
     expect(stepRate(1, -1)).toBe(1);
     expect(stepRate(1.5, -1)).toBe(1.25);
     expect(stepRate('weird', 1)).toBe(1.25);
+  });
+
+  it('finds the marker at or just before the playhead', () => {
+    const ms = [{ sec: 10 }, { sec: 30 }, { sec: 60 }];
+    expect(activeMarkerIndex(ms, 5)).toBe(-1);
+    expect(activeMarkerIndex(ms, 10)).toBe(0);
+    expect(activeMarkerIndex(ms, 29.9)).toBe(1);
+    expect(activeMarkerIndex(ms, 45)).toBe(1);
+    expect(activeMarkerIndex(ms, 999)).toBe(2);
+    expect(activeMarkerIndex([], 10)).toBe(-1);
+  });
+
+  it('caps the notes list at six rows', () => {
+    expect(NOTES_CAP).toBe(6);
   });
 });
