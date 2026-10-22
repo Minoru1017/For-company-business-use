@@ -25,3 +25,16 @@ jobs:
       - run: npm test
       - run: npx playwright install --with-deps chromium
       - run: npm run smoke
+      # 去識別公開版：建置 → 外洩檢查 → 冒煙測試；原始碼匯出也要通過外洩檢查
+      - run: npm run check:public
+      - run: npm run export:public
+      - uses: actions/upload-artifact@v4
+        with:
+          name: call-coach-public-site
+          path: dist-public
+          retention-days: 14
+      - uses: actions/upload-artifact@v4
+        with:
+          name: call-coach-public-source
+          path: public-export
+          retention-days: 14

@@ -38,6 +38,8 @@ import {
   upsertRecentTranscript,
 } from './history.js';
 import { initRecentSidebar } from './recent-sidebar.js';
+import { initOnboarding } from './onboarding.js';
+import { EDITION } from './edition.js';
 import { initWorkspaceToc } from './workspace-toc.js';
 import {
   bridgeSupports,
@@ -1009,6 +1011,7 @@ async function practiceSymptom(symptomKey) {
 const cloudAuthRedirect = takeAuthRedirect();
 
 function init() {
+  document.body.dataset.edition = EDITION;
   mountHomePhilosophy();
   dayTypeHomeCtrl = initDayTypeHome({
     showToast,
@@ -1183,6 +1186,11 @@ function init() {
       todayPanel?.refresh();
     }
   });
+  try {
+    initOnboarding({ getMode: resolveMode });
+  } catch (e) {
+    console.error('onboarding init failed', e);
+  }
   window.addEventListener(REVIEWS_CHANGED_EVENT, () => customerProgress?.refresh());
   window.addEventListener(CUSTOMERS_CHANGED_EVENT, () => customerProgress?.refresh());
   onBrandChange(() => customerProgress?.refresh());

@@ -43,7 +43,7 @@ function env(name) {
 }
 
 /** 公司的 Supabase 專案；anon key 是設計給瀏覽器用的公開金鑰，資料權限由 Storage policy 控管 */
-const BUILT_IN_CLOUD = {
+export const BUILT_IN_CLOUD = {
   url: 'https://tgmpwiuavzuzsqjcftrj.supabase.co',
   anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InRnbXB3aXVhdnp1enNxamNmdHJqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTE5NDM5MDIsImV4cCI6MjEwNzUxOTkwMn0.CK7B4_N-IfV9aOPxhJOs0xzHgQWBMlebisBiEwTk1JE',
 };

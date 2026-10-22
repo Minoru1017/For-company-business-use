@@ -1,0 +1,53 @@
+/* ---- 新手教學：聚光框 + 說明卡；重看按鈕 ---- */
+.home-help-btn { flex-shrink:0; margin-left:auto; padding:7px 14px; border:1px solid var(--hairline-2); border-radius:999px; background:transparent; color:var(--text-2); font-size:.76rem; font-weight:600; box-shadow:none; cursor:pointer; }
+.home-help-btn::before { content:"?"; display:inline-grid; place-items:center; width:15px; height:15px; margin-right:6px; border:1px solid currentColor; border-radius:50%; font-size:.62rem; font-weight:700; vertical-align:-2px; }
+.home-help-btn:hover { color:var(--text); border-color:var(--text-2); background:transparent; transform:none; }
+.app-sidebar-help { color:var(--text-2); }
+.app-sidebar-help:hover { color:var(--text); background:rgba(239,236,230,.06); }
+
+body[data-edition="public"] .home-brand-name::after { content:"公開版"; margin-left:8px; padding:2px 7px; border:1px solid var(--hairline-2); border-radius:999px; color:var(--muted); font-size:.62rem; font-weight:600; letter-spacing:.04em; vertical-align:2px; }
+
+.ob-root { position:fixed; inset:0; z-index:1000; }
+.ob-scrim { position:absolute; inset:0; background:transparent; }
+.ob-root.ob-centered .ob-scrim { background:rgba(8,9,11,.72); }
+.ob-spot { position:fixed; border-radius:var(--r-card, 6px); box-shadow:0 0 0 2px var(--paper, #e7e2d6), 0 0 0 9999px rgba(8,9,11,.72); pointer-events:none;
+  transition:top .25s var(--ease-out, ease), left .25s var(--ease-out, ease), width .25s var(--ease-out, ease), height .25s var(--ease-out, ease); }
+.ob-root.ob-centered .ob-spot { display:none; }
+
+.ob-card { position:fixed; width:min(360px, calc(100vw - 24px)); max-height:calc(100vh - 24px); overflow:auto; padding:18px 18px 14px;
+  border:1px solid var(--hairline-2); border-radius:var(--r-card, 6px); background:var(--panel2, #1a1c20); color:var(--text, #efece6);
+  box-shadow:0 18px 48px -12px rgba(0,0,0,.65); outline:none; transition:top .25s var(--ease-out, ease), left .25s var(--ease-out, ease); }
+.ob-root.ob-centered .ob-card { width:min(440px, calc(100vw - 24px)); }
+.ob-card:focus-visible { box-shadow:0 0 0 2px var(--paper, #e7e2d6), 0 18px 48px -12px rgba(0,0,0,.65); }
+.ob-kicker { display:flex; justify-content:space-between; margin:0 0 8px; color:var(--muted); font-size:.68rem; font-weight:600; letter-spacing:.12em; }
+.ob-count { font-family:var(--num, var(--mono)); letter-spacing:.04em; }
+.ob-title { margin:0 0 8px; color:var(--text); font-size:1.02rem; font-weight:700; line-height:1.4; }
+.ob-body { color:var(--text-2); font-size:.84rem; line-height:1.75; }
+.ob-body p { margin:0 0 8px; }
+.ob-body b { color:var(--text); font-weight:600; }
+.ob-list { display:grid; gap:6px; margin:2px 0 8px; padding:0; list-style:none; }
+.ob-list li { display:grid; grid-template-columns:7.5em 1fr; gap:8px; padding:6px 8px; border-radius:var(--r-field, 4px); background:rgba(239,236,230,.04); }
+.ob-list li b { color:var(--text); font-weight:600; }
+.ob-list li span { color:var(--text-2); }
+
+.ob-dots { display:flex; gap:4px; margin:10px 0 12px; }
+.ob-dots i { flex:1; height:3px; border-radius:2px; background:var(--hairline-2); }
+.ob-dots i.on { background:var(--paper, #e7e2d6); }
+
+.ob-actions { display:flex; align-items:center; gap:8px; }
+.ob-actions-gap { flex:1; }
+.ob-card .ob-btn { min-height:34px; padding:6px 14px; border:1px solid var(--hairline-2); border-radius:var(--r-field, 4px); background:transparent; color:var(--text);
+  font-size:.8rem; font-weight:600; text-transform:none; letter-spacing:0; box-shadow:none; cursor:pointer; }
+.ob-card .ob-btn:hover { border-color:var(--text-2); background:rgba(239,236,230,.06); transform:none; box-shadow:none; }
+.ob-card .ob-btn:focus-visible { outline:2px solid var(--paper, #e7e2d6); outline-offset:2px; }
+.ob-card .ob-next { border-color:var(--paper, #e7e2d6); background:var(--paper, #e7e2d6); color:var(--on-deep, #141518); }
+.ob-card .ob-next:hover { border-color:#fff; background:#fff; color:var(--on-deep, #141518); }
+.ob-card .ob-skip { padding-left:4px; padding-right:4px; border-color:transparent; color:var(--muted); }
+.ob-card .ob-skip:hover { border-color:transparent; background:transparent; color:var(--text); }
+
+@media (max-width:560px) {
+  .ob-list li { grid-template-columns:1fr; gap:2px; }
+}
+@media (prefers-reduced-motion:reduce) {
+  .ob-spot, .ob-card { transition:none; }
+}
