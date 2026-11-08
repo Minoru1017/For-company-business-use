@@ -9,6 +9,16 @@ import {
   stripPurposePrefix,
   stripPurposePrefixes,
 } from '../tab-purpose-extension/lib/purpose.js';
+import {
+  SLOT_COUNT,
+  addPageToFirstEmptySlot,
+  getRoutinePlan,
+  getRoutineSlots,
+  getWorkspaceGroups,
+  moveSlot,
+  normalizeWebUrl,
+  normalizeWorkspace,
+} from '../tab-purpose-extension/lib/workspace.js';
 
 describe('tab purpose helpers', () => {
   it('normalizes purpose text for compact labels', () => {
@@ -67,14 +77,107 @@ describe('tab purpose helpers', () => {
   });
 });
 
+describe('work homepage helpers', () => {
+  it('always creates exactly 16 normalized slots', () => {
+    const workspace = normalizeWorkspace({
+      slots: [{ url: 'example.com', title: ' 範例網站 ' }],
+    });
+    expect(workspace.slots).toHaveLength(SLOT_COUNT);
+    expect(workspace.slots[0]).toMatchObject({
+      url: 'https://example.com/',
+      title: '範例網站',
+    });
+    expect(workspace.slots[15].url).toBe('');
+  });
+
+  it('accepts only web URLs', () => {
+    expect(normalizeWebUrl('portal.company.com')).toBe('https://portal.company.com/');
+    expect(normalizeWebUrl('http://localhost:5173')).toBe('http://localhost:5173/');
+    expect(normalizeWebUrl('chrome://extensions')).toBe('');
+    expect(normalizeWebUrl('javascript:alert(1)')).toBe('');
+  });
+
+  it('adds a page to the first empty slot and reports a full homepage', () => {
+    const initial = normalizeWorkspace({
+      slots: [{ url: 'https://first.example', title: '第一個' }],
+    });
+    const result = addPageToFirstEmptySlot(initial, {
+      url: 'https://second.example',
+      title: '第二個',
+    });
+    expect(result.index).toBe(1);
+    expect(result.workspace.slots[1].title).toBe('第二個');
+
+    const full = normalizeWorkspace({
+      slots: Array.from({ length: SLOT_COUNT }, (_, index) => ({
+        url: `https://example.com/${index}`,
+        title: String(index),
+      })),
+    });
+    expect(addPageToFirstEmptySlot(full, { url: 'https://overflow.example' }).index).toBe(-1);
+  });
+
+  it('moves slots while keeping a fixed 16-slot workspace', () => {
+    const initial = normalizeWorkspace({
+      slots: [
+        { url: 'https://first.example', title: '第一個' },
+        { url: 'https://second.example', title: '第二個' },
+      ],
+    });
+    const moved = moveSlot(initial, 0, 1);
+    expect(moved.slots).toHaveLength(SLOT_COUNT);
+    expect(moved.slots[0].title).toBe('第二個');
+    expect(moved.slots[1].title).toBe('第一個');
+
+    const movedBack = moveSlot(moved, 1, 0);
+    expect(movedBack.slots).toHaveLength(SLOT_COUNT);
+    expect(movedBack.slots.slice(0, 2).map((slot) => slot.title)).toEqual([
+      '第一個',
+      '第二個',
+    ]);
+  });
+
+  it('groups sites and sorts routines by step then slot position', () => {
+    const workspace = normalizeWorkspace({
+      slots: [
+        {
+          url: 'https://mail.example',
+          title: '信箱',
+          group: '行政',
+          routine: '每日開工',
+          step: 2,
+        },
+        {
+          url: 'https://calendar.example',
+          title: '行事曆',
+          group: '行政',
+          routine: '每日開工',
+          step: 1,
+        },
+        { url: 'https://wiki.example', title: '知識庫', group: '參考' },
+      ],
+    });
+    expect(getWorkspaceGroups(workspace)).toEqual(['行政', '參考']);
+    expect(getRoutineSlots(workspace, '每日開工').map((slot) => slot.title)).toEqual([
+      '行事曆',
+      '信箱',
+    ]);
+    const plan = getRoutinePlan(workspace, '每日開工');
+    expect(plan.slots.map((slot) => slot.title)).toEqual(['行事曆', '信箱']);
+    expect(plan.summary).toBe('將依序開啟 2 個網站：行事曆 → 信箱');
+  });
+});
+
 describe('extension manifest', () => {
   it('uses Manifest V3 and only the required permissions', async () => {
     const manifestPath = new URL('../tab-purpose-extension/manifest.json', import.meta.url);
     const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
 
     expect(manifest.manifest_version).toBe(3);
+    expect(manifest.version).toBe('1.1.1');
     expect(manifest.permissions).toEqual(['activeTab', 'scripting', 'storage', 'tabs']);
     expect(manifest.host_permissions).toBeUndefined();
     expect(manifest.background.service_worker).toBe('background.js');
+    expect(manifest.chrome_url_overrides.newtab).toBe('dashboard/dashboard.html');
   });
 });

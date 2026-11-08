@@ -6,6 +6,13 @@ import {
   normalizePurpose,
   stripPurposePrefix,
 } from '../lib/purpose.js';
+import {
+  SLOT_COUNT,
+  WORKSPACE_KEY,
+  addPageToFirstEmptySlot,
+  normalizeWebUrl,
+  normalizeWorkspace,
+} from '../lib/workspace.js';
 
 const elements = {
   form: document.querySelector('#purpose-form'),
@@ -20,6 +27,9 @@ const elements = {
   searchInput: document.querySelector('#search-input'),
   emptyState: document.querySelector('#empty-state'),
   status: document.querySelector('#status'),
+  openHomeButton: document.querySelector('#open-home-button'),
+  saveHomeButton: document.querySelector('#save-home-button'),
+  homeSlotStatus: document.querySelector('#home-slot-status'),
 };
 
 let tabs = [];
@@ -170,6 +180,91 @@ async function reloadTabs() {
   renderTabs();
 }
 
+async function readWorkspace() {
+  const stored = await chrome.storage.local.get(WORKSPACE_KEY);
+  return normalizeWorkspace(stored[WORKSPACE_KEY]);
+}
+
+async function updateHomeSlotStatus() {
+  const savedWorkspace = await readWorkspace();
+  const used = savedWorkspace.slots.filter((slot) => slot.url).length;
+  elements.homeSlotStatus.textContent = `${used} / ${SLOT_COUNT} 個位置已使用`;
+  elements.saveHomeButton.disabled = used >= SLOT_COUNT;
+}
+
+async function captureThumbnail() {
+  try {
+    const source = await chrome.tabs.captureVisibleTab(undefined, {
+      format: 'jpeg',
+      quality: 45,
+    });
+    const image = new Image();
+    image.src = source;
+    await image.decode();
+
+    const width = 320;
+    const height = 180;
+    const scale = Math.max(width / image.naturalWidth, height / image.naturalHeight);
+    const sourceWidth = width / scale;
+    const sourceHeight = height / scale;
+    const sourceX = (image.naturalWidth - sourceWidth) / 2;
+    const sourceY = 0;
+    const canvas = document.createElement('canvas');
+    canvas.width = width;
+    canvas.height = height;
+    const context = canvas.getContext('2d');
+    context.drawImage(
+      image,
+      sourceX,
+      sourceY,
+      sourceWidth,
+      sourceHeight,
+      0,
+      0,
+      width,
+      height,
+    );
+    return canvas.toDataURL('image/jpeg', 0.55);
+  } catch {
+    return '';
+  }
+}
+
+async function saveCurrentPageToHome() {
+  if (!activeTab || !normalizeWebUrl(activeTab.url)) {
+    showStatus('這個瀏覽器頁面無法存到工作首頁。', true);
+    return;
+  }
+
+  elements.saveHomeButton.disabled = true;
+  elements.saveHomeButton.textContent = '擷取中…';
+  try {
+    const [savedWorkspace, thumbnail] = await Promise.all([
+      readWorkspace(),
+      captureThumbnail(),
+    ]);
+    const result = addPageToFirstEmptySlot(savedWorkspace, {
+      url: activeTab.url,
+      title: stripPurposePrefix(activeTab.title, activeTab.purpose),
+      thumbnail,
+    });
+    if (result.index < 0) {
+      showStatus('16 個位置都已使用，請先到工作首頁清空一格。', true);
+      return;
+    }
+    await chrome.storage.local.set({ [WORKSPACE_KEY]: result.workspace });
+    await updateHomeSlotStatus();
+    showStatus(`已存到工作首頁第 ${result.index + 1} 格。`);
+  } catch (error) {
+    showStatus(error.message || '無法儲存目前分頁。', true);
+  } finally {
+    elements.saveHomeButton.textContent = '存到首頁';
+    const currentWorkspace = await readWorkspace();
+    elements.saveHomeButton.disabled =
+      currentWorkspace.slots.filter((slot) => slot.url).length >= SLOT_COUNT;
+  }
+}
+
 async function savePurpose(rawPurpose, color = getSelectedColor()) {
   if (!activeTab) return;
   const purpose = normalizePurpose(rawPurpose);
@@ -209,12 +304,16 @@ elements.clearButton.addEventListener('click', async () => {
 });
 
 elements.searchInput.addEventListener('input', renderTabs);
+elements.openHomeButton.addEventListener('click', () => {
+  chrome.tabs.create({ url: chrome.runtime.getURL('dashboard/dashboard.html') });
+});
+elements.saveHomeButton.addEventListener('click', saveCurrentPageToHome);
 
 async function initialize() {
   renderColorOptions();
   renderPresets();
   try {
-    await reloadTabs();
+    await Promise.all([reloadTabs(), updateHomeSlotStatus()]);
   } catch (error) {
     showStatus(error.message, true);
   }

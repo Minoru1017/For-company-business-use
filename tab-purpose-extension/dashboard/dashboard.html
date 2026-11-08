@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#f7f9fc">
+    <title>我的工作首頁</title>
+    <link rel="stylesheet" href="dashboard.css">
+  </head>
+  <body>
+    <header class="topbar">
+      <a class="brand" href="dashboard.html" aria-label="工作首頁">
+        <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
+        <span>
+          <strong>工作首頁</strong>
+          <small>16 個位置，排好每天的工作</small>
+        </span>
+      </a>
+      <div class="topbar-meta">
+        <span id="saved-count">0 / 16 已使用</span>
+        <button id="help-button" class="quiet-button" type="button">使用說明</button>
+      </div>
+    </header>
+
+    <main>
+      <section class="hero">
+        <div>
+          <p class="eyebrow">WORK ROUTINE</p>
+          <h1>今天要開的網站，照順序放好。</h1>
+          <p class="hero-copy">
+            從擴充功能儲存目前分頁，再用群組與流程順位整理。拖曳卡片即可調整首頁位置。
+          </p>
+        </div>
+        <div class="routine-runner" aria-labelledby="routine-heading">
+          <div>
+            <span class="runner-label">例行公事</span>
+            <strong id="routine-heading">依設定順位開啟</strong>
+          </div>
+          <div class="runner-actions">
+            <label>
+              <span class="visually-hidden">選擇例行流程</span>
+              <select id="routine-select">
+                <option value="">尚未建立流程</option>
+              </select>
+            </label>
+            <button id="run-routine-button" class="primary-button" type="button" disabled>
+              開始流程
+              <svg aria-hidden="true" viewBox="0 0 20 20">
+                <path d="m7 4 6 6-6 6"></path>
+              </svg>
+            </button>
+          </div>
+          <p id="routine-summary">編輯網站時，可填寫流程名稱與步驟順位。</p>
+        </div>
+      </section>
+
+      <section class="workspace" aria-labelledby="workspace-heading">
+        <div class="workspace-header">
+          <div>
+            <p class="eyebrow">QUICK ACCESS</p>
+            <h2 id="workspace-heading">我的網站</h2>
+          </div>
+          <div id="group-filters" class="group-filters" aria-label="群組篩選"></div>
+        </div>
+
+        <div id="slot-grid" class="slot-grid" aria-live="polite"></div>
+      </section>
+    </main>
+
+    <dialog id="slot-dialog">
+      <form id="slot-form" method="dialog">
+        <div class="dialog-header">
+          <div>
+            <p class="eyebrow">SLOT <span id="dialog-slot-number"></span></p>
+            <h2>編輯網站位置</h2>
+          </div>
+          <button class="icon-button" type="button" data-close-dialog aria-label="關閉">×</button>
+        </div>
+
+        <label>
+          網站名稱
+          <input id="slot-title" name="title" maxlength="60" required placeholder="例如：公司信箱">
+        </label>
+        <label>
+          網址
+          <input id="slot-url" name="url" type="text" inputmode="url" required
+            placeholder="https://example.com">
+        </label>
+        <div class="form-columns">
+          <label>
+            群組
+            <input id="slot-group" name="group" maxlength="24" list="group-options"
+              placeholder="例如：行政">
+          </label>
+          <label>
+            例行流程
+            <input id="slot-routine" name="routine" maxlength="24" list="routine-options"
+              placeholder="例如：每日開工">
+          </label>
+        </div>
+        <label class="step-field">
+          流程順位
+          <input id="slot-step" name="step" type="number" inputmode="numeric" min="0" max="99"
+            placeholder="1">
+          <small>同一流程中，數字小的先開啟；留空則依首頁位置。</small>
+        </label>
+
+        <datalist id="group-options"></datalist>
+        <datalist id="routine-options"></datalist>
+
+        <div class="dialog-actions">
+          <button id="delete-slot-button" class="danger-button" type="button">清空此槽</button>
+          <span></span>
+          <button class="quiet-button" type="button" data-close-dialog>取消</button>
+          <button class="primary-button" type="submit">儲存設定</button>
+        </div>
+        <p id="dialog-error" class="dialog-error" role="alert"></p>
+      </form>
+    </dialog>
+
+    <dialog id="help-dialog" class="help-dialog">
+      <div class="dialog-header">
+        <div>
+          <p class="eyebrow">3 STEPS</p>
+          <h2>快速建立工作首頁</h2>
+        </div>
+        <button class="icon-button" type="button" data-close-help aria-label="關閉">×</button>
+      </div>
+      <ol>
+        <li><span>01</span><div><strong>儲存分頁</strong><p>在任何網頁點擴充功能，再按「存到工作首頁」。</p></div></li>
+        <li><span>02</span><div><strong>設定群組與流程</strong><p>點卡片的編輯按鈕，填入群組、流程和順位。</p></div></li>
+        <li><span>03</span><div><strong>每天一鍵開工</strong><p>選擇例行流程，系統會依順位開啟所有網站。</p></div></li>
+      </ol>
+      <button class="primary-button full-button" type="button" data-close-help>知道了</button>
+    </dialog>
+
+    <div id="toast" class="toast" role="status" aria-live="polite"></div>
+    <script type="module" src="dashboard.js"></script>
+  </body>
+</html>

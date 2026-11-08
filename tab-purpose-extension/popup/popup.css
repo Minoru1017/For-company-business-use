@@ -57,6 +57,10 @@ input:focus-visible {
   background: var(--surface);
 }
 
+.app-header > div:nth-child(2) {
+  min-width: 0;
+}
+
 .app-header h1,
 .app-header p,
 .section-heading h2,
@@ -110,6 +114,87 @@ input:focus-visible {
 .brand-mark span:nth-child(3) {
   height: 11px;
   background: #60a5fa;
+}
+
+.home-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 30px;
+  margin-left: auto;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 10px;
+  font-weight: 650;
+  letter-spacing: 0.015em;
+}
+
+.home-button:hover {
+  border-color: var(--border-strong);
+  background: var(--surface-muted);
+  color: var(--text);
+}
+
+.home-button svg {
+  width: 13px;
+  fill: none;
+  stroke: currentColor;
+  stroke-linejoin: round;
+  stroke-width: 1.5;
+}
+
+.home-save-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 13px;
+  border-bottom: 1px solid #bfe8e1;
+  background: var(--primary-tint);
+}
+
+.home-save-bar strong,
+.home-save-bar span {
+  display: block;
+}
+
+.home-save-bar strong {
+  color: var(--text);
+  font-size: 11px;
+  font-weight: 650;
+  letter-spacing: 0.015em;
+}
+
+.home-save-bar span {
+  margin-top: 3px;
+  color: var(--text-muted);
+  font-size: 9px;
+  letter-spacing: 0.02em;
+}
+
+.home-save-bar button {
+  flex: 0 0 auto;
+  min-height: 30px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 6px;
+  background: var(--primary);
+  color: white;
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.015em;
+}
+
+.home-save-bar button:hover {
+  background: var(--primary-hover);
+}
+
+.home-save-bar button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
 }
 
 .current-tab {
