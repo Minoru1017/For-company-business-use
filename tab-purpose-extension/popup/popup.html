@@ -1,0 +1,80 @@
+<!doctype html>
+<html lang="zh-Hant">
+  <head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#f8fafc">
+    <title>分頁用途標記</title>
+    <link rel="stylesheet" href="popup.css">
+  </head>
+  <body>
+    <main class="app-shell">
+      <header class="app-header">
+        <div class="brand-mark" aria-hidden="true"><span></span><span></span><span></span></div>
+        <div>
+          <h1>分頁用途</h1>
+          <p>一眼認出每個工作分頁</p>
+        </div>
+      </header>
+
+      <section class="current-tab" aria-labelledby="current-heading">
+        <div class="section-heading">
+          <div>
+            <p class="eyebrow">目前分頁</p>
+            <h2 id="current-heading">設定用途</h2>
+          </div>
+          <span id="saved-indicator" class="saved-indicator" hidden>已標記</span>
+        </div>
+
+        <p id="current-title" class="current-title">讀取中…</p>
+
+        <form id="purpose-form">
+          <label for="purpose-input">這個分頁要做什麼？</label>
+          <div class="input-row">
+            <input
+              id="purpose-input"
+              name="purpose"
+              maxlength="20"
+              autocomplete="off"
+              placeholder="例如：核對 11 月報表"
+              required
+            >
+            <button class="primary-button" type="submit">套用</button>
+          </div>
+
+          <div id="preset-list" class="preset-list" aria-label="常用用途"></div>
+
+          <fieldset class="color-fieldset">
+            <legend>標記顏色</legend>
+            <div id="color-list" class="color-list"></div>
+          </fieldset>
+
+          <button id="clear-button" class="text-button danger-button" type="button" hidden>
+            移除這個標記
+          </button>
+        </form>
+        <div id="status" class="status" role="status" aria-live="polite"></div>
+      </section>
+
+      <section class="tab-browser" aria-labelledby="tabs-heading">
+        <div class="tabs-header">
+          <div>
+            <p class="eyebrow">目前視窗</p>
+            <h2 id="tabs-heading">所有分頁 <span id="tab-count"></span></h2>
+          </div>
+          <label class="search-box">
+            <span class="visually-hidden">搜尋分頁</span>
+            <svg aria-hidden="true" viewBox="0 0 20 20">
+              <path d="m17 17-3.6-3.6m1.9-4.1a6 6 0 1 1-12 0 6 6 0 0 1 12 0Z"></path>
+            </svg>
+            <input id="search-input" type="search" placeholder="搜尋…" autocomplete="off">
+          </label>
+        </div>
+        <div id="tab-list" class="tab-list"></div>
+        <p id="empty-state" class="empty-state" hidden>找不到符合的分頁。</p>
+      </section>
+    </main>
+
+    <script type="module" src="popup.js"></script>
+  </body>
+</html>

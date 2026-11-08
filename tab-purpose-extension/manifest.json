@@ -1,0 +1,15 @@
+{
+  "manifest_version": 3,
+  "name": "分頁用途標記",
+  "version": "1.0.0",
+  "description": "替工作分頁加上用途標籤、顏色與標題前綴，快速找到要處理的頁面。",
+  "permissions": ["activeTab", "scripting", "storage", "tabs"],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "標記這個分頁",
+    "default_popup": "popup/popup.html"
+  }
+}
