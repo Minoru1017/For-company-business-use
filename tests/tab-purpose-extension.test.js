@@ -12,12 +12,16 @@ import {
 import {
   SLOT_COUNT,
   addPageToFirstEmptySlot,
+  createHomepageArea,
+  getAreaWorkspace,
   getRoutinePlan,
   getRoutineSlots,
   getWorkspaceGroups,
   moveSlot,
+  normalizeHomepage,
   normalizeWebUrl,
   normalizeWorkspace,
+  updateAreaWorkspace,
 } from '../tab-purpose-extension/lib/workspace.js';
 
 describe('tab purpose helpers', () => {
@@ -166,6 +170,35 @@ describe('work homepage helpers', () => {
     expect(plan.slots.map((slot) => slot.title)).toEqual(['行事曆', '信箱']);
     expect(plan.summary).toBe('將依序開啟 2 個網站：行事曆 → 信箱');
   });
+
+  it('migrates the previous 16-slot homepage into the work area', () => {
+    const homepage = normalizeHomepage({
+      slots: [{ url: 'https://legacy.example', title: '舊首頁網站' }],
+    });
+    expect(homepage.version).toBe(2);
+    expect(homepage.areas.map((area) => area.name)).toEqual(['工作', '興趣', '影視']);
+    expect(getAreaWorkspace(homepage, 'work').slots[0].title).toBe('舊首頁網站');
+    expect(getAreaWorkspace(homepage, 'interest').slots[0].url).toBe('');
+  });
+
+  it('keeps 16 slots isolated for each main area', () => {
+    let homepage = normalizeHomepage();
+    const interest = normalizeWorkspace({
+      slots: [{ url: 'https://hobby.example', title: '興趣網站' }],
+    });
+    homepage = updateAreaWorkspace(homepage, 'interest', interest);
+    expect(getAreaWorkspace(homepage, 'interest').slots[0].title).toBe('興趣網站');
+    expect(getAreaWorkspace(homepage, 'work').slots[0].url).toBe('');
+  });
+
+  it('creates a custom area with its own empty slots', () => {
+    const homepage = createHomepageArea(normalizeHomepage(), '旅遊');
+    const custom = homepage.areas.find((area) => area.name === '旅遊');
+    expect(custom).toBeTruthy();
+    expect(custom.slots).toHaveLength(SLOT_COUNT);
+    expect(custom.slots.every((slot) => !slot.url)).toBe(true);
+    expect(homepage.activeAreaId).toBe(custom.id);
+  });
 });
 
 describe('extension manifest', () => {
@@ -174,7 +207,7 @@ describe('extension manifest', () => {
     const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
 
     expect(manifest.manifest_version).toBe(3);
-    expect(manifest.version).toBe('1.1.1');
+    expect(manifest.version).toBe('1.2.0');
     expect(manifest.permissions).toEqual(['activeTab', 'scripting', 'storage', 'tabs']);
     expect(manifest.host_permissions).toBeUndefined();
     expect(manifest.background.service_worker).toBe('background.js');

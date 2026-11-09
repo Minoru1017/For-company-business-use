@@ -1,5 +1,11 @@
 export const SLOT_COUNT = 16;
 export const WORKSPACE_KEY = 'workHomepage';
+export const DEFAULT_AREAS = Object.freeze([
+  { id: 'work', name: '工作' },
+  { id: 'interest', name: '興趣' },
+  { id: 'entertainment', name: '影視' },
+]);
+export const MAX_AREAS = 8;
 
 function cleanText(value, maxLength) {
   return String(value ?? '').trim().replace(/\s+/g, ' ').slice(0, maxLength);
@@ -26,12 +32,14 @@ export function createEmptySlot() {
     routine: '',
     step: 0,
     thumbnail: '',
+    favicon: '',
   };
 }
 
 export function normalizeSlot(rawSlot = {}) {
   const url = normalizeWebUrl(rawSlot.url);
   const thumbnail = String(rawSlot.thumbnail ?? '');
+  const favicon = String(rawSlot.favicon ?? '');
   return {
     url,
     title: url ? cleanText(rawSlot.title, 60) || new URL(url).hostname : '',
@@ -40,6 +48,12 @@ export function normalizeSlot(rawSlot = {}) {
     step: url ? Math.max(0, Math.min(99, Number.parseInt(rawSlot.step, 10) || 0)) : 0,
     thumbnail:
       url && /^data:image\/(?:jpeg|png|webp);base64,/.test(thumbnail) ? thumbnail : '',
+    favicon:
+      url && /^(?:data:image\/(?:x-icon|vnd\.microsoft\.icon|png|jpeg|webp);base64,|https?:\/\/)/.test(
+        favicon,
+      )
+        ? favicon
+        : '',
   };
 }
 
@@ -49,6 +63,81 @@ export function normalizeWorkspace(rawWorkspace = {}) {
     normalizeSlot(sourceSlots[index]),
   );
   return { slots };
+}
+
+function normalizeAreaId(value) {
+  return String(value ?? '').trim().replace(/[^a-z\d-]/gi, '').slice(0, 36);
+}
+
+function normalizeAreaName(value) {
+  return cleanText(value, 12);
+}
+
+export function normalizeHomepage(rawHomepage = {}) {
+  const rawAreas = Array.isArray(rawHomepage.areas) ? rawHomepage.areas : [];
+  const seenIds = new Set();
+  const areas = rawAreas
+    .map((area) => {
+      const id = normalizeAreaId(area?.id);
+      const name = normalizeAreaName(area?.name);
+      if (!id || !name || seenIds.has(id)) return null;
+      seenIds.add(id);
+      return { id, name, ...normalizeWorkspace(area) };
+    })
+    .filter(Boolean)
+    .slice(0, MAX_AREAS);
+
+  DEFAULT_AREAS.forEach((defaultArea, index) => {
+    if (seenIds.has(defaultArea.id)) return;
+    const legacyWorkspace =
+      defaultArea.id === 'work' && !rawAreas.length
+        ? normalizeWorkspace(rawHomepage)
+        : normalizeWorkspace();
+    areas.splice(Math.min(index, areas.length), 0, { ...defaultArea, ...legacyWorkspace });
+    seenIds.add(defaultArea.id);
+  });
+
+  const activeAreaId = areas.some((area) => area.id === rawHomepage.activeAreaId)
+    ? rawHomepage.activeAreaId
+    : 'work';
+  return { version: 2, activeAreaId, areas: areas.slice(0, MAX_AREAS) };
+}
+
+export function getAreaWorkspace(homepage, areaId) {
+  const normalized = normalizeHomepage(homepage);
+  const area = normalized.areas.find((item) => item.id === areaId) ?? normalized.areas[0];
+  return normalizeWorkspace(area);
+}
+
+export function updateAreaWorkspace(homepage, areaId, workspace) {
+  const normalized = normalizeHomepage(homepage);
+  return {
+    ...normalized,
+    activeAreaId: areaId,
+    areas: normalized.areas.map((area) =>
+      area.id === areaId ? { id: area.id, name: area.name, ...normalizeWorkspace(workspace) } : area,
+    ),
+  };
+}
+
+export function createHomepageArea(homepage, name) {
+  const normalized = normalizeHomepage(homepage);
+  const cleanName = normalizeAreaName(name);
+  if (!cleanName || normalized.areas.length >= MAX_AREAS) return normalized;
+  const baseId =
+    cleanName
+      .normalize('NFKD')
+      .toLowerCase()
+      .replace(/[^a-z\d]+/g, '-')
+      .replace(/^-|-$/g, '') || `area-${Date.now().toString(36)}`;
+  let id = baseId;
+  let suffix = 2;
+  while (normalized.areas.some((area) => area.id === id)) id = `${baseId}-${suffix++}`;
+  return {
+    ...normalized,
+    activeAreaId: id,
+    areas: [...normalized.areas, { id, name: cleanName, ...normalizeWorkspace() }],
+  };
 }
 
 export function addPageToFirstEmptySlot(workspace, page) {

@@ -1,16 +1,27 @@
 import {
+  MAX_AREAS,
   WORKSPACE_KEY,
+  addPageToFirstEmptySlot,
+  createHomepageArea,
   createEmptySlot,
+  getAreaWorkspace,
   getRoutinePlan,
   getWorkspaceGroups,
   getWorkspaceRoutines,
   moveSlot,
+  normalizeHomepage,
   normalizeSlot,
   normalizeWebUrl,
   normalizeWorkspace,
+  updateAreaWorkspace,
 } from '../lib/workspace.js';
 
 const elements = {
+  areaTabs: document.querySelector('#area-tabs'),
+  addAreaButton: document.querySelector('#add-area-button'),
+  activeAreaName: document.querySelector('#active-area-name'),
+  openTabList: document.querySelector('#open-tab-list'),
+  openTabEmpty: document.querySelector('#open-tab-empty'),
   grid: document.querySelector('#slot-grid'),
   savedCount: document.querySelector('#saved-count'),
   groupFilters: document.querySelector('#group-filters'),
@@ -31,10 +42,15 @@ const elements = {
   dialogError: document.querySelector('#dialog-error'),
   helpButton: document.querySelector('#help-button'),
   helpDialog: document.querySelector('#help-dialog'),
+  areaDialog: document.querySelector('#area-dialog'),
+  areaForm: document.querySelector('#area-form'),
+  areaName: document.querySelector('#area-name'),
   toast: document.querySelector('#toast'),
 };
 
+let homepage = normalizeHomepage();
 let workspace = normalizeWorkspace();
+let openTabs = [];
 let selectedGroup = '';
 let editingIndex = -1;
 let draggedIndex = -1;
@@ -56,7 +72,8 @@ function showToast(message) {
 }
 
 async function saveWorkspace(message = '') {
-  await chrome.storage.local.set({ [WORKSPACE_KEY]: workspace });
+  homepage = updateAreaWorkspace(homepage, homepage.activeAreaId, workspace);
+  await chrome.storage.local.set({ [WORKSPACE_KEY]: homepage });
   if (message) showToast(message);
 }
 
@@ -77,6 +94,206 @@ function createMetaChip(text, className = '') {
   chip.className = `meta-chip ${className}`.trim();
   chip.textContent = text;
   return chip;
+}
+
+function currentArea() {
+  return homepage.areas.find((area) => area.id === homepage.activeAreaId) ?? homepage.areas[0];
+}
+
+function pageFromTransfer(dataTransfer) {
+  try {
+    const custom = dataTransfer.getData('application/x-homepage-tab');
+    if (custom) {
+      const parsed = JSON.parse(custom);
+      const url = normalizeWebUrl(parsed.url);
+      if (url) return normalizeSlot({ ...parsed, url });
+    }
+  } catch {
+    // Continue with standard URL drag formats.
+  }
+
+  const uri = dataTransfer
+    .getData('text/uri-list')
+    .split(/\r?\n/)
+    .find((line) => line && !line.startsWith('#'));
+  const plain = dataTransfer.getData('text/plain');
+  const url = normalizeWebUrl(uri || plain);
+  return url ? normalizeSlot({ url, title: safeHostname(url) }) : null;
+}
+
+async function addPage(page, targetIndex = -1) {
+  const normalizedPage = normalizeSlot(page);
+  if (!normalizedPage.url) {
+    showToast('這個項目不是可加入的網頁。');
+    return false;
+  }
+
+  let addedIndex = targetIndex;
+  if (targetIndex >= 0 && !workspace.slots[targetIndex].url) {
+    workspace.slots[targetIndex] = normalizedPage;
+  } else {
+    const result = addPageToFirstEmptySlot(workspace, normalizedPage);
+    workspace = result.workspace;
+    addedIndex = result.index;
+  }
+  if (addedIndex < 0) {
+    showToast(`${currentArea().name}的 16 個位置都已使用。`);
+    return false;
+  }
+  await saveWorkspace(`已加入${currentArea().name}第 ${addedIndex + 1} 格。`);
+  render();
+  return true;
+}
+
+function createTabFavicon(tab) {
+  const icon = document.createElement('span');
+  icon.className = 'tab-favicon';
+  if (tab.favIconUrl && /^(?:data:image|https?:)/.test(tab.favIconUrl)) {
+    const image = document.createElement('img');
+    image.src = tab.favIconUrl;
+    image.alt = '';
+    image.width = 18;
+    image.height = 18;
+    image.addEventListener('error', () => {
+      icon.replaceChildren(document.createTextNode(safeHostname(tab.url).slice(0, 1) || 'W'));
+    });
+    icon.append(image);
+  } else {
+    icon.textContent = safeHostname(tab.url).slice(0, 1) || 'W';
+  }
+  return icon;
+}
+
+function tabPage(tab) {
+  return {
+    url: tab.url,
+    title: tab.title || safeHostname(tab.url),
+    favicon: tab.favIconUrl || '',
+  };
+}
+
+function bindTabPointerDrag(item, page) {
+  let pointerId = null;
+  let startX = 0;
+  let startY = 0;
+  let target = null;
+
+  function clearTarget() {
+    target?.classList.remove('is-external-drop-target');
+    target = null;
+  }
+
+  item.addEventListener('pointerdown', (event) => {
+    if (
+      event.pointerType !== 'mouse' ||
+      event.button !== 0 ||
+      event.target.closest('button')
+    ) {
+      return;
+    }
+    pointerId = event.pointerId;
+    startX = event.clientX;
+    startY = event.clientY;
+    item.setPointerCapture(pointerId);
+  });
+
+  item.addEventListener('pointermove', (event) => {
+    if (event.pointerId !== pointerId) return;
+    const distance = Math.hypot(event.clientX - startX, event.clientY - startY);
+    if (distance < 7 && !item.classList.contains('is-dragging')) return;
+    event.preventDefault();
+    item.classList.add('is-dragging');
+    const nextTarget = document.elementFromPoint(event.clientX, event.clientY)?.closest('.empty-slot');
+    if (nextTarget === target) return;
+    clearTarget();
+    target = nextTarget;
+    target?.classList.add('is-external-drop-target');
+  });
+
+  item.addEventListener('pointerup', async (event) => {
+    if (event.pointerId !== pointerId) return;
+    const droppedTarget = target;
+    const wasDragging = item.classList.contains('is-dragging');
+    clearTarget();
+    item.classList.remove('is-dragging');
+    item.releasePointerCapture(pointerId);
+    pointerId = null;
+    if (!wasDragging || !droppedTarget) return;
+    const index = Number.parseInt(droppedTarget.dataset.index, 10);
+    if (Number.isInteger(index)) await addPage(page, index);
+  });
+
+  item.addEventListener('pointercancel', () => {
+    clearTarget();
+    item.classList.remove('is-dragging');
+    pointerId = null;
+  });
+}
+
+function renderOpenTabs() {
+  const fragment = document.createDocumentFragment();
+  openTabs.forEach((tab) => {
+    const item = document.createElement('article');
+    item.className = 'open-tab-item';
+    item.dataset.tabId = tab.id;
+    item.setAttribute('aria-label', `拖曳 ${tab.title} 到空槽`);
+
+    const copy = document.createElement('span');
+    copy.className = 'tab-item-copy';
+    const title = document.createElement('span');
+    title.className = 'tab-item-title';
+    title.textContent = tab.title || '未命名分頁';
+    title.title = tab.title || '';
+    const host = document.createElement('span');
+    host.className = 'tab-item-host';
+    host.textContent = safeHostname(tab.url);
+    copy.append(title, host);
+
+    const addButton = document.createElement('button');
+    addButton.type = 'button';
+    addButton.className = 'tab-add-button';
+    addButton.textContent = '+';
+    addButton.setAttribute('aria-label', `將 ${tab.title} 加入${currentArea().name}`);
+    addButton.addEventListener('click', () => addPage(tabPage(tab)));
+
+    item.append(createTabFavicon(tab), copy, addButton);
+    bindTabPointerDrag(item, tabPage(tab));
+    fragment.append(item);
+  });
+  elements.openTabList.replaceChildren(fragment);
+  elements.openTabEmpty.hidden = openTabs.length > 0;
+}
+
+async function refreshOpenTabs() {
+  const dashboardUrl = chrome.runtime.getURL('dashboard/dashboard.html');
+  const tabs = await chrome.tabs.query({ currentWindow: true });
+  openTabs = tabs.filter(
+    (tab) => normalizeWebUrl(tab.url) && !String(tab.url).startsWith(dashboardUrl),
+  );
+  renderOpenTabs();
+}
+
+function renderAreaTabs() {
+  const fragment = document.createDocumentFragment();
+  homepage.areas.forEach((area) => {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = `area-tab${area.id === homepage.activeAreaId ? ' is-active' : ''}`;
+    button.textContent = area.name;
+    button.setAttribute('aria-pressed', String(area.id === homepage.activeAreaId));
+    button.addEventListener('click', async () => {
+      homepage = updateAreaWorkspace(homepage, homepage.activeAreaId, workspace);
+      homepage.activeAreaId = area.id;
+      workspace = getAreaWorkspace(homepage, area.id);
+      selectedGroup = '';
+      await chrome.storage.local.set({ [WORKSPACE_KEY]: homepage });
+      render();
+    });
+    fragment.append(button);
+  });
+  elements.areaTabs.replaceChildren(fragment);
+  elements.addAreaButton.disabled = homepage.areas.length >= MAX_AREAS;
+  elements.activeAreaName.textContent = currentArea().name;
 }
 
 async function reorderSlot(fromIndex, toIndex) {
@@ -142,9 +359,21 @@ function createFilledCard(slot, index) {
   } else {
     const fallback = document.createElement('span');
     fallback.className = 'preview-fallback';
-    const initial = document.createElement('span');
-    initial.textContent = safeHostname(slot.url).slice(0, 1) || 'W';
-    fallback.append(initial);
+    if (slot.favicon) {
+      const favicon = document.createElement('img');
+      favicon.src = slot.favicon;
+      favicon.alt = '';
+      favicon.width = 28;
+      favicon.height = 28;
+      const initial = document.createElement('span');
+      initial.textContent = safeHostname(slot.url).slice(0, 1) || 'W';
+      favicon.addEventListener('error', () => fallback.replaceChildren(initial));
+      fallback.append(favicon);
+    } else {
+      const initial = document.createElement('span');
+      initial.textContent = safeHostname(slot.url).slice(0, 1) || 'W';
+      fallback.append(initial);
+    }
     preview.append(fallback);
   }
 
@@ -205,10 +434,27 @@ function createEmptyCard(index) {
   const label = document.createElement('strong');
   label.textContent = `空槽 ${String(index + 1).padStart(2, '0')}`;
   const hint = document.createElement('small');
-  hint.textContent = '點此手動新增網站';
+  hint.textContent = '拖入分頁，或點此手動新增';
   button.append(plus, label, hint);
   button.addEventListener('click', () => openEditor(index));
   card.append(button);
+  card.addEventListener('dragover', (event) => {
+    if (draggedIndex >= 0) return;
+    event.preventDefault();
+    event.dataTransfer.dropEffect = 'copy';
+    card.classList.add('is-external-drop-target');
+  });
+  card.addEventListener('dragleave', (event) => {
+    if (!card.contains(event.relatedTarget)) card.classList.remove('is-external-drop-target');
+  });
+  card.addEventListener('drop', async (event) => {
+    if (draggedIndex >= 0) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    card.classList.remove('is-external-drop-target');
+    const page = pageFromTransfer(event.dataTransfer);
+    if (page) await addPage(page, index);
+  });
   bindDragEvents(card, index);
   return card;
 }
@@ -316,9 +562,12 @@ function renderRoutines() {
 }
 
 function render() {
+  homepage = normalizeHomepage(homepage);
   workspace = normalizeWorkspace(workspace);
   const count = workspace.slots.filter((slot) => slot.url).length;
-  elements.savedCount.textContent = `${count} / 16 已使用`;
+  elements.savedCount.textContent = `${currentArea().name}：${count} / 16 已使用`;
+  renderAreaTabs();
+  renderOpenTabs();
   renderGroupFilters();
   renderRoutines();
   renderGrid();
@@ -383,6 +632,31 @@ document.querySelectorAll('[data-close-help]').forEach((button) => {
   button.addEventListener('click', () => elements.helpDialog.close());
 });
 
+elements.addAreaButton.addEventListener('click', () => {
+  elements.areaName.value = '';
+  elements.areaDialog.showModal();
+  elements.areaName.focus();
+});
+document.querySelectorAll('[data-close-area]').forEach((button) => {
+  button.addEventListener('click', () => elements.areaDialog.close());
+});
+elements.areaForm.addEventListener('submit', async (event) => {
+  event.preventDefault();
+  homepage = updateAreaWorkspace(homepage, homepage.activeAreaId, workspace);
+  const previousCount = homepage.areas.length;
+  homepage = createHomepageArea(homepage, elements.areaName.value);
+  if (homepage.areas.length === previousCount) {
+    showToast('請輸入不同的領域名稱，或已達 8 個領域上限。');
+    return;
+  }
+  workspace = getAreaWorkspace(homepage, homepage.activeAreaId);
+  selectedGroup = '';
+  await chrome.storage.local.set({ [WORKSPACE_KEY]: homepage });
+  elements.areaDialog.close();
+  render();
+  showToast(`已建立「${currentArea().name}」領域。`);
+});
+
 elements.routineSelect.addEventListener('change', updateRoutineSummary);
 elements.routineButton.addEventListener('click', async () => {
   const { slots } = getRoutinePlan(workspace, elements.routineSelect.value);
@@ -394,13 +668,27 @@ elements.routineButton.addEventListener('click', async () => {
 
 chrome.storage.onChanged.addListener((changes, areaName) => {
   if (areaName !== 'local' || !changes[WORKSPACE_KEY]) return;
-  workspace = normalizeWorkspace(changes[WORKSPACE_KEY].newValue);
+  homepage = normalizeHomepage(changes[WORKSPACE_KEY].newValue);
+  workspace = getAreaWorkspace(homepage, homepage.activeAreaId);
   render();
 });
 
+chrome.tabs.onCreated.addListener(refreshOpenTabs);
+chrome.tabs.onRemoved.addListener(refreshOpenTabs);
+chrome.tabs.onUpdated.addListener((_tabId, changeInfo) => {
+  if (changeInfo.status === 'complete' || changeInfo.url || changeInfo.title) refreshOpenTabs();
+});
+
 async function initialize() {
-  const stored = await chrome.storage.local.get(WORKSPACE_KEY);
-  workspace = normalizeWorkspace(stored[WORKSPACE_KEY]);
+  const [stored] = await Promise.all([
+    chrome.storage.local.get(WORKSPACE_KEY),
+    refreshOpenTabs(),
+  ]);
+  homepage = normalizeHomepage(stored[WORKSPACE_KEY]);
+  workspace = getAreaWorkspace(homepage, homepage.activeAreaId);
+  if (stored[WORKSPACE_KEY]?.version !== 2) {
+    await chrome.storage.local.set({ [WORKSPACE_KEY]: homepage });
+  }
   render();
 }
 

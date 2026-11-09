@@ -4,16 +4,16 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="theme-color" content="#f7f9fc">
-    <title>我的工作首頁</title>
+    <title>我的網站首頁</title>
     <link rel="stylesheet" href="dashboard.css">
   </head>
   <body>
     <header class="topbar">
-      <a class="brand" href="dashboard.html" aria-label="工作首頁">
+      <a class="brand" href="dashboard.html" aria-label="網站首頁">
         <span class="brand-mark" aria-hidden="true"><i></i><i></i><i></i></span>
         <span>
-          <strong>工作首頁</strong>
-          <small>16 個位置，排好每天的工作</small>
+          <strong>我的網站首頁</strong>
+          <small>依生活領域整理常用網站</small>
         </span>
       </a>
       <div class="topbar-meta">
@@ -22,13 +22,30 @@
       </div>
     </header>
 
+    <nav class="area-switcher" aria-label="主領域切換">
+      <div id="area-tabs" class="area-tabs"></div>
+      <button id="add-area-button" class="add-area-button" type="button">＋ 新領域</button>
+    </nav>
+
     <main>
+      <section class="tab-shelf" aria-labelledby="tab-shelf-heading">
+        <div class="tab-shelf-heading">
+          <div>
+            <p class="eyebrow">OPEN TABS</p>
+            <h2 id="tab-shelf-heading">這個瀏覽器目前開啟的分頁</h2>
+          </div>
+          <p>拖曳分頁到空槽，或按＋直接加入目前領域。</p>
+        </div>
+        <div id="open-tab-list" class="open-tab-list"></div>
+        <p id="open-tab-empty" class="open-tab-empty" hidden>目前沒有可加入的網站分頁。</p>
+      </section>
+
       <section class="hero">
         <div>
-          <p class="eyebrow">WORK ROUTINE</p>
-          <h1>今天要開的網站，照順序放好。</h1>
+          <p class="eyebrow">YOUR SPACE</p>
+          <h1><span id="active-area-name">工作</span>網站，照你的方式排好。</h1>
           <p class="hero-copy">
-            從擴充功能儲存目前分頁，再用群組與流程順位整理。拖曳卡片即可調整首頁位置。
+            每個領域有獨立 16 槽。拖入分頁、建立群組，再用流程順位安排開啟順序。
           </p>
         </div>
         <div class="routine-runner" aria-labelledby="routine-heading">
@@ -58,7 +75,7 @@
         <div class="workspace-header">
           <div>
             <p class="eyebrow">QUICK ACCESS</p>
-            <h2 id="workspace-heading">我的網站</h2>
+            <h2 id="workspace-heading">網站位置</h2>
           </div>
           <div id="group-filters" class="group-filters" aria-label="群組篩選"></div>
         </div>
@@ -118,18 +135,42 @@
       </form>
     </dialog>
 
+    <dialog id="area-dialog" class="area-dialog">
+      <form id="area-form" method="dialog">
+        <div class="dialog-header">
+          <div>
+            <p class="eyebrow">NEW SPACE</p>
+            <h2>建立新領域</h2>
+          </div>
+          <button class="icon-button" type="button" data-close-area aria-label="關閉">×</button>
+        </div>
+        <label>
+          領域名稱
+          <input id="area-name" name="area-name" maxlength="12" required
+            placeholder="例如：閱讀、旅遊、理財">
+        </label>
+        <p class="area-hint">新領域會有一組獨立的 16 個網站位置。</p>
+        <div class="dialog-actions compact-actions">
+          <span></span>
+          <span></span>
+          <button class="quiet-button" type="button" data-close-area>取消</button>
+          <button class="primary-button" type="submit">建立領域</button>
+        </div>
+      </form>
+    </dialog>
+
     <dialog id="help-dialog" class="help-dialog">
       <div class="dialog-header">
         <div>
           <p class="eyebrow">3 STEPS</p>
-          <h2>快速建立工作首頁</h2>
+          <h2>快速建立網站首頁</h2>
         </div>
         <button class="icon-button" type="button" data-close-help aria-label="關閉">×</button>
       </div>
       <ol>
-        <li><span>01</span><div><strong>儲存分頁</strong><p>在任何網頁點擴充功能，再按「存到工作首頁」。</p></div></li>
-        <li><span>02</span><div><strong>設定群組與流程</strong><p>點卡片的編輯按鈕，填入群組、流程和順位。</p></div></li>
-        <li><span>03</span><div><strong>每天一鍵開工</strong><p>選擇例行流程，系統會依順位開啟所有網站。</p></div></li>
+        <li><span>01</span><div><strong>選擇生活領域</strong><p>用工作、興趣、影視或自訂領域分開保存網站。</p></div></li>
+        <li><span>02</span><div><strong>拖入開啟的分頁</strong><p>把上方分頁拖到空槽，也能從其他視窗拖入網頁連結。</p></div></li>
+        <li><span>03</span><div><strong>設定群組與流程</strong><p>編輯卡片的群組、流程和順位，再一鍵依序開啟。</p></div></li>
       </ol>
       <button class="primary-button full-button" type="button" data-close-help>知道了</button>
     </dialog>

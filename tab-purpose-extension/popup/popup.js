@@ -10,8 +10,10 @@ import {
   SLOT_COUNT,
   WORKSPACE_KEY,
   addPageToFirstEmptySlot,
+  getAreaWorkspace,
+  normalizeHomepage,
   normalizeWebUrl,
-  normalizeWorkspace,
+  updateAreaWorkspace,
 } from '../lib/workspace.js';
 
 const elements = {
@@ -180,15 +182,17 @@ async function reloadTabs() {
   renderTabs();
 }
 
-async function readWorkspace() {
+async function readHomepage() {
   const stored = await chrome.storage.local.get(WORKSPACE_KEY);
-  return normalizeWorkspace(stored[WORKSPACE_KEY]);
+  return normalizeHomepage(stored[WORKSPACE_KEY]);
 }
 
 async function updateHomeSlotStatus() {
-  const savedWorkspace = await readWorkspace();
+  const homepage = await readHomepage();
+  const savedWorkspace = getAreaWorkspace(homepage, homepage.activeAreaId);
   const used = savedWorkspace.slots.filter((slot) => slot.url).length;
-  elements.homeSlotStatus.textContent = `${used} / ${SLOT_COUNT} 個位置已使用`;
+  const area = homepage.areas.find((item) => item.id === homepage.activeAreaId);
+  elements.homeSlotStatus.textContent = `${area?.name ?? '目前領域'}：${used} / ${SLOT_COUNT} 已使用`;
   elements.saveHomeButton.disabled = used >= SLOT_COUNT;
 }
 
@@ -239,10 +243,11 @@ async function saveCurrentPageToHome() {
   elements.saveHomeButton.disabled = true;
   elements.saveHomeButton.textContent = '擷取中…';
   try {
-    const [savedWorkspace, thumbnail] = await Promise.all([
-      readWorkspace(),
+    const [homepage, thumbnail] = await Promise.all([
+      readHomepage(),
       captureThumbnail(),
     ]);
+    const savedWorkspace = getAreaWorkspace(homepage, homepage.activeAreaId);
     const result = addPageToFirstEmptySlot(savedWorkspace, {
       url: activeTab.url,
       title: stripPurposePrefix(activeTab.title, activeTab.purpose),
@@ -252,14 +257,17 @@ async function saveCurrentPageToHome() {
       showStatus('16 個位置都已使用，請先到工作首頁清空一格。', true);
       return;
     }
-    await chrome.storage.local.set({ [WORKSPACE_KEY]: result.workspace });
+    await chrome.storage.local.set({
+      [WORKSPACE_KEY]: updateAreaWorkspace(homepage, homepage.activeAreaId, result.workspace),
+    });
     await updateHomeSlotStatus();
     showStatus(`已存到工作首頁第 ${result.index + 1} 格。`);
   } catch (error) {
     showStatus(error.message || '無法儲存目前分頁。', true);
   } finally {
     elements.saveHomeButton.textContent = '存到首頁';
-    const currentWorkspace = await readWorkspace();
+    const currentHomepage = await readHomepage();
+    const currentWorkspace = getAreaWorkspace(currentHomepage, currentHomepage.activeAreaId);
     elements.saveHomeButton.disabled =
       currentWorkspace.slots.filter((slot) => slot.url).length >= SLOT_COUNT;
   }

@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "分頁用途標記",
-  "version": "1.1.1",
-  "description": "用分頁用途標記與 16 格工作首頁，整理網站、群組和例行流程。",
+  "version": "1.2.0",
+  "description": "拖入開啟的分頁，依工作、興趣與影視領域整理 16 格網站首頁。",
   "permissions": ["activeTab", "scripting", "storage", "tabs"],
   "background": {
     "service_worker": "background.js",
