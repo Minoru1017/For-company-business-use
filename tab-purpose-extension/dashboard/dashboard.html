@@ -32,6 +32,7 @@
           </div>
         </div>
         <span id="saved-count">0 / 16 已使用</span>
+        <button id="open-default-search" class="quiet-button" type="button">預設搜尋頁</button>
         <button id="help-button" class="quiet-button" type="button">使用說明</button>
       </div>
     </header>
@@ -40,6 +41,22 @@
       <div id="area-tabs" class="area-tabs"></div>
       <button id="add-area-button" class="add-area-button" type="button">＋ 新領域</button>
     </nav>
+
+    <section id="search-page-prompt" class="search-page-prompt" hidden>
+      <div class="search-page-prompt-copy">
+        <p class="eyebrow">OPTIONAL</p>
+        <strong>可選是否要回到預設搜尋引擎頁面</strong>
+        <p>此擴充功能會取代新分頁。若你想先用瀏覽器原本的搜尋頁，可在這裡切換。</p>
+      </div>
+      <div class="search-page-prompt-actions">
+        <button id="search-page-yes" class="primary-button" type="button">是，開啟預設搜尋頁</button>
+        <button id="search-page-no" class="quiet-button" type="button">否，留在此首頁</button>
+        <label class="search-page-remember">
+          <input id="search-page-remember" type="checkbox">
+          記住選擇（之後新分頁套用）
+        </label>
+      </div>
+    </section>
 
     <main>
       <section class="tab-shelf" aria-labelledby="tab-shelf-heading">
@@ -182,7 +199,7 @@
         <button class="icon-button" type="button" data-close-help aria-label="關閉">×</button>
       </div>
       <ol>
-        <li><span>01</span><div><strong>登入 Google 帳號</strong><p>右上角可登入瀏覽器目前的 Google 帳號，方便辨識工作身分。</p></div></li>
+        <li><span>01</span><div><strong>可選預設搜尋頁</strong><p>首頁可選擇是否回到瀏覽器預設搜尋引擎頁面；也可之後用右上角「預設搜尋頁」。</p></div></li>
         <li><span>02</span><div><strong>拖入開啟的分頁</strong><p>把上方分頁拖到空槽；網站會自動帶入放大的 LOGO 縮圖。</p></div></li>
         <li><span>03</span><div><strong>內嵌開啟與左右分屏</strong><p>點槽位會以浮動視窗內嵌開啟；再點另一個槽位可左右分屏，拖曳中間分隔線縮放。</p></div></li>
       </ol>

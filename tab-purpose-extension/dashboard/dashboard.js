@@ -6,6 +6,15 @@ import {
 } from '../lib/google-account.js';
 import { enrichPageWithLogo, resolveSlotLogo } from '../lib/logo.js';
 import {
+  SEARCH_PAGE_MODES,
+  normalizeSearchPagePref,
+  openDefaultSearchPage,
+  readSearchPagePref,
+  shouldRedirectToSearchPage,
+  shouldShowSearchPagePrompt,
+  writeSearchPagePref,
+} from '../lib/search-page.js';
+import {
   assignOpenTarget,
   clampSplitRatio,
   closeViewerPane,
@@ -67,6 +76,11 @@ const elements = {
   areaDialog: document.querySelector('#area-dialog'),
   areaForm: document.querySelector('#area-form'),
   areaName: document.querySelector('#area-name'),
+  searchPagePrompt: document.querySelector('#search-page-prompt'),
+  searchPageYes: document.querySelector('#search-page-yes'),
+  searchPageNo: document.querySelector('#search-page-no'),
+  searchPageRemember: document.querySelector('#search-page-remember'),
+  openDefaultSearch: document.querySelector('#open-default-search'),
   toast: document.querySelector('#toast'),
   embeddedViewer: document.querySelector('#embedded-viewer'),
   viewerStage: document.querySelector('#viewer-stage'),
@@ -99,6 +113,23 @@ let toastTimer = null;
 let googleAccount = { signedIn: false, email: '', id: '', name: '', picture: '' };
 let viewerState = createViewerState();
 let viewerResizeBound = null;
+let searchPagePref = { mode: SEARCH_PAGE_MODES.ASK, updatedAt: 0 };
+
+function renderSearchPagePrompt() {
+  elements.searchPagePrompt.hidden = !shouldShowSearchPagePrompt(searchPagePref);
+}
+
+async function goToDefaultSearchPage({ rememberRedirect = false } = {}) {
+  if (rememberRedirect) {
+    searchPagePref = await writeSearchPagePref(SEARCH_PAGE_MODES.REDIRECT);
+    renderSearchPagePrompt();
+  }
+  try {
+    await openDefaultSearchPage(chrome, window);
+  } catch (error) {
+    showToast(error.message || '無法開啟預設搜尋頁。');
+  }
+}
 
 function safeHostname(url) {
   try {
@@ -1064,18 +1095,54 @@ document.addEventListener('keydown', (event) => {
   }
 });
 
+elements.searchPageYes.addEventListener('click', async () => {
+  await goToDefaultSearchPage({
+    rememberRedirect: Boolean(elements.searchPageRemember.checked),
+  });
+});
+
+elements.searchPageNo.addEventListener('click', async () => {
+  if (elements.searchPageRemember.checked) {
+    searchPagePref = await writeSearchPagePref(SEARCH_PAGE_MODES.STAY);
+  }
+  elements.searchPagePrompt.hidden = true;
+  showToast(
+    elements.searchPageRemember.checked
+      ? '已記住：之後新分頁留在此首頁。'
+      : '將留在網站首頁。可用右上角「預設搜尋頁」隨時切換。',
+  );
+});
+
+elements.openDefaultSearch.addEventListener('click', async () => {
+  await goToDefaultSearchPage();
+});
+
+chrome.storage.onChanged.addListener((changes, areaName) => {
+  if (areaName === 'local' && changes.defaultSearchPagePref) {
+    searchPagePref = normalizeSearchPagePref(changes.defaultSearchPagePref.newValue);
+    renderSearchPagePrompt();
+  }
+});
+
 async function initialize() {
-  const [stored] = await Promise.all([
+  const [stored, pref] = await Promise.all([
     chrome.storage.local.get(WORKSPACE_KEY),
+    readSearchPagePref(),
     refreshOpenTabs(),
     syncGoogleAccount(),
   ]);
+  searchPagePref = pref;
+  if (shouldRedirectToSearchPage(searchPagePref)) {
+    await goToDefaultSearchPage();
+    return;
+  }
   homepage = normalizeHomepage(stored[WORKSPACE_KEY]);
   workspace = getAreaWorkspace(homepage, homepage.activeAreaId);
   if (stored[WORKSPACE_KEY]?.version !== 2) {
     await chrome.storage.local.set({ [WORKSPACE_KEY]: homepage });
   }
   render();
+  renderSearchPagePrompt();
 }
 
 initialize();

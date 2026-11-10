@@ -16,6 +16,13 @@ import {
   buildEmbedAllowRules,
 } from '../tab-purpose-extension/lib/embed-allow.js';
 import {
+  SEARCH_PAGE_MODES,
+  getDefaultSearchPageCandidates,
+  normalizeSearchPagePref,
+  shouldRedirectToSearchPage,
+  shouldShowSearchPagePrompt,
+} from '../tab-purpose-extension/lib/search-page.js';
+import {
   assignOpenTarget,
   clampSplitRatio,
   closeViewerPane,
@@ -294,13 +301,28 @@ describe('embed allow rules', () => {
   });
 });
 
+describe('default search page preference', () => {
+  it('defaults to asking, and can stay or redirect', () => {
+    expect(normalizeSearchPagePref()).toMatchObject({ mode: SEARCH_PAGE_MODES.ASK });
+    expect(shouldShowSearchPagePrompt({ mode: 'ask' })).toBe(true);
+    expect(shouldShowSearchPagePrompt({ mode: 'stay' })).toBe(false);
+    expect(shouldRedirectToSearchPage({ mode: 'redirect' })).toBe(true);
+    expect(getDefaultSearchPageCandidates('Mozilla/5.0 Chrome/120')).toContain(
+      'chrome://new-tab-page/',
+    );
+    expect(getDefaultSearchPageCandidates('Mozilla/5.0 Edg/120')).toContain(
+      'edge://new-tab-page/',
+    );
+  });
+});
+
 describe('extension manifest', () => {
   it('uses Manifest V3 and only the required permissions', async () => {
     const manifestPath = new URL('../tab-purpose-extension/manifest.json', import.meta.url);
     const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
 
     expect(manifest.manifest_version).toBe(3);
-    expect(manifest.version).toBe('1.4.1');
+    expect(manifest.version).toBe('1.5.0');
     expect(manifest.permissions).toEqual([
       'activeTab',
       'declarativeNetRequest',

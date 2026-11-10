@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "分頁用途標記",
-  "version": "1.4.1",
-  "description": "拖入開啟的分頁，依工作、興趣與影視領域整理 16 格網站首頁；點槽位以內嵌浮動視窗開啟，並支援左右分屏縮放。",
+  "version": "1.5.0",
+  "description": "多領域 16 格網站首頁、內嵌分屏瀏覽，並可選擇回到預設搜尋引擎頁面。",
   "permissions": [
     "activeTab",
     "declarativeNetRequest",
