@@ -18,6 +18,18 @@ export default [
     },
   },
   {
+    files: ['tab-purpose-extension/**/*.js'],
+    languageOptions: {
+      ecmaVersion: 2023,
+      sourceType: 'module',
+      globals: { ...globals.browser, chrome: 'readonly' },
+    },
+    rules: {
+      'no-unused-vars': ['warn', { args: 'none', caughtErrors: 'none' }],
+      'no-empty': ['error', { allowEmptyCatch: true }],
+    },
+  },
+  {
     files: ['tests/**/*.js', 'vite.config.js', 'vitest.config.js', 'scripts/**/*.mjs', 'eslint.config.js'],
     languageOptions: {
       ecmaVersion: 2023,

@@ -1,0 +1,27 @@
+{
+  "manifest_version": 3,
+  "name": "分頁用途標記",
+  "version": "1.5.0",
+  "description": "多領域 16 格網站首頁、內嵌分屏瀏覽，並可選擇回到預設搜尋引擎頁面。",
+  "permissions": [
+    "activeTab",
+    "declarativeNetRequest",
+    "identity",
+    "identity.email",
+    "scripting",
+    "storage",
+    "tabs"
+  ],
+  "host_permissions": ["http://*/*", "https://*/*"],
+  "background": {
+    "service_worker": "background.js",
+    "type": "module"
+  },
+  "action": {
+    "default_title": "標記這個分頁",
+    "default_popup": "popup/popup.html"
+  },
+  "chrome_url_overrides": {
+    "newtab": "dashboard/dashboard.html"
+  }
+}

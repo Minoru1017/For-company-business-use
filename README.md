@@ -2,6 +2,10 @@
 
 顧問式銷售電訪逐字稿分析工具（VER 11）。
 
+## 分頁用途標記（Chrome／Edge）
+
+`tab-purpose-extension/` 是獨立、輕量的分頁標記擴充功能，可替工作分頁加上用途前綴、顏色與工具列徽章。安裝與使用方式見 [`tab-purpose-extension/README.md`](tab-purpose-extension/README.md)，可直接傳送的 ZIP 位於 `artifacts/tab-purpose-extension.zip`。
+
 ## 線上使用
 
 **https://minoru1017.github.io/For-company-business-use/**
