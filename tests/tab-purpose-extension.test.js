@@ -12,6 +12,10 @@ import {
 import { normalizeAccount } from '../tab-purpose-extension/lib/google-account.js';
 import { buildLogoUrl, enrichPageWithLogo, resolveSlotLogo } from '../tab-purpose-extension/lib/logo.js';
 import {
+  EMBED_ALLOW_RULE_ID,
+  buildEmbedAllowRules,
+} from '../tab-purpose-extension/lib/embed-allow.js';
+import {
   assignOpenTarget,
   clampSplitRatio,
   closeViewerPane,
@@ -272,15 +276,41 @@ describe('embedded viewer helpers', () => {
   });
 });
 
+describe('embed allow rules', () => {
+  it('builds a sub_frame header-removal rule scoped to this extension', () => {
+    const rules = buildEmbedAllowRules('abcdefghijklmnop');
+    expect(rules).toHaveLength(1);
+    expect(rules[0].id).toBe(EMBED_ALLOW_RULE_ID);
+    expect(rules[0].condition).toMatchObject({
+      resourceTypes: ['sub_frame'],
+      initiatorDomains: ['abcdefghijklmnop'],
+    });
+    expect(rules[0].action.responseHeaders.map((item) => item.header)).toEqual([
+      'x-frame-options',
+      'content-security-policy',
+      'content-security-policy-report-only',
+    ]);
+    expect(buildEmbedAllowRules('')).toEqual([]);
+  });
+});
+
 describe('extension manifest', () => {
   it('uses Manifest V3 and only the required permissions', async () => {
     const manifestPath = new URL('../tab-purpose-extension/manifest.json', import.meta.url);
     const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
 
     expect(manifest.manifest_version).toBe(3);
-    expect(manifest.version).toBe('1.4.0');
-    expect(manifest.permissions).toEqual(['activeTab', 'identity', 'identity.email', 'scripting', 'storage', 'tabs']);
-    expect(manifest.host_permissions).toBeUndefined();
+    expect(manifest.version).toBe('1.4.1');
+    expect(manifest.permissions).toEqual([
+      'activeTab',
+      'declarativeNetRequest',
+      'identity',
+      'identity.email',
+      'scripting',
+      'storage',
+      'tabs',
+    ]);
+    expect(manifest.host_permissions).toEqual(['http://*/*', 'https://*/*']);
     expect(manifest.background.service_worker).toBe('background.js');
     expect(manifest.chrome_url_overrides.newtab).toBe('dashboard/dashboard.html');
   });

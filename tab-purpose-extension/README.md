@@ -54,10 +54,10 @@
 
 - 分頁標記存在瀏覽器工作階段；首頁設定與縮圖存在本機 `chrome.storage.local`。
 - LOGO 縮圖會向 Google Favicon 服務請求公開圖示；Google 登入只讀取瀏覽器目前登入的帳號資訊。
-- 不含追蹤碼，不讀取網頁內容。
+- 內嵌視窗只會對「由此首頁 iframe 發出」的子頁面請求，移除 `X-Frame-Options`／CSP 防嵌入標頭；不讀取網頁內容、不含追蹤碼。
 - 縮圖只在你按「存到首頁」時擷取目前可見畫面，壓縮為 320 × 180 JPEG。
 - 使用原生 HTML、CSS、JavaScript，沒有執行階段依賴。
-- 權限包含 `activeTab`、`identity`、`identity.email`、`scripting`、`storage` 與 `tabs`；程式只在你主動標記的分頁注入標題前綴，不要求全網站常駐權限。
+- 權限包含 `activeTab`、`declarativeNetRequest`、`identity`、`identity.email`、`scripting`、`storage`、`tabs`，以及讀取 `http(s)` 回應標頭的主機權限；僅用於讓首頁內嵌視窗略過目標站的防嵌入標頭，並在你主動標記的分頁注入標題前綴。
 
 ## 打包
 

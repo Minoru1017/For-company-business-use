@@ -1336,6 +1336,36 @@ dialog::backdrop {
   display: none !important;
 }
 
+.viewer-blocked {
+  position: absolute;
+  inset: 42px 0 0;
+  z-index: 2;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 10px;
+  padding: 28px;
+  background: rgba(248, 250, 252, 0.96);
+  color: var(--text);
+  text-align: center;
+}
+
+.viewer-blocked[hidden] {
+  display: none !important;
+}
+
+.viewer-blocked strong {
+  font-size: 15px;
+}
+
+.viewer-blocked p {
+  margin: 0;
+  max-width: 360px;
+  color: var(--text-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .viewer-divider {
   position: relative;
   z-index: 3;

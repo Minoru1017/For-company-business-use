@@ -1,9 +1,24 @@
+import { installEmbedAllowRules } from './lib/embed-allow.js';
 import {
   PURPOSE_COLORS,
   getBadgeText,
   normalizeColor,
   normalizePurpose,
 } from './lib/purpose.js';
+
+async function ensureEmbedAllowRules() {
+  try {
+    return await installEmbedAllowRules(chrome);
+  } catch (error) {
+    console.warn('Unable to install embed allow rules', error);
+    return { installed: false, ruleIds: [], error: error.message };
+  }
+}
+
+ensureEmbedAllowRules();
+chrome.runtime.onInstalled.addListener(() => {
+  ensureEmbedAllowRules();
+});
 
 const STORAGE_KEY = 'tabPurposes';
 
@@ -103,6 +118,8 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         return tabId ? setPurpose(tabId, message.entry) : null;
       case 'getTabList':
         return getTabList();
+      case 'ensureEmbedAllow':
+        return ensureEmbedAllowRules();
       default:
         return null;
     }
@@ -129,6 +146,7 @@ chrome.tabs.onUpdated.addListener(async (tabId, changeInfo) => {
 });
 
 chrome.runtime.onStartup.addListener(async () => {
+  await ensureEmbedAllowRules();
   const purposes = await readPurposes();
   await Promise.all(
     Object.entries(purposes).map(([tabId, entry]) => updateBadge(Number(tabId), entry)),

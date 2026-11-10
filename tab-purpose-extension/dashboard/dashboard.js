@@ -82,6 +82,8 @@ const elements = {
   viewerRightFrame: document.querySelector('#viewer-right-frame'),
   viewerLeftEmpty: document.querySelector('#viewer-left-empty'),
   viewerRightEmpty: document.querySelector('#viewer-right-empty'),
+  viewerLeftBlocked: document.querySelector('#viewer-left-blocked'),
+  viewerRightBlocked: document.querySelector('#viewer-right-blocked'),
   viewerLeftPane: document.querySelector('.viewer-pane[data-pane="left"]'),
   viewerRightPane: document.querySelector('.viewer-pane[data-pane="right"]'),
   viewerSlotRail: document.querySelector('#viewer-slot-rail'),
@@ -405,17 +407,64 @@ function createReorderControls(index) {
   return controls;
 }
 
-function syncPaneFrame(frame, empty, page) {
+async function ensureEmbedAllow() {
+  try {
+    await chrome.runtime.sendMessage({ type: 'ensureEmbedAllow' });
+  } catch {
+    /* background may be restarting; rules reinstall on startup */
+  }
+}
+
+function setPaneBlocked(blockedEl, isBlocked) {
+  if (!blockedEl) return;
+  blockedEl.hidden = !isBlocked;
+}
+
+function probeFrameBlocked(frame) {
+  try {
+    const href = String(frame.contentWindow?.location?.href ?? '');
+    if (!href || href === 'about:blank') return true;
+    if (href.startsWith('chrome-error://') || href.startsWith('chrome://')) return true;
+    const text = String(frame.contentDocument?.body?.innerText ?? '');
+    if (/拒絕連線|refused to connect|ERR_BLOCKED_BY_RESPONSE|拒絕連接/i.test(text)) {
+      return true;
+    }
+    return false;
+  } catch {
+    // Cross-origin access denied usually means the remote page loaded.
+    return false;
+  }
+}
+
+function watchFrameLoad(frame, blockedEl) {
+  const token = String(Date.now());
+  frame.dataset.loadToken = token;
+  setPaneBlocked(blockedEl, false);
+
+  const finish = () => {
+    if (frame.dataset.loadToken !== token) return;
+    setPaneBlocked(blockedEl, probeFrameBlocked(frame));
+  };
+
+  frame.addEventListener('load', finish, { once: true });
+  window.setTimeout(finish, 2800);
+}
+
+function syncPaneFrame(frame, empty, blockedEl, page) {
   if (!page) {
     frame.hidden = true;
     frame.removeAttribute('src');
+    delete frame.dataset.url;
+    delete frame.dataset.loadToken;
     empty.hidden = false;
+    setPaneBlocked(blockedEl, false);
     return;
   }
   empty.hidden = true;
   frame.hidden = false;
   if (frame.dataset.url !== page.url) {
     frame.dataset.url = page.url;
+    watchFrameLoad(frame, blockedEl);
     frame.src = page.url;
   }
 }
@@ -447,8 +496,13 @@ function renderViewer() {
   elements.embeddedViewer.hidden = !open;
   elements.embeddedViewer.setAttribute('aria-hidden', open ? 'false' : 'true');
   if (!open) {
-    syncPaneFrame(elements.viewerLeftFrame, elements.viewerLeftEmpty, null);
-    syncPaneFrame(elements.viewerRightFrame, elements.viewerRightEmpty, null);
+    syncPaneFrame(elements.viewerLeftFrame, elements.viewerLeftEmpty, elements.viewerLeftBlocked, null);
+    syncPaneFrame(
+      elements.viewerRightFrame,
+      elements.viewerRightEmpty,
+      elements.viewerRightBlocked,
+      null,
+    );
     elements.viewerSlotRail.replaceChildren();
     return;
   }
@@ -473,18 +527,25 @@ function renderViewer() {
   elements.viewerLeftPane.classList.toggle('is-active', viewerState.activePane === 'left');
   elements.viewerRightPane.classList.toggle('is-active', viewerState.activePane === 'right');
 
-  syncPaneFrame(elements.viewerLeftFrame, elements.viewerLeftEmpty, viewerState.left);
+  syncPaneFrame(
+    elements.viewerLeftFrame,
+    elements.viewerLeftEmpty,
+    elements.viewerLeftBlocked,
+    viewerState.left,
+  );
   syncPaneFrame(
     elements.viewerRightFrame,
     elements.viewerRightEmpty,
+    elements.viewerRightBlocked,
     split ? viewerState.right : null,
   );
   renderViewerRail();
 }
 
-function openSlot(index, preferredPane = '') {
+async function openSlot(index, preferredPane = '') {
   const page = pageFromSlot(workspace.slots[index]);
   if (!page) return;
+  await ensureEmbedAllow();
   const wasSplit = viewerState.mode === 'split' && Boolean(viewerState.right);
   viewerState = assignOpenTarget(viewerState, page, preferredPane);
   renderViewer();

@@ -221,6 +221,11 @@
             </div>
             <iframe id="viewer-left-frame" class="viewer-frame" title="左側內嵌網站" referrerpolicy="no-referrer-when-downgrade"></iframe>
             <div id="viewer-left-empty" class="viewer-empty">點選首頁槽位以開啟網站。</div>
+            <div id="viewer-left-blocked" class="viewer-blocked" hidden>
+              <strong>此網站拒絕內嵌顯示</strong>
+              <p>已嘗試解除常見的防內嵌標頭，但仍可能被網站阻擋。可改用分頁開啟。</p>
+              <button type="button" class="primary-button" data-open-tab-pane="left">另開分頁</button>
+            </div>
           </section>
           <div id="viewer-divider" class="viewer-divider" role="separator" aria-orientation="vertical" aria-label="調整左右寬度" tabindex="0" hidden></div>
           <section class="viewer-pane" data-pane="right" hidden>
@@ -234,9 +239,14 @@
             </div>
             <iframe id="viewer-right-frame" class="viewer-frame" title="右側內嵌網站" referrerpolicy="no-referrer-when-downgrade"></iframe>
             <div id="viewer-right-empty" class="viewer-empty">再點一個槽位放到右側，或拖曳分隔線縮放。</div>
+            <div id="viewer-right-blocked" class="viewer-blocked" hidden>
+              <strong>此網站拒絕內嵌顯示</strong>
+              <p>已嘗試解除常見的防內嵌標頭，但仍可能被網站阻擋。可改用分頁開啟。</p>
+              <button type="button" class="primary-button" data-open-tab-pane="right">另開分頁</button>
+            </div>
           </section>
         </div>
-        <p class="viewer-footnote">部分網站禁止被內嵌顯示；可按「另開分頁」。再點另一個槽位即可左右分屏。</p>
+        <p class="viewer-footnote">內嵌時會暫時移除目標網站的防嵌入標頭（僅限此首頁發出的 iframe）。若仍顯示拒絕連線，請按「另開分頁」。</p>
       </div>
     </div>
 
