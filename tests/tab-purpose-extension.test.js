@@ -9,6 +9,8 @@ import {
   stripPurposePrefix,
   stripPurposePrefixes,
 } from '../tab-purpose-extension/lib/purpose.js';
+import { normalizeAccount } from '../tab-purpose-extension/lib/google-account.js';
+import { buildLogoUrl, enrichPageWithLogo, resolveSlotLogo } from '../tab-purpose-extension/lib/logo.js';
 import {
   SLOT_COUNT,
   addPageToFirstEmptySlot,
@@ -201,14 +203,41 @@ describe('work homepage helpers', () => {
   });
 });
 
+
+describe('slot logo helpers', () => {
+  it('builds and resolves enlarged logo URLs for empty-slot imports', () => {
+    expect(buildLogoUrl('https://www.youtube.com/watch?v=1', 128)).toContain(
+      'youtube.com',
+    );
+    expect(buildLogoUrl('https://www.youtube.com/watch?v=1', 128)).toContain('sz=128');
+    expect(resolveSlotLogo({ url: 'https://example.com', favicon: '' })).toContain(
+      'example.com',
+    );
+    expect(
+      enrichPageWithLogo({ url: 'https://calendar.google.com', title: '行事曆' }).favicon,
+    ).toContain('calendar.google.com');
+  });
+});
+
+describe('google account helpers', () => {
+  it('normalizes signed-in and signed-out account states', () => {
+    expect(normalizeAccount()).toMatchObject({ signedIn: false, email: '' });
+    expect(normalizeAccount({ email: 'user@gmail.com', id: '123' })).toMatchObject({
+      signedIn: true,
+      email: 'user@gmail.com',
+      id: '123',
+    });
+  });
+});
+
 describe('extension manifest', () => {
   it('uses Manifest V3 and only the required permissions', async () => {
     const manifestPath = new URL('../tab-purpose-extension/manifest.json', import.meta.url);
     const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
 
     expect(manifest.manifest_version).toBe(3);
-    expect(manifest.version).toBe('1.2.0');
-    expect(manifest.permissions).toEqual(['activeTab', 'scripting', 'storage', 'tabs']);
+    expect(manifest.version).toBe('1.3.0');
+    expect(manifest.permissions).toEqual(['activeTab', 'identity', 'identity.email', 'scripting', 'storage', 'tabs']);
     expect(manifest.host_permissions).toBeUndefined();
     expect(manifest.background.service_worker).toBe('background.js');
     expect(manifest.chrome_url_overrides.newtab).toBe('dashboard/dashboard.html');

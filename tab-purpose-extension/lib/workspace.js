@@ -49,7 +49,7 @@ export function normalizeSlot(rawSlot = {}) {
     thumbnail:
       url && /^data:image\/(?:jpeg|png|webp);base64,/.test(thumbnail) ? thumbnail : '',
     favicon:
-      url && /^(?:data:image\/(?:x-icon|vnd\.microsoft\.icon|png|jpeg|webp);base64,|https?:\/\/)/.test(
+      url && /^(?:data:image\/(?:x-icon|vnd\.microsoft\.icon|png|jpeg|webp|svg\+xml);base64,|https?:\/\/)/.test(
         favicon,
       )
         ? favicon

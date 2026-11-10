@@ -17,6 +17,20 @@
         </span>
       </a>
       <div class="topbar-meta">
+        <div id="account-panel" class="account-panel">
+          <button id="google-signin-button" class="google-signin-button" type="button">
+            <span class="google-g" aria-hidden="true">G</span>
+            登入 Google 帳號
+          </button>
+          <div id="account-chip" class="account-chip" hidden>
+            <span id="account-avatar" class="account-avatar" aria-hidden="true">G</span>
+            <span class="account-copy">
+              <strong id="account-name">Google 帳號</strong>
+              <small id="account-email"></small>
+            </span>
+            <button id="google-signout-button" class="quiet-button account-signout" type="button">登出</button>
+          </div>
+        </div>
         <span id="saved-count">0 / 16 已使用</span>
         <button id="help-button" class="quiet-button" type="button">使用說明</button>
       </div>
@@ -168,9 +182,9 @@
         <button class="icon-button" type="button" data-close-help aria-label="關閉">×</button>
       </div>
       <ol>
-        <li><span>01</span><div><strong>選擇生活領域</strong><p>用工作、興趣、影視或自訂領域分開保存網站。</p></div></li>
-        <li><span>02</span><div><strong>拖入開啟的分頁</strong><p>把上方分頁拖到空槽，也能從其他視窗拖入網頁連結。</p></div></li>
-        <li><span>03</span><div><strong>設定群組與流程</strong><p>編輯卡片的群組、流程和順位，再一鍵依序開啟。</p></div></li>
+        <li><span>01</span><div><strong>登入 Google 帳號</strong><p>右上角可登入瀏覽器目前的 Google 帳號，方便辨識工作身分。</p></div></li>
+        <li><span>02</span><div><strong>拖入開啟的分頁</strong><p>把上方分頁拖到空槽；網站會自動帶入放大的 LOGO 縮圖。</p></div></li>
+        <li><span>03</span><div><strong>切換領域與流程</strong><p>用工作／興趣／影視分開整理，再設定群組與開啟順位。</p></div></li>
       </ol>
       <button class="primary-button full-button" type="button" data-close-help>知道了</button>
     </dialog>

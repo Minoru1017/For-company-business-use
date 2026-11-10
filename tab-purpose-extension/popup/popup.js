@@ -6,6 +6,7 @@ import {
   normalizePurpose,
   stripPurposePrefix,
 } from '../lib/purpose.js';
+import { enrichPageWithLogo } from '../lib/logo.js';
 import {
   SLOT_COUNT,
   WORKSPACE_KEY,
@@ -248,11 +249,15 @@ async function saveCurrentPageToHome() {
       captureThumbnail(),
     ]);
     const savedWorkspace = getAreaWorkspace(homepage, homepage.activeAreaId);
-    const result = addPageToFirstEmptySlot(savedWorkspace, {
-      url: activeTab.url,
-      title: stripPurposePrefix(activeTab.title, activeTab.purpose),
-      thumbnail,
-    });
+    const result = addPageToFirstEmptySlot(
+      savedWorkspace,
+      enrichPageWithLogo({
+        url: activeTab.url,
+        title: stripPurposePrefix(activeTab.title, activeTab.purpose),
+        thumbnail,
+        favicon: activeTab.favIconUrl || '',
+      }),
+    );
     if (result.index < 0) {
       showStatus('16 個位置都已使用，請先到工作首頁清空一格。', true);
       return;

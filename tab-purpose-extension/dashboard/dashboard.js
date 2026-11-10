@@ -1,4 +1,11 @@
 import {
+  beginGoogleSignIn,
+  normalizeAccount,
+  refreshGoogleAccount,
+  signOutGoogleAccount,
+} from '../lib/google-account.js';
+import { enrichPageWithLogo, resolveSlotLogo } from '../lib/logo.js';
+import {
   MAX_AREAS,
   WORKSPACE_KEY,
   addPageToFirstEmptySlot,
@@ -22,6 +29,12 @@ const elements = {
   activeAreaName: document.querySelector('#active-area-name'),
   openTabList: document.querySelector('#open-tab-list'),
   openTabEmpty: document.querySelector('#open-tab-empty'),
+  googleSignInButton: document.querySelector('#google-signin-button'),
+  accountChip: document.querySelector('#account-chip'),
+  accountAvatar: document.querySelector('#account-avatar'),
+  accountName: document.querySelector('#account-name'),
+  accountEmail: document.querySelector('#account-email'),
+  googleSignOutButton: document.querySelector('#google-signout-button'),
   grid: document.querySelector('#slot-grid'),
   savedCount: document.querySelector('#saved-count'),
   groupFilters: document.querySelector('#group-filters'),
@@ -55,6 +68,7 @@ let selectedGroup = '';
 let editingIndex = -1;
 let draggedIndex = -1;
 let toastTimer = null;
+let googleAccount = { signedIn: false, email: '', id: '', name: '', picture: '' };
 
 function safeHostname(url) {
   try {
@@ -121,8 +135,40 @@ function pageFromTransfer(dataTransfer) {
   return url ? normalizeSlot({ url, title: safeHostname(url) }) : null;
 }
 
+function renderAccountPanel() {
+  if (googleAccount.signedIn) {
+    elements.googleSignInButton.hidden = true;
+    elements.accountChip.hidden = false;
+    elements.accountEmail.textContent = googleAccount.email || '已登入 Google 帳號';
+    elements.accountName.textContent = googleAccount.name || 'Google 帳號';
+    if (googleAccount.picture) {
+      const image = document.createElement('img');
+      image.src = googleAccount.picture;
+      image.alt = '';
+      image.width = 28;
+      image.height = 28;
+      elements.accountAvatar.replaceChildren(image);
+    } else {
+      const initial = (googleAccount.email || 'G').slice(0, 1).toUpperCase();
+      elements.accountAvatar.replaceChildren(document.createTextNode(initial));
+    }
+    return;
+  }
+  elements.googleSignInButton.hidden = false;
+  elements.accountChip.hidden = true;
+}
+
+async function syncGoogleAccount(options = {}) {
+  googleAccount = await refreshGoogleAccount();
+  renderAccountPanel();
+  if (options.announce && googleAccount.signedIn) {
+    showToast(`已登入：${googleAccount.email}`);
+  }
+  return googleAccount;
+}
+
 async function addPage(page, targetIndex = -1) {
-  const normalizedPage = normalizeSlot(page);
+  const normalizedPage = normalizeSlot(enrichPageWithLogo(page));
   if (!normalizedPage.url) {
     showToast('這個項目不是可加入的網頁。');
     return false;
@@ -165,11 +211,11 @@ function createTabFavicon(tab) {
 }
 
 function tabPage(tab) {
-  return {
+  return enrichPageWithLogo({
     url: tab.url,
     title: tab.title || safeHostname(tab.url),
     favicon: tab.favIconUrl || '',
-  };
+  });
 }
 
 function bindTabPointerDrag(item, page) {
@@ -349,33 +395,38 @@ function createFilledCard(slot, index) {
   preview.setAttribute('aria-label', `開啟 ${slot.title}`);
   preview.addEventListener('click', () => openSlot(index));
 
+  const logoUrl = resolveSlotLogo(slot);
+  const fallback = document.createElement('span');
+  fallback.className = 'preview-fallback';
   if (slot.thumbnail) {
-    const image = document.createElement('img');
-    image.src = slot.thumbnail;
-    image.alt = '';
-    image.width = 320;
-    image.height = 180;
-    preview.append(image);
-  } else {
-    const fallback = document.createElement('span');
-    fallback.className = 'preview-fallback';
-    if (slot.favicon) {
-      const favicon = document.createElement('img');
-      favicon.src = slot.favicon;
-      favicon.alt = '';
-      favicon.width = 28;
-      favicon.height = 28;
-      const initial = document.createElement('span');
-      initial.textContent = safeHostname(slot.url).slice(0, 1) || 'W';
-      favicon.addEventListener('error', () => fallback.replaceChildren(initial));
-      fallback.append(favicon);
-    } else {
-      const initial = document.createElement('span');
-      initial.textContent = safeHostname(slot.url).slice(0, 1) || 'W';
-      fallback.append(initial);
-    }
-    preview.append(fallback);
+    const backdrop = document.createElement('img');
+    backdrop.className = 'preview-backdrop';
+    backdrop.src = slot.thumbnail;
+    backdrop.alt = '';
+    backdrop.width = 320;
+    backdrop.height = 180;
+    fallback.append(backdrop);
   }
+  const logoFrame = document.createElement('span');
+  logoFrame.className = 'logo-frame';
+  const initial = document.createElement('span');
+  initial.className = 'logo-initial';
+  initial.textContent = safeHostname(slot.url).slice(0, 1).toUpperCase() || 'W';
+  if (logoUrl) {
+    const logo = document.createElement('img');
+    logo.className = 'slot-logo';
+    logo.src = logoUrl;
+    logo.alt = `${slot.title} logo`;
+    logo.width = 112;
+    logo.height = 112;
+    logo.loading = 'lazy';
+    logo.addEventListener('error', () => logoFrame.replaceChildren(initial));
+    logoFrame.append(logo);
+  } else {
+    logoFrame.append(initial);
+  }
+  fallback.append(logoFrame);
+  preview.append(fallback);
 
   const position = document.createElement('span');
   position.className = 'slot-position';
@@ -679,10 +730,51 @@ chrome.tabs.onUpdated.addListener((_tabId, changeInfo) => {
   if (changeInfo.status === 'complete' || changeInfo.url || changeInfo.title) refreshOpenTabs();
 });
 
+elements.googleSignInButton.addEventListener('click', async () => {
+  elements.googleSignInButton.disabled = true;
+  elements.googleSignInButton.textContent = '登入中…';
+  try {
+    const result = await beginGoogleSignIn();
+    googleAccount = result.account;
+    renderAccountPanel();
+    if (result.openedSignInPage) {
+      showToast('已開啟 Google 登入頁。登入後請回到此首頁再按一次。');
+    } else if (googleAccount.signedIn) {
+      showToast(`已登入：${googleAccount.email}`);
+    } else {
+      showToast('尚未偵測到 Google 帳號，請先在瀏覽器登入。');
+    }
+  } catch (error) {
+    showToast(error.message || '無法登入 Google 帳號。');
+  } finally {
+    elements.googleSignInButton.disabled = false;
+    elements.googleSignInButton.innerHTML =
+      '<span class="google-g" aria-hidden="true">G</span>登入 Google 帳號';
+  }
+});
+
+elements.googleSignOutButton.addEventListener('click', async () => {
+  googleAccount = await signOutGoogleAccount();
+  renderAccountPanel();
+  showToast('已登出 Google 帳號顯示。');
+});
+
+chrome.storage.onChanged.addListener((changes, areaName) => {
+  if (areaName === 'local' && changes.googleAccount) {
+    googleAccount = normalizeAccount(changes.googleAccount.newValue);
+    renderAccountPanel();
+  }
+});
+
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') syncGoogleAccount();
+});
+
 async function initialize() {
   const [stored] = await Promise.all([
     chrome.storage.local.get(WORKSPACE_KEY),
     refreshOpenTabs(),
+    syncGoogleAccount(),
   ]);
   homepage = normalizeHomepage(stored[WORKSPACE_KEY]);
   workspace = getAreaWorkspace(homepage, homepage.activeAreaId);
