@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "分頁用途標記",
-  "version": "1.3.0",
-  "description": "拖入開啟的分頁，依工作、興趣與影視領域整理 16 格網站首頁，並支援 Google 帳號登入。",
+  "version": "1.4.0",
+  "description": "拖入開啟的分頁，依工作、興趣與影視領域整理 16 格網站首頁；點槽位以內嵌浮動視窗開啟，並支援左右分屏縮放。",
   "permissions": ["activeTab", "identity", "identity.email", "scripting", "storage", "tabs"],
   "background": {
     "service_worker": "background.js",

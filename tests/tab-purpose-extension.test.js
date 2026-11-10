@@ -12,6 +12,15 @@ import {
 import { normalizeAccount } from '../tab-purpose-extension/lib/google-account.js';
 import { buildLogoUrl, enrichPageWithLogo, resolveSlotLogo } from '../tab-purpose-extension/lib/logo.js';
 import {
+  assignOpenTarget,
+  clampSplitRatio,
+  closeViewerPane,
+  createViewerState,
+  pageFromSlot,
+  ratioFromPointer,
+  setViewerMode,
+} from '../tab-purpose-extension/lib/viewer.js';
+import {
   SLOT_COUNT,
   addPageToFirstEmptySlot,
   createHomepageArea,
@@ -230,13 +239,46 @@ describe('google account helpers', () => {
   });
 });
 
+describe('embedded viewer helpers', () => {
+  it('opens the first slot in a single floating pane', () => {
+    const first = assignOpenTarget(
+      createViewerState(),
+      pageFromSlot({ title: 'YouTube', url: 'https://youtube.com' }),
+    );
+    expect(first).toMatchObject({
+      open: true,
+      mode: 'single',
+      left: { title: 'YouTube', url: 'https://youtube.com' },
+      right: null,
+    });
+  });
+
+  it('puts the next slot on the right and supports split resize clamping', () => {
+    const first = assignOpenTarget(
+      createViewerState(),
+      pageFromSlot({ title: '左', url: 'https://left.example' }),
+    );
+    const split = assignOpenTarget(
+      first,
+      pageFromSlot({ title: '右', url: 'https://right.example' }),
+    );
+    expect(split.mode).toBe('split');
+    expect(split.right.title).toBe('右');
+    expect(clampSplitRatio(0.05)).toBe(0.24);
+    expect(clampSplitRatio(0.95)).toBe(0.76);
+    expect(ratioFromPointer(250, { left: 0, width: 1000 })).toBe(0.25);
+    expect(setViewerMode(split, 'single').right).toBeNull();
+    expect(closeViewerPane(split, 'left').left.title).toBe('右');
+  });
+});
+
 describe('extension manifest', () => {
   it('uses Manifest V3 and only the required permissions', async () => {
     const manifestPath = new URL('../tab-purpose-extension/manifest.json', import.meta.url);
     const manifest = JSON.parse(await readFile(manifestPath, 'utf8'));
 
     expect(manifest.manifest_version).toBe(3);
-    expect(manifest.version).toBe('1.3.0');
+    expect(manifest.version).toBe('1.4.0');
     expect(manifest.permissions).toEqual(['activeTab', 'identity', 'identity.email', 'scripting', 'storage', 'tabs']);
     expect(manifest.host_permissions).toBeUndefined();
     expect(manifest.background.service_worker).toBe('background.js');

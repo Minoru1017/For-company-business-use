@@ -6,6 +6,15 @@ import {
 } from '../lib/google-account.js';
 import { enrichPageWithLogo, resolveSlotLogo } from '../lib/logo.js';
 import {
+  assignOpenTarget,
+  clampSplitRatio,
+  closeViewerPane,
+  createViewerState,
+  pageFromSlot,
+  ratioFromPointer,
+  setViewerMode,
+} from '../lib/viewer.js';
+import {
   MAX_AREAS,
   WORKSPACE_KEY,
   addPageToFirstEmptySlot,
@@ -59,6 +68,23 @@ const elements = {
   areaForm: document.querySelector('#area-form'),
   areaName: document.querySelector('#area-name'),
   toast: document.querySelector('#toast'),
+  embeddedViewer: document.querySelector('#embedded-viewer'),
+  viewerStage: document.querySelector('#viewer-stage'),
+  viewerHeading: document.querySelector('#viewer-heading'),
+  viewerModeSingle: document.querySelector('#viewer-mode-single'),
+  viewerModeSplit: document.querySelector('#viewer-mode-split'),
+  viewerOpenTab: document.querySelector('#viewer-open-tab'),
+  viewerClose: document.querySelector('#viewer-close'),
+  viewerDivider: document.querySelector('#viewer-divider'),
+  viewerLeftTitle: document.querySelector('#viewer-left-title'),
+  viewerRightTitle: document.querySelector('#viewer-right-title'),
+  viewerLeftFrame: document.querySelector('#viewer-left-frame'),
+  viewerRightFrame: document.querySelector('#viewer-right-frame'),
+  viewerLeftEmpty: document.querySelector('#viewer-left-empty'),
+  viewerRightEmpty: document.querySelector('#viewer-right-empty'),
+  viewerLeftPane: document.querySelector('.viewer-pane[data-pane="left"]'),
+  viewerRightPane: document.querySelector('.viewer-pane[data-pane="right"]'),
+  viewerSlotRail: document.querySelector('#viewer-slot-rail'),
 };
 
 let homepage = normalizeHomepage();
@@ -69,6 +95,8 @@ let editingIndex = -1;
 let draggedIndex = -1;
 let toastTimer = null;
 let googleAccount = { signedIn: false, email: '', id: '', name: '', picture: '' };
+let viewerState = createViewerState();
+let viewerResizeBound = null;
 
 function safeHostname(url) {
   try {
@@ -377,9 +405,140 @@ function createReorderControls(index) {
   return controls;
 }
 
-function openSlot(index) {
-  const slot = workspace.slots[index];
-  if (slot.url) chrome.tabs.create({ url: slot.url });
+function syncPaneFrame(frame, empty, page) {
+  if (!page) {
+    frame.hidden = true;
+    frame.removeAttribute('src');
+    empty.hidden = false;
+    return;
+  }
+  empty.hidden = true;
+  frame.hidden = false;
+  if (frame.dataset.url !== page.url) {
+    frame.dataset.url = page.url;
+    frame.src = page.url;
+  }
+}
+
+function renderViewerRail() {
+  const fragment = document.createDocumentFragment();
+  workspace.slots.forEach((slot, index) => {
+    if (!slot.url) return;
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'viewer-slot-chip';
+    const openHere =
+      viewerState.left?.url === slot.url || viewerState.right?.url === slot.url;
+    if (openHere) button.classList.add('is-open');
+    button.title = slot.url;
+    button.dataset.openSlotIndex = String(index);
+    const mark = document.createElement('strong');
+    mark.textContent = String(index + 1).padStart(2, '0');
+    const label = document.createElement('span');
+    label.textContent = slot.title;
+    button.append(mark, label);
+    fragment.append(button);
+  });
+  elements.viewerSlotRail.replaceChildren(fragment);
+}
+
+function renderViewer() {
+  const open = Boolean(viewerState.open && viewerState.left);
+  elements.embeddedViewer.hidden = !open;
+  elements.embeddedViewer.setAttribute('aria-hidden', open ? 'false' : 'true');
+  if (!open) {
+    syncPaneFrame(elements.viewerLeftFrame, elements.viewerLeftEmpty, null);
+    syncPaneFrame(elements.viewerRightFrame, elements.viewerRightEmpty, null);
+    elements.viewerSlotRail.replaceChildren();
+    return;
+  }
+
+  const split = viewerState.mode === 'split';
+  elements.viewerStage.dataset.mode = split ? 'split' : 'single';
+  elements.viewerStage.style.setProperty(
+    '--split-left',
+    `${Math.round(clampSplitRatio(viewerState.splitRatio) * 1000) / 10}%`,
+  );
+  elements.viewerModeSingle.classList.toggle('is-active', !split);
+  elements.viewerModeSplit.classList.toggle('is-active', split);
+  elements.viewerDivider.hidden = !split;
+  elements.viewerRightPane.hidden = !split;
+
+  elements.viewerLeftTitle.textContent = viewerState.left?.title || '左側';
+  elements.viewerRightTitle.textContent = viewerState.right?.title || '右側待命';
+  elements.viewerHeading.textContent = split
+    ? `${viewerState.left?.title || '左側'} ／ ${viewerState.right?.title || '右側'}`
+    : viewerState.left?.title || '內嵌瀏覽';
+
+  elements.viewerLeftPane.classList.toggle('is-active', viewerState.activePane === 'left');
+  elements.viewerRightPane.classList.toggle('is-active', viewerState.activePane === 'right');
+
+  syncPaneFrame(elements.viewerLeftFrame, elements.viewerLeftEmpty, viewerState.left);
+  syncPaneFrame(
+    elements.viewerRightFrame,
+    elements.viewerRightEmpty,
+    split ? viewerState.right : null,
+  );
+  renderViewerRail();
+}
+
+function openSlot(index, preferredPane = '') {
+  const page = pageFromSlot(workspace.slots[index]);
+  if (!page) return;
+  const wasSplit = viewerState.mode === 'split' && Boolean(viewerState.right);
+  viewerState = assignOpenTarget(viewerState, page, preferredPane);
+  renderViewer();
+  if (!wasSplit && viewerState.mode === 'split' && viewerState.right) {
+    showToast('已左右分屏；拖曳中間分隔線可縮放。');
+  }
+}
+
+function closeEmbeddedViewer() {
+  viewerState = createViewerState();
+  renderViewer();
+}
+
+function openPaneInTab(pane = viewerState.activePane) {
+  const page = pane === 'right' ? viewerState.right : viewerState.left;
+  if (!page?.url) return;
+  chrome.tabs.create({ url: page.url });
+}
+
+function beginViewerResize(event) {
+  if (viewerState.mode !== 'split') return;
+  event.preventDefault();
+  viewerResizeBound = elements.viewerStage.getBoundingClientRect();
+  document.body.classList.add('is-resizing-viewer');
+  elements.viewerStage.classList.add('is-resizing');
+  if (typeof event.pointerId === 'number' && elements.viewerDivider.setPointerCapture) {
+    try {
+      elements.viewerDivider.setPointerCapture(event.pointerId);
+    } catch {
+      /* ignore capture failures in unsupported environments */
+    }
+  }
+}
+
+function moveViewerResize(event) {
+  if (!viewerResizeBound) return;
+  event.preventDefault?.();
+  const clientX = event.touches?.[0]?.clientX ?? event.clientX;
+  viewerState = {
+    ...viewerState,
+    splitRatio: ratioFromPointer(clientX, viewerResizeBound),
+  };
+  elements.viewerStage.style.setProperty(
+    '--split-left',
+    `${Math.round(clampSplitRatio(viewerState.splitRatio) * 1000) / 10}%`,
+  );
+}
+
+function endViewerResize() {
+  if (!viewerResizeBound) return;
+  viewerResizeBound = null;
+  document.body.classList.remove('is-resizing-viewer');
+  elements.viewerStage.classList.remove('is-resizing');
+  renderViewer();
 }
 
 function createFilledCard(slot, index) {
@@ -768,6 +927,80 @@ chrome.storage.onChanged.addListener((changes, areaName) => {
 
 document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'visible') syncGoogleAccount();
+});
+
+elements.viewerClose.addEventListener('click', closeEmbeddedViewer);
+elements.viewerOpenTab.addEventListener('click', () => openPaneInTab());
+elements.viewerModeSingle.addEventListener('click', () => {
+  viewerState = setViewerMode(viewerState, 'single');
+  renderViewer();
+});
+elements.viewerModeSplit.addEventListener('click', () => {
+  viewerState = setViewerMode(viewerState, 'split');
+  renderViewer();
+  showToast('左右分屏已開啟；再點一個槽位可放到右側。');
+});
+
+elements.embeddedViewer.addEventListener('click', (event) => {
+  const railIndex = event.target.closest('[data-open-slot-index]')?.dataset.openSlotIndex;
+  if (railIndex !== undefined) {
+    const preferred =
+      viewerState.mode === 'split'
+        ? viewerState.activePane
+        : viewerState.left
+          ? 'right'
+          : 'left';
+    openSlot(Number(railIndex), preferred);
+    return;
+  }
+  const focusPane = event.target.closest('[data-focus-pane]')?.dataset.focusPane;
+  if (focusPane) {
+    viewerState = { ...viewerState, activePane: focusPane };
+    renderViewer();
+    return;
+  }
+  const openTabPane = event.target.closest('[data-open-tab-pane]')?.dataset.openTabPane;
+  if (openTabPane) {
+    openPaneInTab(openTabPane);
+    return;
+  }
+  const closePane = event.target.closest('[data-close-pane]')?.dataset.closePane;
+  if (closePane) {
+    viewerState = closeViewerPane(viewerState, closePane);
+    renderViewer();
+  }
+});
+
+elements.viewerDivider.addEventListener('pointerdown', beginViewerResize);
+window.addEventListener('pointermove', moveViewerResize);
+window.addEventListener('pointerup', endViewerResize);
+window.addEventListener('pointercancel', endViewerResize);
+
+elements.viewerDivider.addEventListener('keydown', (event) => {
+  if (viewerState.mode !== 'split') return;
+  const step = event.shiftKey ? 0.08 : 0.03;
+  if (event.key === 'ArrowLeft') {
+    event.preventDefault();
+    viewerState = {
+      ...viewerState,
+      splitRatio: clampSplitRatio(viewerState.splitRatio - step),
+    };
+    renderViewer();
+  } else if (event.key === 'ArrowRight') {
+    event.preventDefault();
+    viewerState = {
+      ...viewerState,
+      splitRatio: clampSplitRatio(viewerState.splitRatio + step),
+    };
+    renderViewer();
+  }
+});
+
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && viewerState.open) {
+    event.preventDefault();
+    closeEmbeddedViewer();
+  }
 });
 
 async function initialize() {

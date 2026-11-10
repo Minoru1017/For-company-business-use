@@ -184,10 +184,61 @@
       <ol>
         <li><span>01</span><div><strong>登入 Google 帳號</strong><p>右上角可登入瀏覽器目前的 Google 帳號，方便辨識工作身分。</p></div></li>
         <li><span>02</span><div><strong>拖入開啟的分頁</strong><p>把上方分頁拖到空槽；網站會自動帶入放大的 LOGO 縮圖。</p></div></li>
-        <li><span>03</span><div><strong>切換領域與流程</strong><p>用工作／興趣／影視分開整理，再設定群組與開啟順位。</p></div></li>
+        <li><span>03</span><div><strong>內嵌開啟與左右分屏</strong><p>點槽位會以浮動視窗內嵌開啟；再點另一個槽位可左右分屏，拖曳中間分隔線縮放。</p></div></li>
       </ol>
       <button class="primary-button full-button" type="button" data-close-help>知道了</button>
     </dialog>
+
+    <div id="embedded-viewer" class="embedded-viewer" hidden aria-hidden="true">
+      <div class="viewer-shell" role="dialog" aria-modal="true" aria-labelledby="viewer-heading">
+        <header class="viewer-toolbar">
+          <div class="viewer-heading-block">
+            <p class="eyebrow">EMBEDDED VIEW</p>
+            <h2 id="viewer-heading">內嵌瀏覽</h2>
+          </div>
+          <div class="viewer-toolbar-actions">
+            <div class="viewer-mode-group" role="group" aria-label="版面">
+              <button id="viewer-mode-single" class="viewer-tool-button is-active" type="button">單頁</button>
+              <button id="viewer-mode-split" class="viewer-tool-button" type="button">左右分屏</button>
+            </div>
+            <button id="viewer-open-tab" class="quiet-button" type="button">另開分頁</button>
+            <button id="viewer-close" class="icon-button" type="button" aria-label="關閉內嵌視窗">×</button>
+          </div>
+        </header>
+        <div class="viewer-rail-wrap">
+          <p class="viewer-rail-label">目前領域槽位（點選可放入內嵌視窗）</p>
+          <div id="viewer-slot-rail" class="viewer-slot-rail" aria-label="快速開啟槽位"></div>
+        </div>
+        <div id="viewer-stage" class="viewer-stage" data-mode="single">
+          <section class="viewer-pane is-active" data-pane="left">
+            <div class="viewer-pane-bar">
+              <strong id="viewer-left-title">左側</strong>
+              <div class="viewer-pane-actions">
+                <button type="button" class="quiet-button" data-focus-pane="left">設為目前</button>
+                <button type="button" class="quiet-button" data-open-tab-pane="left">分頁</button>
+                <button type="button" class="quiet-button" data-close-pane="left">關閉</button>
+              </div>
+            </div>
+            <iframe id="viewer-left-frame" class="viewer-frame" title="左側內嵌網站" referrerpolicy="no-referrer-when-downgrade"></iframe>
+            <div id="viewer-left-empty" class="viewer-empty">點選首頁槽位以開啟網站。</div>
+          </section>
+          <div id="viewer-divider" class="viewer-divider" role="separator" aria-orientation="vertical" aria-label="調整左右寬度" tabindex="0" hidden></div>
+          <section class="viewer-pane" data-pane="right" hidden>
+            <div class="viewer-pane-bar">
+              <strong id="viewer-right-title">右側</strong>
+              <div class="viewer-pane-actions">
+                <button type="button" class="quiet-button" data-focus-pane="right">設為目前</button>
+                <button type="button" class="quiet-button" data-open-tab-pane="right">分頁</button>
+                <button type="button" class="quiet-button" data-close-pane="right">關閉</button>
+              </div>
+            </div>
+            <iframe id="viewer-right-frame" class="viewer-frame" title="右側內嵌網站" referrerpolicy="no-referrer-when-downgrade"></iframe>
+            <div id="viewer-right-empty" class="viewer-empty">再點一個槽位放到右側，或拖曳分隔線縮放。</div>
+          </section>
+        </div>
+        <p class="viewer-footnote">部分網站禁止被內嵌顯示；可按「另開分頁」。再點另一個槽位即可左右分屏。</p>
+      </div>
+    </div>
 
     <div id="toast" class="toast" role="status" aria-live="polite"></div>
     <script type="module" src="dashboard.js"></script>
