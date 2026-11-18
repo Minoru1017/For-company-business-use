@@ -80,11 +80,6 @@ export function onUiThemeChange(fn) {
   return () => window.removeEventListener(UI_THEME_CHANGED_EVENT, h);
 }
 
-/** 內嵌於 <head> 的同步腳本字串，避免首屏閃一下錯色 */
-export function bootUiThemeInlineScript() {
-  return `(function(){try{var k=${JSON.stringify(UI_THEME_KEY)};var v=localStorage.getItem(k);var ok=v==='light'||v==='dark'||v==='system';var pref=ok?v:${JSON.stringify(DEFAULT_UI_THEME)};var dark=pref==='dark'||(pref==='system'&&window.matchMedia&&matchMedia('(prefers-color-scheme: dark)').matches);var t=dark?'dark':'light';document.documentElement.dataset.theme=t;document.documentElement.style.colorScheme=t;}catch(e){document.documentElement.dataset.theme='light';}})();`;
-}
-
 /**
  * 掛上切換器：任何 [data-ui-theme-set] 可指定主題；
  * [data-ui-theme-cycle] 在淺色→深色→跟隨系統間輪替。

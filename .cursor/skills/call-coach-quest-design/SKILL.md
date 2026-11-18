@@ -30,7 +30,7 @@ paths:
 | 強調 | 黑底黃字主按鈕、品牌黃做優先訊號 | 紙色（`--paper`）底＋深色字主按鈕 |
 | 字體 | Plus Jakarta Sans + Noto Sans TC | Noto Sans TC + JetBrains Mono（數字） |
 
-切換邏輯在 `src/ui-theme.js`：偏好 `light`｜`dark`｜`system` 存在 `call_coach_ui_theme`；`index.html` 有同步 boot script 防閃爍。首頁頂欄三顆按鈕、側欄「外觀」輪替按鈕。
+切換邏輯在 `src/ui-theme.js`：偏好 `light`｜`dark`｜`system` 存在 `call_coach_ui_theme`；`src/ui-theme-boot.js` 以一般 script 在 CSS 前載入防閃爍（不可改成 inline，會撞 CSP）。首頁頂欄三顆按鈕、側欄「外觀」輪替按鈕。
 
 **預設**：`system`（跟 OS）。不要擅自改成永遠深色或永遠淺色。
 
@@ -71,6 +71,7 @@ paths:
 | 檔案 | 用途 |
 |---|---|
 | `src/ui-theme.js` | 偏好、解析、套用、切換器 |
+| `src/ui-theme-boot.js` | 首屏同步套用（CSP 友善，非 inline） |
 | `src/styles/quest.css` | 淺色版面與元件 |
 | `src/styles/tone.css` | 淺色色調層級 |
 | `src/styles/blocks.css` | 積木缺角（兩主題可共用結構） |
