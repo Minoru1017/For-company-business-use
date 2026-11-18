@@ -176,7 +176,7 @@ h2 .slog-info { align-self:center; }
 .slog-settings[open] summary { margin-bottom:8px; color:var(--text); }
 .slog-settings label { display:inline-flex; flex-direction:row; align-items:center; gap:8px; margin:0 14px 6px 0; }
 .slog-settings input { width:80px; }
-.slog-settings input[type="date"] { width:160px; color-scheme:dark; }
+.slog-settings input[type="date"] { width:160px; color-scheme:inherit; }
 .slog-settings .hint { display:block; margin-top:4px; }
 .slog-settings .slog-info { display:block; margin-top:2px; }
 .slog-calls-head { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:10px; margin-bottom:10px; }
