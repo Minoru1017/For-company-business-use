@@ -6,8 +6,8 @@ import { beforeAll, describe, expect, it } from 'vitest';
 // 這類錯誤會讓整個 app 白屏、所有按鈕無反應，但單元測試不會直接 import 到它們。
 
 const SRC = join(process.cwd(), 'src');
-// app.js 是入口，載入時會直接綁定真實 DOM，改由其餘模組逐一檢查
-const files = readdirSync(SRC).filter((f) => f.endsWith('.js') && f !== 'app.js');
+// app.js 是入口，載入時會直接綁定真實 DOM；ui-theme-boot.js 是給 <script> 用的 IIFE，不是模組
+const files = readdirSync(SRC).filter((f) => f.endsWith('.js') && f !== 'app.js' && f !== 'ui-theme-boot.js');
 
 function memoryStorage() {
   const m = new Map();

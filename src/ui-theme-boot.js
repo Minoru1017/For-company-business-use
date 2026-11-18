@@ -1,16 +1,20 @@
 /* 同步套用外觀，避免首屏閃錯色（須在 CSS 前以一般 script 載入，不可 type=module） */
 (function () {
+  var root = typeof document !== 'undefined' ? document.documentElement : null;
+  if (!root) return;
   try {
     var k = 'call_coach_ui_theme';
-    var v = localStorage.getItem(k);
+    var v = typeof localStorage !== 'undefined' ? localStorage.getItem(k) : null;
     var pref = v === 'light' || v === 'dark' || v === 'system' ? v : 'system';
     var dark =
       pref === 'dark' ||
-      (pref === 'system' && window.matchMedia && matchMedia('(prefers-color-scheme: dark)').matches);
+      (pref === 'system' &&
+        typeof matchMedia === 'function' &&
+        matchMedia('(prefers-color-scheme: dark)').matches);
     var t = dark ? 'dark' : 'light';
-    document.documentElement.dataset.theme = t;
-    document.documentElement.style.colorScheme = t;
+    root.dataset.theme = t;
+    root.style.colorScheme = t;
   } catch (e) {
-    document.documentElement.dataset.theme = 'light';
+    root.dataset.theme = 'light';
   }
 })();
