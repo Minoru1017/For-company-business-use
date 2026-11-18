@@ -56,9 +56,35 @@ export function renderKeyMomentsLegend(moments) {
   });
 }
 
+function cssVar(name, fallback) {
+  try {
+    const v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
+    return v || fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function chartPalette() {
+  const sales = cssVar('--sales', '#1b1b1a');
+  const cust = cssVar('--cust', '#d8432b');
+  const muted = cssVar('--muted', '#8b8880');
+  const faint = cssVar('--faint', muted);
+  const hair = cssVar('--hairline', 'rgba(23,21,15,.08)');
+  return {
+    sales,
+    cust,
+    muted,
+    faint,
+    hair,
+    label: document.documentElement.dataset.theme === 'dark' ? '每句字數（淺=業務 紅=客戶）' : '每句字數（黑=業務 紅=客戶）',
+  };
+}
+
 export function drawChart(segs, moments = []) {
   const vals = segs.map((s) => s.chars);
-  const colors = segs.map((s) => (s.spk === 'S' ? 'rgba(213,207,194,.85)' : 'rgba(225,90,66,.9)'));
+  const pal = chartPalette();
+  const colors = segs.map((s) => (s.spk === 'S' ? pal.sales : pal.cust));
   const borders = momentBarHighlight(segs, moments);
   if (chart) chart.destroy();
   chart = new Chart($('chart'), {
@@ -67,7 +93,7 @@ export function drawChart(segs, moments = []) {
       labels: segs.map((s) => fmt(s.start)),
       datasets: [
         {
-          label: '每句字數（淺=業務 紅=客戶）',
+          label: pal.label,
           data: vals,
           backgroundColor: colors,
           borderColor: borders,
@@ -89,7 +115,7 @@ export function drawChart(segs, moments = []) {
         }
       },
       plugins: {
-        legend: { labels: { color: '#8e938c', font: { family: 'Noto Sans TC' } } },
+        legend: { labels: { color: pal.muted, font: { family: 'Noto Sans TC' } } },
         tooltip: {
           callbacks: {
             afterBody: (items) => {
@@ -104,8 +130,8 @@ export function drawChart(segs, moments = []) {
         },
       },
       scales: {
-        x: { ticks: { color: '#5c615b', maxTicksLimit: 18, font: { family: 'JetBrains Mono', size: 10 } }, grid: { color: 'rgba(239,236,230,.06)' } },
-        y: { ticks: { color: '#5c615b', font: { family: 'JetBrains Mono', size: 10 } }, grid: { color: 'rgba(239,236,230,.06)' } },
+        x: { ticks: { color: pal.faint, maxTicksLimit: 18, font: { family: 'JetBrains Mono', size: 10 } }, grid: { color: pal.hair } },
+        y: { ticks: { color: pal.faint, font: { family: 'JetBrains Mono', size: 10 } }, grid: { color: pal.hair } },
       },
     },
   });

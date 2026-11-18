@@ -2,6 +2,7 @@ import { runAnalysis } from './analyze.js';
 import { initBackupUI } from './backup-ui.js';
 import { initCloudSyncUI } from './cloud-sync-ui.js';
 import { initBrandSwitches, onBrandChange } from './brands.js';
+import { initUiThemeControls } from './ui-theme.js';
 import { takeAuthRedirect } from './cloud-sync.js';
 import { drawChart } from './chart.js';
 import {
@@ -1055,6 +1056,11 @@ function init() {
     initBrandSwitches();
   } catch (e) {
     console.error('brand switch init failed', e);
+  }
+  try {
+    initUiThemeControls();
+  } catch (e) {
+    console.error('ui theme init failed', e);
   }
   try {
     customerProgress = mountCustomerProgress($('customerProgressHome'), { onOpen: openCustomerFromHome, dueContainer: $('followUpHome') });
